@@ -1,21 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { Suspense } from "react";
 
 type Mode = "login" | "signup";
 
-export default function AuthForm({ mode }: { mode: Mode }) {
+function AuthFormInner({ mode }: { mode: Mode }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    searchParams.get("error") === "confirmation_failed"
+      ? "That confirmation link has expired or is invalid. Please request a new one by signing up again."
+      : ""
+  );
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -31,6 +37,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           password,
           options: {
             data: { display_name: displayName },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
         if (signUpError) throw signUpError;
@@ -202,5 +209,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AuthForm({ mode }: { mode: Mode }) {
+  return (
+    <Suspense>
+      <AuthFormInner mode={mode} />
+    </Suspense>
   );
 }
