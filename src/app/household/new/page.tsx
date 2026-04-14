@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { getErrorMessage } from "@/lib/utils";
 
 export default function NewHouseholdPage() {
   const router = useRouter();
@@ -25,6 +26,13 @@ export default function NewHouseholdPage() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Ensure a profile row exists for this user (in case the trigger
+      // didn't fire — e.g. the migration was applied after sign-up).
+      await supabase.from("profiles").upsert(
+        { id: user.id, display_name: user.user_metadata?.display_name ?? user.email ?? "" },
+        { onConflict: "id", ignoreDuplicates: true }
+      );
+
       // Create household
       const { data: household, error: hhError } = await supabase
         .from("households")
@@ -41,7 +49,7 @@ export default function NewHouseholdPage() {
 
       router.push(`/household/${household.id}/pantry`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(getErrorMessage(err));
       setLoading(false);
     }
   }

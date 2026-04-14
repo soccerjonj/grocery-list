@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { getErrorMessage } from "@/lib/utils";
 import { Suspense } from "react";
 
 type Mode = "login" | "signup";
@@ -60,7 +61,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
         router.refresh();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

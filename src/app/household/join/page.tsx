@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { getErrorMessage } from "@/lib/utils";
 import { Suspense } from "react";
 
 function JoinForm() {
@@ -52,6 +53,12 @@ function JoinForm() {
         return;
       }
 
+      // Ensure profile exists for this user
+      await supabase.from("profiles").upsert(
+        { id: user.id, display_name: user.user_metadata?.display_name ?? user.email ?? "" },
+        { onConflict: "id", ignoreDuplicates: true }
+      );
+
       // Join the household
       const { error: joinError } = await supabase
         .from("household_members")
@@ -60,7 +67,7 @@ function JoinForm() {
 
       router.push(`/household/${household.id}/pantry`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(getErrorMessage(err));
       setLoading(false);
     }
   }
