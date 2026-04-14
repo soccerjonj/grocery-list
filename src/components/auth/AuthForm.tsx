@@ -1,0 +1,149 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+
+type Mode = "login" | "signup";
+
+export default function AuthForm({ mode }: { mode: Mode }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (mode === "signup") {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { display_name: displayName },
+          },
+        });
+        if (signUpError) throw signUpError;
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-900 rounded-2xl mb-4">
+            <svg
+              className="w-7 h-7 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {mode === "login" ? "Welcome back" : "Create account"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {mode === "login"
+              ? "Sign in to your household"
+              : "Start tracking together"}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {mode === "signup" && (
+              <Input
+                id="name"
+                label="Your name"
+                type="text"
+                placeholder="Jane"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                required
+                autoComplete="given-name"
+              />
+            )}
+            <Input
+              id="email"
+              label="Email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+            <Input
+              id="password"
+              label="Password"
+              type="password"
+              placeholder={mode === "signup" ? "At least 6 characters" : "••••••••"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            />
+
+            {error && (
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">
+                {error}
+              </p>
+            )}
+
+            <Button type="submit" size="lg" loading={loading} className="w-full mt-1">
+              {mode === "login" ? "Sign in" : "Create account"}
+            </Button>
+          </form>
+        </div>
+
+        <p className="text-center text-sm text-gray-500 mt-5">
+          {mode === "login" ? (
+            <>
+              No account?{" "}
+              <Link href="/auth/signup" className="font-medium text-gray-900 hover:underline">
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <Link href="/auth/login" className="font-medium text-gray-900 hover:underline">
+                Sign in
+              </Link>
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}

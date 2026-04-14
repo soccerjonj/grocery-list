@@ -1,0 +1,124 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { PantryItem } from "@/types/database";
+
+export function usePantry(householdId: string) {
+  const [items, setItems] = useState<PantryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
+
+  const fetchItems = useCallback(async () => {
+    const { data, error: fetchError } = await supabase
+      .from("pantry_items")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("created_at", { ascending: false });
+
+    if (fetchError) {
+      setError(fetchError.message);
+    } else {
+      setItems(data ?? []);
+    }
+    setLoading(false);
+  }, [householdId, supabase]);
+
+  useEffect(() => {
+    fetchItems();
+
+    const channel = supabase
+      .channel(`pantry-${householdId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "pantry_items",
+          filter: `household_id=eq.${householdId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const newItem = payload.new as PantryItem;
+            setItems((prev) => {
+              if (prev.find((i) => i.id === newItem.id)) return prev;
+              return [newItem, ...prev];
+            });
+          } else if (payload.eventType === "UPDATE") {
+            const updated = payload.new as PantryItem;
+            setItems((prev) =>
+              prev.map((i) => (i.id === updated.id ? updated : i))
+            );
+          } else if (payload.eventType === "DELETE") {
+            const deleted = payload.old as { id: string };
+            setItems((prev) => prev.filter((i) => i.id !== deleted.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [householdId, fetchItems, supabase]);
+
+  async function addItem(name: string, quantity: number, unit?: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const optimistic: PantryItem = {
+      id: `temp-${Date.now()}`,
+      household_id: householdId,
+      name,
+      quantity,
+      unit: unit ?? null,
+      notes: null,
+      added_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+
+    setItems((prev) => [optimistic, ...prev]);
+
+    const { data, error: insertError } = await supabase
+      .from("pantry_items")
+      .insert({
+        household_id: householdId,
+        name,
+        quantity,
+        unit: unit ?? null,
+        added_by: user?.id ?? null,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
+    } else if (data) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === optimistic.id ? data : i))
+      );
+    }
+  }
+
+  async function updateQuantity(id: string, quantity: number) {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, quantity, updated_at: new Date().toISOString() } : i
+      )
+    );
+    await supabase
+      .from("pantry_items")
+      .update({ quantity, updated_at: new Date().toISOString() })
+      .eq("id", id);
+  }
+
+  async function deleteItem(id: string) {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    await supabase.from("pantry_items").delete().eq("id", id);
+  }
+
+  return { items, loading, error, addItem, updateQuantity, deleteItem };
+}
