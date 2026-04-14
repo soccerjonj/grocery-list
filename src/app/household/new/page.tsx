@@ -28,8 +28,13 @@ export default function NewHouseholdPage() {
 
       // Ensure a profile row exists for this user (in case the trigger
       // didn't fire — e.g. the migration was applied after sign-up).
+      const fullName =
+        user.user_metadata?.display_name ||
+        [user.user_metadata?.first_name, user.user_metadata?.last_name].filter(Boolean).join(" ") ||
+        user.email?.split("@")[0] ||
+        "";
       await supabase.from("profiles").upsert(
-        { id: user.id, display_name: user.user_metadata?.display_name ?? user.email ?? "" },
+        { id: user.id, display_name: fullName },
         { onConflict: "id", ignoreDuplicates: true }
       );
 

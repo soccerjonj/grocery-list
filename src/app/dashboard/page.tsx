@@ -41,13 +41,13 @@ export default async function DashboardPage() {
     redirect("/auth/login");
   }
 
-  const profile = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", user.id)
-    .single();
-
-  const name = profile.data?.display_name ?? user.email;
+  // Prefer first_name from auth metadata, fall back to the first
+  // word of display_name, then to the email prefix
+  const firstName: string =
+    user.user_metadata?.first_name ||
+    (user.user_metadata?.display_name as string | undefined)?.split(" ")[0] ||
+    user.email?.split("@")[0] ||
+    "there";
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">
-            Hi, {name}
+            Hi, {firstName}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {households && households.length > 0

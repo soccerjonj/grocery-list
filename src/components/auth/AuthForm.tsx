@@ -17,7 +17,8 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [error, setError] = useState(
     searchParams.get("error") === "confirmation_failed"
       ? "That confirmation link has expired or is invalid. Please request a new one by signing up again."
@@ -33,11 +34,16 @@ function AuthFormInner({ mode }: { mode: Mode }) {
 
     try {
       if (mode === "signup") {
+        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: { display_name: displayName },
+            data: {
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              display_name: fullName,
+            },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
@@ -147,16 +153,28 @@ function AuthFormInner({ mode }: { mode: Mode }) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {mode === "signup" && (
-              <Input
-                id="name"
-                label="Your name"
-                type="text"
-                placeholder="Jane"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                required
-                autoComplete="given-name"
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  id="first-name"
+                  label="First name"
+                  type="text"
+                  placeholder="Jane"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  autoComplete="given-name"
+                />
+                <Input
+                  id="last-name"
+                  label="Last name"
+                  type="text"
+                  placeholder="Smith"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  autoComplete="family-name"
+                />
+              </div>
             )}
             <Input
               id="email"
