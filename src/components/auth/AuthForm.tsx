@@ -17,6 +17,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +26,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
     try {
       if (mode === "signup") {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -33,20 +34,76 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           },
         });
         if (signUpError) throw signUpError;
+        // Supabase returns a session immediately if email confirmation is disabled,
+        // or identities[] is empty if the user already exists.
+        if (data.session) {
+          router.push("/dashboard");
+          router.refresh();
+        } else {
+          // Email confirmation required — show the check-your-email screen
+          setConfirming(true);
+        }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
+        router.push("/dashboard");
+        router.refresh();
       }
-      router.push("/dashboard");
-      router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (confirming) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
+        <div className="w-full max-w-sm text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-900 rounded-2xl mb-6">
+            <svg
+              className="w-7 h-7 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+            Check your email
+          </h1>
+          <p className="text-sm text-gray-500 mb-1">
+            We sent a confirmation link to
+          </p>
+          <p className="text-sm font-medium text-gray-900 mb-6">{email}</p>
+          <p className="text-sm text-gray-500 mb-8">
+            Click the link in the email to activate your account, then come back
+            and sign in.
+          </p>
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center justify-center w-full bg-gray-900 text-white text-sm font-medium rounded-xl px-5 py-3 hover:bg-gray-700 transition-colors"
+          >
+            Go to sign in
+          </Link>
+          <button
+            onClick={() => setConfirming(false)}
+            className="block w-full text-center text-sm text-gray-400 hover:text-gray-600 mt-4 transition-colors"
+          >
+            Use a different email
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
