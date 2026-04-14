@@ -119,13 +119,11 @@ CREATE POLICY "households_insert_auth" ON public.households
 CREATE POLICY "households_update_owner" ON public.households
   FOR UPDATE USING (created_by = auth.uid());
 
--- household_members
-CREATE POLICY "members_select_same_household" ON public.household_members
-  FOR SELECT USING (
-    household_id IN (
-      SELECT household_id FROM public.household_members WHERE user_id = auth.uid()
-    )
-  );
+-- household_members: each user can only see their own rows.
+-- Querying household_members from within its own policy causes
+-- infinite recursion, so we keep this simple.
+CREATE POLICY "members_select_own" ON public.household_members
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "members_insert_self" ON public.household_members
   FOR INSERT WITH CHECK (user_id = auth.uid());
