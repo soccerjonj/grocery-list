@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/database";
@@ -13,20 +14,35 @@ interface AddPantryItemProps {
   currentUserId: string | null;
 }
 
+function formatDateDisplay(iso: string): string {
+  // iso is "YYYY-MM-DD" — parse as local midnight to avoid UTC offset shifts
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function AddPantryItem({ onAdd, members, currentUserId }: AddPantryItemProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
   const [expanded, setExpanded] = useState(false);
 
-  // New optional fields
   const [storageLocation, setStorageLocation] = useState<string>("");
   const [fridgeZone, setFridgeZone] = useState<string>("");
   const [foodCategory, setFoodCategory] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
-  const [assignedTo, setAssignedTo] = useState<string[]>([]); // empty = everyone
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
 
   const nameRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
+
+  function collapse() {
+    setExpanded(false);
+    nameRef.current?.blur();
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,22 +74,31 @@ export default function AddPantryItem({ onAdd, members, currentUserId }: AddPant
   }
 
   const showMemberPicker = members.length >= 2;
+  const today = new Date().toISOString().split("T")[0];
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-      {/* Name row */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
-          <input
-            ref={nameRef}
-            type="text"
-            placeholder="Add an item..."
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onFocus={() => setExpanded(true)}
-            className="w-full text-sm text-gray-900 placeholder:text-gray-400 outline-none bg-transparent"
-          />
-        </div>
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* ── Name row ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <input
+          ref={nameRef}
+          type="text"
+          placeholder="Add an item…"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onFocus={() => setExpanded(true)}
+          className="flex-1 text-sm text-gray-900 placeholder:text-gray-400 outline-none bg-transparent"
+        />
+        {expanded ? (
+          /* Done button when expanded */
+          <button
+            type="button"
+            onClick={collapse}
+            className="text-xs font-medium text-gray-400 hover:text-gray-700 transition-colors px-1 flex-shrink-0"
+          >
+            Done
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={!name.trim()}
@@ -85,164 +110,227 @@ export default function AddPantryItem({ onAdd, members, currentUserId }: AddPant
         </button>
       </div>
 
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col gap-3">
-          {/* Quantity + unit */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setQuantity(String(Math.max(0.5, (parseFloat(quantity) || 1) - 1)))}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg leading-none"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-14 text-center text-sm font-medium text-gray-900 outline-none bg-transparent border border-gray-200 rounded-lg py-1"
-              />
-              <button
-                type="button"
-                onClick={() => setQuantity(String((parseFloat(quantity) || 1) + 1))}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg leading-none"
-              >
-                +
-              </button>
-            </div>
-            <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
-            >
-              {UNITS.map((u) => (
-                <option key={u} value={u}>{u || "unit"}</option>
-              ))}
-            </select>
-          </div>
+      {/* ── Expanded options ─────────────────────────────────── */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="options"
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-gray-100 px-4 pb-4 pt-3 flex flex-col gap-4">
 
-          {/* Storage location */}
-          <div>
-            <p className="text-xs text-gray-400 font-medium mb-1.5">Storage</p>
-            <div className="flex flex-wrap gap-1.5">
-              {STORAGE_LOCATIONS.map(({ value, label, emoji }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setStorageLocation(storageLocation === value ? "" : value);
-                    if (value !== "fridge") setFridgeZone("");
-                  }}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    storageLocation === value
-                      ? "bg-gray-900 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {emoji} {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Fridge zone (only when fridge selected) */}
-          {storageLocation === "fridge" && (
-            <div>
-              <p className="text-xs text-gray-400 font-medium mb-1.5">Fridge zone</p>
-              <div className="flex gap-1.5">
-                {FRIDGE_ZONES.map(({ value, label }) => (
+              {/* Quantity + unit */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
-                    key={value}
                     type="button"
-                    onClick={() => setFridgeZone(fridgeZone === value ? "" : value)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                      fridgeZone === value
-                        ? "bg-blue-600 text-white"
-                        : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                    }`}
+                    onClick={() => setQuantity(String(Math.max(0.5, (parseFloat(quantity) || 1) - 1)))}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg leading-none"
                   >
-                    {label}
+                    −
                   </button>
-                ))}
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    className="w-12 text-center text-sm font-semibold text-gray-900 outline-none border border-gray-200 rounded-lg py-1 bg-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(String((parseFloat(quantity) || 1) + 1))}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg leading-none"
+                  >
+                    +
+                  </button>
+                </div>
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="flex-1 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>{u || "unit"}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-          )}
 
-          {/* Food category */}
-          <div>
-            <p className="text-xs text-gray-400 font-medium mb-1.5">Category</p>
-            <div className="flex flex-wrap gap-1.5">
-              {FOOD_CATEGORIES.map(({ value, label, emoji }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFoodCategory(foodCategory === value ? "" : value)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    foodCategory === value
-                      ? "bg-gray-900 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {emoji} {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Expiry date */}
-          <div>
-            <p className="text-xs text-gray-400 font-medium mb-1.5">Expires</p>
-            <input
-              type="date"
-              value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-              className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 outline-none w-full"
-            />
-          </div>
-
-          {/* Owned by (only if household has ≥2 members) */}
-          {showMemberPicker && (
-            <div>
-              <p className="text-xs text-gray-400 font-medium mb-1.5">For</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setAssignedTo([])}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    assignedTo.length === 0
-                      ? "bg-gray-900 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  Everyone
-                </button>
-                {members.map((m) => {
-                  const isMe = m.user_id === currentUserId;
-                  const selected = assignedTo.includes(m.user_id);
-                  return (
+              {/* Storage location */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Storage</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {STORAGE_LOCATIONS.map(({ value, label, emoji }) => (
                     <button
-                      key={m.user_id}
+                      key={value}
                       type="button"
-                      onClick={() => toggleMember(m.user_id)}
+                      onClick={() => {
+                        setStorageLocation(storageLocation === value ? "" : value);
+                        if (value !== "fridge") setFridgeZone("");
+                      }}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                        selected
+                        storageLocation === value
                           ? "bg-gray-900 text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
-                      {isMe ? "Me" : m.short_name}
+                      {emoji} {label}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
+
+              {/* Fridge zone */}
+              <AnimatePresence>
+                {storageLocation === "fridge" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="overflow-hidden flex flex-col gap-1.5"
+                  >
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fridge zone</p>
+                    <div className="flex gap-1.5">
+                      {FRIDGE_ZONES.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setFridgeZone(fridgeZone === value ? "" : value)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                            fridgeZone === value
+                              ? "bg-blue-600 text-white"
+                              : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Food category */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Category</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {FOOD_CATEGORIES.map(({ value, label, emoji }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFoodCategory(foodCategory === value ? "" : value)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        foodCategory === value
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {emoji} {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Expiry date — custom chip UI */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Expires</p>
+
+                {/* Hidden native date input — triggered by the button below */}
+                <input
+                  ref={dateRef}
+                  type="date"
+                  value={expiresAt}
+                  min={today}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  className="sr-only"
+                />
+
+                {expiresAt ? (
+                  /* Date is set — show chip with clear button */
+                  <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-xl px-3 py-1.5 self-start">
+                    <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <button
+                      type="button"
+                      onClick={() => dateRef.current?.showPicker?.()}
+                      className="text-xs font-medium text-green-700"
+                    >
+                      {formatDateDisplay(expiresAt)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExpiresAt("")}
+                      className="text-green-500 hover:text-green-700 transition-colors ml-0.5"
+                      aria-label="Clear date"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  /* No date — show picker trigger */
+                  <button
+                    type="button"
+                    onClick={() => dateRef.current?.showPicker?.()}
+                    className="inline-flex items-center gap-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors self-start"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Add expiry date
+                  </button>
+                )}
+              </div>
+
+              {/* Owned by */}
+              {showMemberPicker && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">For</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setAssignedTo([])}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        assignedTo.length === 0
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      Everyone
+                    </button>
+                    {members.map((m) => {
+                      const isMe = m.user_id === currentUserId;
+                      const selected = assignedTo.includes(m.user_id);
+                      return (
+                        <button
+                          key={m.user_id}
+                          type="button"
+                          onClick={() => toggleMember(m.user_id)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                            selected
+                              ? "bg-gray-900 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          {isMe ? "Me" : m.short_name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </form>
   );
 }
