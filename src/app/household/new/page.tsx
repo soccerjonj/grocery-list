@@ -38,21 +38,23 @@ export default function NewHouseholdPage() {
         { onConflict: "id", ignoreDuplicates: true }
       );
 
-      // Create household
-      const { data: household, error: hhError } = await supabase
+      // Generate the ID client-side so we don't need .select() after insert.
+      // (The SELECT policy requires membership, which doesn't exist yet at
+      // insert time — using a pre-known ID sidesteps the timing issue.)
+      const householdId = crypto.randomUUID();
+
+      const { error: hhError } = await supabase
         .from("households")
-        .insert({ name: name.trim(), created_by: user.id })
-        .select()
-        .single();
+        .insert({ id: householdId, name: name.trim(), created_by: user.id });
       if (hhError) throw hhError;
 
       // Add creator as owner
       const { error: memberError } = await supabase
         .from("household_members")
-        .insert({ household_id: household.id, user_id: user.id, role: "owner" });
+        .insert({ household_id: householdId, user_id: user.id, role: "owner" });
       if (memberError) throw memberError;
 
-      router.push(`/household/${household.id}/pantry`);
+      router.push(`/household/${householdId}/pantry`);
     } catch (err: unknown) {
       setError(getErrorMessage(err));
       setLoading(false);

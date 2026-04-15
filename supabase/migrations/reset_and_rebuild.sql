@@ -119,16 +119,13 @@ CREATE POLICY "profiles_update_own" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
 -- ─── Policies: households ─────────────────────────────────────
--- SELECT: user must be in household_members for this household
--- INSERT: any authenticated user (checked via auth.uid() not null)
+-- SELECT: any authenticated user — needed so non-members can look
+--   up a household by invite code before joining, and so the
+--   insert+select timing issue is avoided on creation.
+-- INSERT: any authenticated user
 
 CREATE POLICY "households_select" ON public.households
-  FOR SELECT USING (
-    id IN (
-      SELECT household_id FROM public.household_members
-      WHERE user_id = auth.uid()
-    )
-  );
+  FOR SELECT USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY "households_insert" ON public.households
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
