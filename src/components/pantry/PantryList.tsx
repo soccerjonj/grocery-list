@@ -49,7 +49,6 @@ function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
 
 interface SectionProps {
   label: string;
-  emoji: string;
   items: PantryItemType[];
   members: MemberProfile[];
   currentUserId: string | null;
@@ -62,7 +61,6 @@ interface SectionProps {
 
 function StorageSection({
   label,
-  emoji,
   items,
   members,
   currentUserId,
@@ -119,7 +117,7 @@ function StorageSection({
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </motion.svg>
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          {emoji} {label}
+          {label}
         </span>
         <span className="text-xs text-gray-300">({items.length})</span>
       </button>
@@ -229,18 +227,17 @@ export default function PantryList({
           >
             All
           </button>
-          {FOOD_CATEGORIES.map(({ value, emoji, label }) => (
+          {FOOD_CATEGORIES.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => setFilterCategory(filterCategory === value ? "" : value)}
-              title={label}
-              className={`px-2 py-1 rounded-full text-sm transition-colors flex-shrink-0 ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
                 filterCategory === value
-                  ? "bg-gray-900"
-                  : "bg-white border border-gray-200 hover:border-gray-400"
+                  ? "bg-gray-900 text-white"
+                  : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
               }`}
             >
-              {emoji}
+              {label}
             </button>
           ))}
         </div>
@@ -258,12 +255,12 @@ export default function PantryList({
         <p className="text-center text-sm text-gray-400 py-8">No items in this category</p>
       ) : (
         <div className="flex flex-col gap-4">
-          <StorageSection label="Fridge"  emoji="🧊" items={fridgeItems}   {...sectionProps} />
-          <StorageSection label="Freezer" emoji="❄️" items={freezerItems}  {...sectionProps} />
-          <StorageSection label="Pantry"  emoji="🏪" items={pantryItems}   {...sectionProps} />
-          <StorageSection label="Counter" emoji="🌡️" items={roomTempItems} {...sectionProps} />
+          <StorageSection label="Fridge"  items={fridgeItems}   {...sectionProps} />
+          <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} />
+          <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} />
+          <StorageSection label="Counter" items={roomTempItems} {...sectionProps} />
           {unsortedItems.length > 0 && (
-            <StorageSection label="Other" emoji="📦" items={unsortedItems} {...sectionProps} />
+            <StorageSection label="Other" items={unsortedItems} {...sectionProps} />
           )}
         </div>
       )}

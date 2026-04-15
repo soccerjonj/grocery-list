@@ -164,7 +164,7 @@ export default function AddPantryItem({ onAdd, members, currentUserId }: AddPant
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Storage</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {STORAGE_LOCATIONS.map(({ value, label, emoji }) => (
+                  {STORAGE_LOCATIONS.map(({ value, label }) => (
                     <button
                       key={value}
                       type="button"
@@ -178,7 +178,7 @@ export default function AddPantryItem({ onAdd, members, currentUserId }: AddPant
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
-                      {emoji} {label}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -219,7 +219,7 @@ export default function AddPantryItem({ onAdd, members, currentUserId }: AddPant
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Category</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {FOOD_CATEGORIES.map(({ value, label, emoji }) => (
+                  {FOOD_CATEGORIES.map(({ value, label }) => (
                     <button
                       key={value}
                       type="button"
@@ -230,7 +230,7 @@ export default function AddPantryItem({ onAdd, members, currentUserId }: AddPant
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
-                      {emoji} {label}
+                      {label}
                     </button>
                   ))}
                 </div>

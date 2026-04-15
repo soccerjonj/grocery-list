@@ -209,10 +209,10 @@ export type ShoppingItem = Database["public"]["Tables"]["shopping_items"]["Row"]
 // ── Derived display types ─────────────────────────────────────────
 
 export const STORAGE_LOCATIONS = [
-  { value: "fridge",    label: "Fridge",   emoji: "🧊" },
-  { value: "freezer",   label: "Freezer",  emoji: "❄️" },
-  { value: "pantry",    label: "Pantry",   emoji: "🏪" },
-  { value: "room_temp", label: "Counter",  emoji: "🌡️" },
+  { value: "fridge",    label: "Fridge"  },
+  { value: "freezer",   label: "Freezer" },
+  { value: "pantry",    label: "Pantry"  },
+  { value: "room_temp", label: "Counter" },
 ] as const;
 
 export const FRIDGE_ZONES = [
@@ -221,13 +221,13 @@ export const FRIDGE_ZONES = [
 ] as const;
 
 export const FOOD_CATEGORIES = [
-  { value: "produce",    label: "Produce",      emoji: "🥬" },
-  { value: "meat",       label: "Meat",         emoji: "🥩" },
-  { value: "dairy",      label: "Dairy",        emoji: "🥛" },
-  { value: "drinks",     label: "Drinks",       emoji: "🥤" },
-  { value: "condiments", label: "Condiments",   emoji: "🥫" },
-  { value: "grains",     label: "Grains",       emoji: "🌾" },
-  { value: "snacks",     label: "Snacks",       emoji: "🍎" },
-  { value: "prepared",   label: "Prepared",     emoji: "🍱" },
-  { value: "other",      label: "Other",        emoji: "📦" },
+  { value: "produce",    label: "Produce"    },
+  { value: "meat",       label: "Meat"       },
+  { value: "dairy",      label: "Dairy"      },
+  { value: "drinks",     label: "Drinks"     },
+  { value: "condiments", label: "Condiments" },
+  { value: "grains",     label: "Grains"     },
+  { value: "snacks",     label: "Snacks"     },
+  { value: "prepared",   label: "Prepared"   },
+  { value: "other",      label: "Other"      },
 ] as const;

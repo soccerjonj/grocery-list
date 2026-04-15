@@ -124,8 +124,8 @@ export default function PantryItem({
             </span>
           )}
           {category && (
-            <span className="text-sm leading-none" title={category.label}>
-              {category.emoji}
+            <span className="text-xs text-gray-400" title={category.label}>
+              {category.label}
             </span>
           )}
           <span className="text-xs font-semibold text-gray-500 tabular-nums min-w-[1.5rem] text-right">
