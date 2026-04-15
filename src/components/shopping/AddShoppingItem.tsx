@@ -3,13 +3,14 @@
 import { useState, useRef } from "react";
 
 interface AddShoppingItemProps {
-  onAdd: (name: string, quantity?: number, unit?: string) => void;
+  onAdd: (name: string, quantity?: number, unit?: string, store?: string) => void;
 }
 
 export default function AddShoppingItem({ onAdd }: AddShoppingItemProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("");
+  const [store, setStore] = useState("");
   const [expanded, setExpanded] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -19,11 +20,13 @@ export default function AddShoppingItem({ onAdd }: AddShoppingItemProps) {
     onAdd(
       name.trim(),
       quantity ? parseFloat(quantity) : undefined,
-      unit || undefined
+      unit || undefined,
+      store.trim() || undefined
     );
     setName("");
     setQuantity("");
     setUnit("");
+    setStore("");
     nameRef.current?.focus();
   }
 
@@ -52,22 +55,31 @@ export default function AddShoppingItem({ onAdd }: AddShoppingItemProps) {
       </div>
 
       {expanded && (
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-          <input
-            type="number"
-            min="1"
-            step="1"
-            placeholder="Qty"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="w-16 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none text-center"
-          />
+        <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              step="any"
+              placeholder="Qty"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-16 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none text-center"
+            />
+            <input
+              type="text"
+              placeholder="Unit (optional)"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
+            />
+          </div>
           <input
             type="text"
-            placeholder="Unit (optional)"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
+            placeholder="Store (e.g. Trader Joe's)"
+            value={store}
+            onChange={(e) => setStore(e.target.value)}
+            className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 outline-none"
           />
         </div>
       )}

@@ -11,10 +11,12 @@ interface ShoppingListProps {
   activeItems: ShoppingItemType[];
   completedItems: ShoppingItemType[];
   loading: boolean;
-  onAdd: (name: string, quantity?: number, unit?: string) => void;
+  onAdd: (name: string, quantity?: number, unit?: string, store?: string) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onClearAll: () => void;
+  /** When true (archived list), hide the add form */
+  readOnly?: boolean;
 }
 
 export default function ShoppingList({
@@ -25,6 +27,7 @@ export default function ShoppingList({
   onToggle,
   onDelete,
   onClearAll,
+  readOnly = false,
 }: ShoppingListProps) {
   if (loading) {
     return (
@@ -38,7 +41,7 @@ export default function ShoppingList({
 
   return (
     <div className="flex flex-col gap-3">
-      <AddShoppingItem onAdd={onAdd} />
+      {!readOnly && <AddShoppingItem onAdd={onAdd} />}
 
       {isEmpty ? (
         <div className="text-center py-12 text-gray-400">
@@ -55,8 +58,10 @@ export default function ShoppingList({
               d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z"
             />
           </svg>
-          <p className="text-sm">Your list is empty</p>
-          <p className="text-xs mt-1 opacity-60">Add items you need to pick up</p>
+          <p className="text-sm">{readOnly ? "This list is empty" : "Your list is empty"}</p>
+          {!readOnly && (
+            <p className="text-xs mt-1 opacity-60">Add items you need to pick up</p>
+          )}
         </div>
       ) : (
         <>

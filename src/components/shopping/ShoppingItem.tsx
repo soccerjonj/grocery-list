@@ -93,7 +93,7 @@ export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemP
         </motion.div>
       </button>
 
-      {/* ── Label + animated strikethrough ── */}
+      {/* ── Label + store + animated strikethrough ── */}
       <div className="flex-1 min-w-0 relative">
         <motion.p
           animate={{ opacity: isChecked ? 0.38 : 1 }}
@@ -108,6 +108,13 @@ export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemP
             </span>
           )}
         </motion.p>
+
+        {/* Store tag */}
+        {item.store && !isChecked && (
+          <p className="text-xs text-gray-400 mt-0.5 truncate">
+            🏪 {item.store}
+          </p>
+        )}
 
         {/* Strikethrough line — sweeps left to right */}
         <AnimatePresence>

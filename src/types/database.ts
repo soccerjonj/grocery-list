@@ -72,6 +72,32 @@ export interface Database {
           joined_at?: string;
         };
       };
+      shopping_lists: {
+        Row: {
+          id: string;
+          household_id: string;
+          name: string;
+          created_by: string | null;
+          created_at: string;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          name: string;
+          created_by?: string | null;
+          created_at?: string;
+          archived_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          name?: string;
+          created_by?: string | null;
+          created_at?: string;
+          archived_at?: string | null;
+        };
+      };
       pantry_items: {
         Row: {
           id: string;
@@ -83,6 +109,11 @@ export interface Database {
           added_by: string | null;
           updated_at: string;
           created_at: string;
+          expires_at: string | null;       // ISO date string "YYYY-MM-DD"
+          storage_location: string | null; // 'fridge'|'freezer'|'pantry'|'room_temp'
+          fridge_zone: string | null;      // 'quick_use'|'long_term'
+          food_category: string | null;    // 'produce'|'meat'|'dairy'|'drinks'|'condiments'|'grains'|'snacks'|'prepared'|'other'
+          assigned_to: string[] | null;    // null=household, [uuid,...]=specific people
         };
         Insert: {
           id?: string;
@@ -94,6 +125,11 @@ export interface Database {
           added_by?: string | null;
           updated_at?: string;
           created_at?: string;
+          expires_at?: string | null;
+          storage_location?: string | null;
+          fridge_zone?: string | null;
+          food_category?: string | null;
+          assigned_to?: string[] | null;
         };
         Update: {
           id?: string;
@@ -105,15 +141,22 @@ export interface Database {
           added_by?: string | null;
           updated_at?: string;
           created_at?: string;
+          expires_at?: string | null;
+          storage_location?: string | null;
+          fridge_zone?: string | null;
+          food_category?: string | null;
+          assigned_to?: string[] | null;
         };
       };
       shopping_items: {
         Row: {
           id: string;
           household_id: string;
+          list_id: string | null;
           name: string;
           quantity: number | null;
           unit: string | null;
+          store: string | null;
           completed: boolean;
           completed_by: string | null;
           completed_at: string | null;
@@ -124,9 +167,11 @@ export interface Database {
         Insert: {
           id?: string;
           household_id: string;
+          list_id?: string | null;
           name: string;
           quantity?: number | null;
           unit?: string | null;
+          store?: string | null;
           completed?: boolean;
           completed_by?: string | null;
           completed_at?: string | null;
@@ -137,9 +182,11 @@ export interface Database {
         Update: {
           id?: string;
           household_id?: string;
+          list_id?: string | null;
           name?: string;
           quantity?: number | null;
           unit?: string | null;
+          store?: string | null;
           completed?: boolean;
           completed_by?: string | null;
           completed_at?: string | null;
@@ -154,8 +201,33 @@ export interface Database {
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Household = Database["public"]["Tables"]["households"]["Row"];
-export type HouseholdMember =
-  Database["public"]["Tables"]["household_members"]["Row"];
+export type HouseholdMember = Database["public"]["Tables"]["household_members"]["Row"];
+export type ShoppingList = Database["public"]["Tables"]["shopping_lists"]["Row"];
 export type PantryItem = Database["public"]["Tables"]["pantry_items"]["Row"];
-export type ShoppingItem =
-  Database["public"]["Tables"]["shopping_items"]["Row"];
+export type ShoppingItem = Database["public"]["Tables"]["shopping_items"]["Row"];
+
+// ── Derived display types ─────────────────────────────────────────
+
+export const STORAGE_LOCATIONS = [
+  { value: "fridge",    label: "Fridge",   emoji: "🧊" },
+  { value: "freezer",   label: "Freezer",  emoji: "❄️" },
+  { value: "pantry",    label: "Pantry",   emoji: "🏪" },
+  { value: "room_temp", label: "Counter",  emoji: "🌡️" },
+] as const;
+
+export const FRIDGE_ZONES = [
+  { value: "quick_use", label: "Quick-use" },
+  { value: "long_term", label: "Long-term" },
+] as const;
+
+export const FOOD_CATEGORIES = [
+  { value: "produce",    label: "Produce",      emoji: "🥬" },
+  { value: "meat",       label: "Meat",         emoji: "🥩" },
+  { value: "dairy",      label: "Dairy",        emoji: "🥛" },
+  { value: "drinks",     label: "Drinks",       emoji: "🥤" },
+  { value: "condiments", label: "Condiments",   emoji: "🥫" },
+  { value: "grains",     label: "Grains",       emoji: "🌾" },
+  { value: "snacks",     label: "Snacks",       emoji: "🍎" },
+  { value: "prepared",   label: "Prepared",     emoji: "🍱" },
+  { value: "other",      label: "Other",        emoji: "📦" },
+] as const;

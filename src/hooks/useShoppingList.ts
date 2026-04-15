@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem } from "@/types/database";
 
-export function useShoppingList(householdId: string) {
+export function useShoppingList(householdId: string, listId: string) {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +15,7 @@ export function useShoppingList(householdId: string) {
       .from("shopping_items")
       .select("*")
       .eq("household_id", householdId)
+      .eq("list_id", listId)
       .is("cleared_at", null)
       .order("created_at", { ascending: true });
 
@@ -24,20 +25,20 @@ export function useShoppingList(householdId: string) {
       setItems(data ?? []);
     }
     setLoading(false);
-  }, [householdId, supabase]);
+  }, [householdId, listId, supabase]);
 
   useEffect(() => {
     fetchItems();
 
     const channel = supabase
-      .channel(`shopping-${householdId}`)
+      .channel(`shopping-${listId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "shopping_items",
-          filter: `household_id=eq.${householdId}`,
+          filter: `list_id=eq.${listId}`,
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
@@ -67,9 +68,14 @@ export function useShoppingList(householdId: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [householdId, fetchItems, supabase]);
+  }, [householdId, listId, fetchItems, supabase]);
 
-  async function addItem(name: string, quantity?: number, unit?: string) {
+  async function addItem(
+    name: string,
+    quantity?: number,
+    unit?: string,
+    store?: string
+  ) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -77,9 +83,11 @@ export function useShoppingList(householdId: string) {
     const optimistic: ShoppingItem = {
       id: `temp-${Date.now()}`,
       household_id: householdId,
+      list_id: listId,
       name,
       quantity: quantity ?? null,
       unit: unit ?? null,
+      store: store ?? null,
       completed: false,
       completed_by: null,
       completed_at: null,
@@ -94,9 +102,11 @@ export function useShoppingList(householdId: string) {
       .from("shopping_items")
       .insert({
         household_id: householdId,
+        list_id: listId,
         name,
         quantity: quantity ?? null,
         unit: unit ?? null,
+        store: store ?? null,
         added_by: user?.id ?? null,
       })
       .select()
@@ -122,7 +132,6 @@ export function useShoppingList(householdId: string) {
     const now = new Date().toISOString();
     const completed = !item.completed;
 
-    // Optimistic update
     setItems((prev) =>
       prev.map((i) =>
         i.id === id

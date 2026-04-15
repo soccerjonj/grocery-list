@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useHouseholdContext } from "@/context/HouseholdContext";
 import { usePantry } from "@/hooks/usePantry";
+import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import PantryList from "@/components/pantry/PantryList";
 import InviteModal from "@/components/household/InviteModal";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function PantryPage() {
   const { householdId, householdName } = useHouseholdContext();
   const { items, loading, addItem, updateQuantity, deleteItem } = usePantry(householdId);
+  const { members, currentUserId } = useHouseholdMembers(householdId);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
 
@@ -61,6 +63,8 @@ export default function PantryPage() {
       <PantryList
         items={items}
         loading={loading}
+        members={members}
+        currentUserId={currentUserId}
         onAdd={addItem}
         onUpdateQuantity={updateQuantity}
         onDelete={deleteItem}

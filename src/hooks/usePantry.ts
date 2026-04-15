@@ -4,6 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PantryItem } from "@/types/database";
 
+export interface AddPantryOptions {
+  expiresAt?: string | null;
+  storageLocation?: string | null;
+  fridgeZone?: string | null;
+  foodCategory?: string | null;
+  assignedTo?: string[] | null;
+}
+
 export function usePantry(householdId: string) {
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +71,12 @@ export function usePantry(householdId: string) {
     };
   }, [householdId, fetchItems, supabase]);
 
-  async function addItem(name: string, quantity: number, unit?: string) {
+  async function addItem(
+    name: string,
+    quantity: number,
+    unit?: string,
+    options?: AddPantryOptions
+  ) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -78,6 +91,11 @@ export function usePantry(householdId: string) {
       added_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
+      expires_at: options?.expiresAt ?? null,
+      storage_location: options?.storageLocation ?? null,
+      fridge_zone: options?.fridgeZone ?? null,
+      food_category: options?.foodCategory ?? null,
+      assigned_to: options?.assignedTo ?? null,
     };
 
     setItems((prev) => [optimistic, ...prev]);
@@ -90,6 +108,11 @@ export function usePantry(householdId: string) {
         quantity,
         unit: unit ?? null,
         added_by: user?.id ?? null,
+        expires_at: options?.expiresAt ?? null,
+        storage_location: options?.storageLocation ?? null,
+        fridge_zone: options?.fridgeZone ?? null,
+        food_category: options?.foodCategory ?? null,
+        assigned_to: options?.assignedTo ?? null,
       })
       .select()
       .single();
