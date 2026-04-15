@@ -28,6 +28,12 @@ export function useShoppingList(householdId: string, listId: string) {
   }, [householdId, listId, supabase]);
 
   useEffect(() => {
+    if (!listId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
     fetchItems();
 
     const channel = supabase

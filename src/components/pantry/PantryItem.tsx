@@ -130,9 +130,6 @@ export default function PantryItem({
           )}
           <span className="text-xs font-semibold text-gray-500 tabular-nums min-w-[1.5rem] text-right">
             ×{qtyDisplay}
-            {item.unit ? (
-              <span className="font-normal text-gray-400"> {item.unit}</span>
-            ) : null}
           </span>
           <motion.svg
             animate={{ rotate: expanded ? 90 : 0 }}
@@ -188,9 +185,6 @@ export default function PantryItem({
                   >
                     {qtyDisplay}
                   </motion.p>
-                  {item.unit && (
-                    <p className="text-xs text-gray-400 mt-0.5">{item.unit}</p>
-                  )}
                 </div>
 
                 <motion.button
