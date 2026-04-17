@@ -154,7 +154,7 @@ export default function PantryItem({
           ? { opacity: 0, x: -52, scale: 0.93, backgroundColor: "#dcfce7" }
           : exitVariant === "delete"
           ? { opacity: 0, x: 52, scale: 0.93, backgroundColor: "#fee2e2" }
-          : { opacity: 1, y: 0, x: 0, scale: 1, backgroundColor: "#ffffff" }
+          : { opacity: 1, y: 0, x: 0, scale: 1 }
       }
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
       transition={
@@ -162,7 +162,7 @@ export default function PantryItem({
           ? { duration: exitVariant === "consume" ? 0.3 : 0.24, ease: [0.4, 0, 1, 1] }
           : { duration: 0.2, ease: "easeOut" }
       }
-      className="rounded-2xl border border-gray-100 overflow-hidden"
+      className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
     >
       {/* ── Compact row ──────────────────────────────────────── */}
       <button
