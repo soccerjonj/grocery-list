@@ -81,8 +81,20 @@ export default function PantryItem({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addedToList, setAddedToList] = useState(false);
   const [flashDecrement, setFlashDecrement] = useState(false);
+  const [exitVariant, setExitVariant] = useState<"consume" | "delete" | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
+
+  function triggerExit(type: "consume" | "delete") {
+    setConfirmDelete(false);
+    setExitVariant(type);
+    setTimeout(() => onDelete(item.id), type === "consume" ? 320 : 260);
+  }
+
+  async function handleAddToListAndRemove() {
+    if (onAddToShoppingList) await onAddToShoppingList(item.name);
+    triggerExit("consume");
+  }
 
   // Sync edit name if item name changes externally (realtime)
   useEffect(() => {
@@ -137,10 +149,20 @@ export default function PantryItem({
     <motion.div
       layout
       initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={
+        exitVariant === "consume"
+          ? { opacity: 0, x: -52, scale: 0.93, backgroundColor: "#dcfce7" }
+          : exitVariant === "delete"
+          ? { opacity: 0, x: 52, scale: 0.93, backgroundColor: "#fee2e2" }
+          : { opacity: 1, y: 0, x: 0, scale: 1, backgroundColor: "#ffffff" }
+      }
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
+      transition={
+        exitVariant
+          ? { duration: exitVariant === "consume" ? 0.3 : 0.24, ease: [0.4, 0, 1, 1] }
+          : { duration: 0.2, ease: "easeOut" }
+      }
+      className="rounded-2xl border border-gray-100 overflow-hidden"
     >
       {/* ── Compact row ──────────────────────────────────────── */}
       <button
@@ -517,11 +539,7 @@ export default function PantryItem({
                       {onAddToShoppingList && (
                         <button
                           type="button"
-                          onClick={async () => {
-                            await onAddToShoppingList(item.name);
-                            setConfirmDelete(false);
-                            onDelete(item.id);
-                          }}
+                          onClick={handleAddToListAndRemove}
                           className="w-full px-3 py-2 bg-gray-900 text-white text-xs font-medium rounded-xl hover:bg-gray-700 active:scale-[0.97] transition-all"
                         >
                           Add to shopping list & remove
@@ -529,7 +547,7 @@ export default function PantryItem({
                       )}
                       <button
                         type="button"
-                        onClick={() => { setConfirmDelete(false); onDelete(item.id); }}
+                        onClick={() => triggerExit("delete")}
                         className="w-full px-3 py-2 text-red-500 text-xs font-medium hover:text-red-700 active:opacity-60 transition-colors"
                       >
                         Remove from pantry
@@ -547,7 +565,7 @@ export default function PantryItem({
                     if (item.quantity <= 1) {
                       setConfirmDelete(true);
                     } else {
-                      onDelete(item.id);
+                      triggerExit("delete");
                     }
                   }}
                   className="text-sm text-gray-400 hover:text-red-500 transition-colors py-1 px-3 active:opacity-60 self-center"
