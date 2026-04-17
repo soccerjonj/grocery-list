@@ -47,7 +47,11 @@ export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemP
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
-      transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{
+        opacity: { duration: 0.15 },
+        height: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+        y: { duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
+      }}
       className="flex items-center gap-3 px-1 py-3 overflow-hidden"
     >
       {/* ── Checkbox ── */}
@@ -112,7 +116,7 @@ export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemP
         {/* Store tag */}
         {item.store && !isChecked && (
           <p className="text-xs text-gray-400 mt-0.5 truncate">
-            🏪 {item.store}
+            {item.store}
           </p>
         )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem } from "@/types/database";
 
@@ -9,6 +9,7 @@ export function useShoppingList(householdId: string, listId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
+  const selfInsertedIds = useRef<Set<string>>(new Set());
 
   const fetchItems = useCallback(async () => {
     const { data, error: fetchError } = await supabase
@@ -51,7 +52,8 @@ export function useShoppingList(householdId: string, listId: string) {
             const newItem = payload.new as ShoppingItem;
             if (newItem.cleared_at) return;
             setItems((prev) => {
-              if (prev.find((i) => i.id === newItem.id)) return prev;
+              if (prev.some((i) => i.id === newItem.id)) return prev;
+              if (selfInsertedIds.current.has(newItem.id)) return prev;
               return [...prev, newItem];
             });
           } else if (payload.eventType === "UPDATE") {
@@ -121,6 +123,8 @@ export function useShoppingList(householdId: string, listId: string) {
     if (insertError) {
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
     } else if (data) {
+      selfInsertedIds.current.add(data.id);
+      setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
       setItems((prev) =>
         prev.map((i) => (i.id === optimistic.id ? data : i))
       );

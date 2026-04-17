@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PantryItem } from "@/types/database";
 
@@ -17,6 +17,8 @@ export function usePantry(householdId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
+  // Tracks IDs we inserted ourselves so Realtime doesn't double-add them
+  const selfInsertedIds = useRef<Set<string>>(new Set());
 
   const fetchItems = useCallback(async () => {
     const { data, error: fetchError } = await supabase
@@ -50,7 +52,9 @@ export function usePantry(householdId: string) {
           if (payload.eventType === "INSERT") {
             const newItem = payload.new as PantryItem;
             setItems((prev) => {
-              if (prev.find((i) => i.id === newItem.id)) return prev;
+              // Skip if already present (exact match) or if we inserted it ourselves
+              if (prev.some((i) => i.id === newItem.id)) return prev;
+              if (selfInsertedIds.current.has(newItem.id)) return prev;
               return [newItem, ...prev];
             });
           } else if (payload.eventType === "UPDATE") {
@@ -96,6 +100,8 @@ export function usePantry(householdId: string) {
       fridge_zone: options?.fridgeZone ?? null,
       food_category: options?.foodCategory ?? null,
       assigned_to: options?.assignedTo ?? null,
+      running_low: false,
+      opened: false,
     };
 
     setItems((prev) => [optimistic, ...prev]);
@@ -120,6 +126,9 @@ export function usePantry(householdId: string) {
     if (insertError) {
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
     } else if (data) {
+      // Register the real ID so the Realtime INSERT event doesn't double-add it
+      selfInsertedIds.current.add(data.id);
+      setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
       setItems((prev) =>
         prev.map((i) => (i.id === optimistic.id ? data : i))
       );
@@ -138,10 +147,26 @@ export function usePantry(householdId: string) {
       .eq("id", id);
   }
 
+  async function updateItem(
+    id: string,
+    fields: Partial<Omit<PantryItem, "id" | "household_id" | "created_at" | "added_by">>
+  ) {
+    const now = new Date().toISOString();
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, ...fields, updated_at: now } : i
+      )
+    );
+    await supabase
+      .from("pantry_items")
+      .update({ ...fields, updated_at: now })
+      .eq("id", id);
+  }
+
   async function deleteItem(id: string) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     await supabase.from("pantry_items").delete().eq("id", id);
   }
 
-  return { items, loading, error, addItem, updateQuantity, deleteItem };
+  return { items, loading, error, addItem, updateQuantity, updateItem, deleteItem };
 }

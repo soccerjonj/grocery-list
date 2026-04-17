@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface BottomNavProps {
@@ -16,9 +17,9 @@ const tabs = [
       <svg
         viewBox="0 0 24 24"
         fill="none"
-        strokeWidth={active ? 2.5 : 1.8}
+        strokeWidth={active ? 2.2 : 1.6}
         stroke="currentColor"
-        className="w-6 h-6"
+        className="w-[22px] h-[22px] transition-all duration-200"
       >
         <path
           strokeLinecap="round"
@@ -35,9 +36,9 @@ const tabs = [
       <svg
         viewBox="0 0 24 24"
         fill="none"
-        strokeWidth={active ? 2.5 : 1.8}
+        strokeWidth={active ? 2.2 : 1.6}
         stroke="currentColor"
-        className="w-6 h-6"
+        className="w-[22px] h-[22px] transition-all duration-200"
       >
         <path
           strokeLinecap="round"
@@ -53,20 +54,34 @@ export default function BottomNav({ householdId }: BottomNavProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30 pb-safe">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-white z-30 pb-safe"
+      style={{ boxShadow: "0 -1px 0 rgba(0,0,0,0.06), 0 -8px 24px rgba(0,0,0,0.05)" }}
+    >
       <div className="max-w-lg mx-auto flex">
         {tabs.map((tab) => {
           const href = tab.href(householdId);
           const active = pathname.startsWith(href);
+
           return (
             <Link
               key={tab.label}
               href={href}
+              style={{ touchAction: "manipulation" }}
               className={cn(
-                "flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors duration-150",
-                active ? "text-gray-900" : "text-gray-400 hover:text-gray-600"
+                "relative flex-1 flex flex-col items-center gap-1 pt-2.5 pb-3 min-h-[52px] text-[11px] font-medium tracking-wide transition-colors duration-150 active:opacity-70",
+                active ? "text-gray-900" : "text-gray-400"
               )}
             >
+              {/* Sliding indicator at the top of the nav */}
+              {active && (
+                <motion.div
+                  layoutId="nav-indicator"
+                  className="absolute top-0 left-5 right-5 h-[2px] bg-gray-900 rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 42 }}
+                />
+              )}
+
               {tab.icon(active)}
               {tab.label}
             </Link>

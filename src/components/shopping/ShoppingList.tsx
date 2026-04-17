@@ -11,6 +11,7 @@ interface ShoppingListProps {
   activeItems: ShoppingItemType[];
   completedItems: ShoppingItemType[];
   loading: boolean;
+  householdId: string;
   onAdd: (name: string, quantity?: number, unit?: string, store?: string) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
@@ -23,6 +24,7 @@ export default function ShoppingList({
   activeItems,
   completedItems,
   loading,
+  householdId,
   onAdd,
   onToggle,
   onDelete,
@@ -41,7 +43,7 @@ export default function ShoppingList({
 
   return (
     <div className="flex flex-col gap-3">
-      {!readOnly && <AddShoppingItem onAdd={onAdd} />}
+      {!readOnly && <AddShoppingItem onAdd={onAdd} householdId={householdId} />}
 
       {isEmpty ? (
         <div className="text-center py-12 text-gray-400">

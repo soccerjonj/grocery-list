@@ -16,6 +16,7 @@ export interface MemberProfile {
 export function useHouseholdMembers(householdId: string) {
   const [members, setMembers] = useState<MemberProfile[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -48,29 +49,43 @@ export function useHouseholdMembers(householdId: string) {
         (profiles ?? []).map((p) => [p.id, p.display_name])
       );
 
-      setMembers(
-        memberRows.map((m) => {
-          const name = profileMap.get(m.user_id) || "Unknown";
-          const parts = name.trim().split(/\s+/);
-          const short = parts[0] || name;
-          const initials =
-            parts.length >= 2
-              ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-              : name.slice(0, 2).toUpperCase();
-          return {
-            user_id: m.user_id,
-            role: m.role,
-            display_name: name,
-            short_name: short,
-            initials,
-          };
-        })
-      );
+      const built = memberRows.map((m) => {
+        const name = profileMap.get(m.user_id) || "Unknown";
+        const parts = name.trim().split(/\s+/);
+        const short = parts[0] || name;
+        const initials =
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : name.slice(0, 2).toUpperCase();
+        return {
+          user_id: m.user_id,
+          role: m.role,
+          display_name: name,
+          short_name: short,
+          initials,
+        };
+      });
+
+      setMembers(built);
+
+      // Track current user's role (reuse user fetched above)
+      const myRow = memberRows.find((m) => m.user_id === user?.id);
+      setCurrentUserRole(myRow?.role ?? null);
+
       setLoading(false);
     }
 
     fetchMembers();
   }, [householdId, supabase]);
 
-  return { members, currentUserId, loading };
+  async function removeMember(userId: string) {
+    setMembers((prev) => prev.filter((m) => m.user_id !== userId));
+    await supabase
+      .from("household_members")
+      .delete()
+      .eq("household_id", householdId)
+      .eq("user_id", userId);
+  }
+
+  return { members, currentUserId, currentUserRole, loading, removeMember };
 }

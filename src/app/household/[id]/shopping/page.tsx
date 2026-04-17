@@ -39,14 +39,14 @@ function PastListRow({
     <div className="flex items-center gap-3 py-2.5">
       <Link
         href={`/household/${householdId}/shopping/${list.id}`}
-        className="flex-1 min-w-0"
+        className="flex-1 min-w-0 active:opacity-60"
       >
         <p className="text-sm text-gray-600 truncate">{list.name}</p>
         <p className="text-xs text-gray-400">{formatDate(list.created_at)}</p>
       </Link>
       <button
         onClick={() => onUnarchive(list.id)}
-        className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+        className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 active:opacity-60"
       >
         Reopen
       </button>
@@ -136,8 +136,8 @@ export default function ShoppingPage() {
             {householdName}
           </p>
           <Link
-            href="/settings"
-            className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            href={`/household/${householdId}/members`}
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors active:opacity-60"
             aria-label="Account settings"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -159,7 +159,7 @@ export default function ShoppingPage() {
             <button
               onClick={handleMarkDone}
               disabled={markingDone}
-              className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl px-3 py-2 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl px-3 py-2 transition-colors disabled:opacity-40 active:scale-[0.95] active:bg-gray-200"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -209,7 +209,7 @@ export default function ShoppingPage() {
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-xl disabled:opacity-40 transition-opacity flex-shrink-0"
+                  className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-xl disabled:opacity-40 transition-all active:scale-[0.96] active:bg-gray-800 flex-shrink-0"
                 >
                   {createLoading ? "Creating…" : "Start list"}
                 </button>
@@ -230,7 +230,7 @@ export default function ShoppingPage() {
               <p className="text-sm mb-4">No active list</p>
               <button
                 onClick={() => { setNewName(defaultListName()); setCreating(true); }}
-                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl"
+                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl active:scale-[0.97] active:bg-gray-800 transition-all"
               >
                 Start a new list
               </button>
@@ -243,6 +243,7 @@ export default function ShoppingPage() {
               activeItems={activeItems}
               completedItems={completedItems}
               loading={itemsLoading}
+              householdId={householdId}
               onAdd={addItem}
               onToggle={toggleComplete}
               onDelete={deleteItem}
@@ -255,11 +256,11 @@ export default function ShoppingPage() {
             <div className="mt-2 border-t border-gray-100 pt-3">
               <button
                 onClick={() => setShowPast((v) => !v)}
-                className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors py-1 w-full"
+                className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors py-1 w-full active:opacity-60"
               >
                 <motion.svg
                   animate={{ rotate: showPast ? 90 : 0 }}
-                  transition={{ duration: 0.18 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
                   className="w-3 h-3"
                   fill="none"
                   viewBox="0 0 24 24"

@@ -84,7 +84,7 @@ export default async function DashboardPage() {
               <Link
                 key={hh.id}
                 href={`/household/${hh.id}/pantry`}
-                className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-4 hover:border-gray-300 transition-colors"
+                className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-4 hover:border-gray-300 transition-colors active:scale-[0.97] active:bg-gray-50"
               >
                 <span className="font-medium text-gray-900">{hh.name}</span>
                 <svg
@@ -108,7 +108,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/household/new"
-            className="flex flex-col items-center gap-2 bg-gray-900 text-white rounded-2xl px-4 py-5 hover:bg-gray-700 transition-colors text-center"
+            className="flex flex-col items-center gap-2 bg-gray-900 text-white rounded-2xl px-4 py-5 hover:bg-gray-700 transition-colors text-center active:scale-[0.97] active:bg-gray-800"
           >
             <svg
               className="w-6 h-6"
@@ -127,7 +127,7 @@ export default async function DashboardPage() {
           </Link>
           <Link
             href="/household/join"
-            className="flex flex-col items-center gap-2 bg-white text-gray-900 border border-gray-200 rounded-2xl px-4 py-5 hover:border-gray-400 transition-colors text-center"
+            className="flex flex-col items-center gap-2 bg-white text-gray-900 border border-gray-200 rounded-2xl px-4 py-5 hover:border-gray-400 transition-colors text-center active:scale-[0.97] active:bg-gray-50"
           >
             <svg
               className="w-6 h-6"

@@ -103,6 +103,7 @@ export default function ShoppingListDetailPage() {
         activeItems={activeItems}
         completedItems={completedItems}
         loading={loading}
+        householdId={householdId}
         onAdd={addItem}
         onToggle={toggleComplete}
         onDelete={deleteItem}

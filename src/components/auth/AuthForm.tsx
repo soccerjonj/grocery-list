@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -76,7 +77,12 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   if (confirming) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
-        <div className="w-full max-w-sm text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="w-full max-w-sm text-center"
+        >
           <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-900 rounded-2xl mb-6">
             <svg
               className="w-7 h-7 text-white"
@@ -105,24 +111,29 @@ function AuthFormInner({ mode }: { mode: Mode }) {
           </p>
           <Link
             href="/auth/login"
-            className="inline-flex items-center justify-center w-full bg-gray-900 text-white text-sm font-medium rounded-xl px-5 py-3 hover:bg-gray-700 transition-colors"
+            className="inline-flex items-center justify-center w-full bg-gray-900 text-white text-sm font-medium rounded-xl px-5 py-3 hover:bg-gray-700 active:scale-[0.97] active:bg-gray-800 transition-all"
           >
             Go to sign in
           </Link>
           <button
             onClick={() => setConfirming(false)}
-            className="block w-full text-center text-sm text-gray-400 hover:text-gray-600 mt-4 transition-colors"
+            className="block w-full text-center text-sm text-gray-400 hover:text-gray-600 mt-4 transition-colors active:opacity-60"
           >
             Use a different email
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
-      <div className="w-full max-w-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="w-full max-w-sm"
+      >
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-900 rounded-2xl mb-4">
@@ -226,7 +237,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
             </>
           )}
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -114,6 +114,8 @@ export interface Database {
           fridge_zone: string | null;      // 'quick_use'|'long_term'
           food_category: string | null;    // 'produce'|'meat'|'dairy'|'drinks'|'condiments'|'grains'|'snacks'|'prepared'|'other'
           assigned_to: string[] | null;    // null=household, [uuid,...]=specific people
+          running_low: boolean;
+          opened: boolean;
         };
         Insert: {
           id?: string;
@@ -130,6 +132,8 @@ export interface Database {
           fridge_zone?: string | null;
           food_category?: string | null;
           assigned_to?: string[] | null;
+          running_low?: boolean;
+          opened?: boolean;
         };
         Update: {
           id?: string;
@@ -146,6 +150,8 @@ export interface Database {
           fridge_zone?: string | null;
           food_category?: string | null;
           assigned_to?: string[] | null;
+          running_low?: boolean;
+          opened?: boolean;
         };
       };
       shopping_items: {

@@ -15,22 +15,61 @@ interface PantryListProps {
   loading: boolean;
   members: MemberProfile[];
   currentUserId: string | null;
+  householdId: string;
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
+  onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
+  onAddToShoppingList?: (name: string) => Promise<boolean>;
 }
 
-type SortKey = "expiry" | "name" | "category" | "added";
+type SortKey = "freshness" | "expiry" | "name" | "category" | "added";
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "freshness", label: "Freshness" },
   { key: "expiry",    label: "Expiry" },
   { key: "name",      label: "Name" },
   { key: "category",  label: "Category" },
   { key: "added",     label: "Recent" },
 ];
 
+// Location urgency: lower = more perishable / needs attention sooner
+const LOCATION_PRIORITY: Record<string, number> = {
+  fridge: 0,
+  room_temp: 1,
+  freezer: 2,
+  pantry: 3,
+};
+
+function freshnessScore(item: PantryItemType): number {
+  // Items with upcoming expiry get top priority (0–4 range)
+  if (item.expires_at) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round(
+      (new Date(item.expires_at + "T00:00:00").getTime() - today.getTime()) / 86_400_000
+    );
+    if (diff < 0) return 0;       // expired
+    if (diff === 0) return 1;     // today
+    if (diff <= 2) return 2;      // 1-2 days
+    if (diff <= 7) return 3;      // this week
+    return 4;                     // future expiry
+  }
+  // No expiry — rank by storage location perishability
+  const loc = item.storage_location ?? "";
+  return 5 + (LOCATION_PRIORITY[loc] ?? 4);
+}
+
 function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
   return [...items].sort((a, b) => {
+    if (sort === "freshness") {
+      const sa = freshnessScore(a);
+      const sb = freshnessScore(b);
+      if (sa !== sb) return sa - sb;
+      // Within same priority: soonest expiry first, then alphabetical
+      if (a.expires_at && b.expires_at) return a.expires_at.localeCompare(b.expires_at);
+      return a.name.localeCompare(b.name);
+    }
     if (sort === "expiry") {
       if (!a.expires_at && !b.expires_at) return 0;
       if (!a.expires_at) return 1;
@@ -56,7 +95,9 @@ interface SectionProps {
   expandedId: string | null;
   onToggleExpand: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
+  onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
+  onAddToShoppingList?: (name: string) => Promise<boolean>;
 }
 
 function StorageSection({
@@ -68,7 +109,9 @@ function StorageSection({
   expandedId,
   onToggleExpand,
   onUpdateQuantity,
+  onUpdateItem,
   onDelete,
+  onAddToShoppingList,
 }: SectionProps) {
   const [open, setOpen] = useState(true);
   if (items.length === 0) return null;
@@ -91,7 +134,9 @@ function StorageSection({
               members={members}
               currentUserId={currentUserId}
               onUpdateQuantity={onUpdateQuantity}
+              onUpdateItem={onUpdateItem}
               onDelete={onDelete}
+              onAddToShoppingList={onAddToShoppingList}
             />
           ))}
         </AnimatePresence>
@@ -103,11 +148,11 @@ function StorageSection({
     <div className="flex flex-col gap-1.5">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 py-0.5"
+        className="flex items-center gap-2 py-0.5 active:opacity-60 transition-opacity"
       >
         <motion.svg
           animate={{ rotate: open ? 90 : 0 }}
-          transition={{ duration: 0.18 }}
+          transition={{ type: "spring", stiffness: 400, damping: 32 }}
           className="w-3 h-3 text-gray-400"
           fill="none"
           viewBox="0 0 24 24"
@@ -162,11 +207,14 @@ export default function PantryList({
   loading,
   members,
   currentUserId,
+  householdId,
   onAdd,
   onUpdateQuantity,
+  onUpdateItem,
   onDelete,
+  onAddToShoppingList,
 }: PantryListProps) {
-  const [sort, setSort] = useState<SortKey>("expiry");
+  const [sort, setSort] = useState<SortKey>("freshness");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -194,11 +242,11 @@ export default function PantryList({
 
   const hasItems = filtered.length > 0;
 
-  const sectionProps = { members, currentUserId, sort, expandedId, onToggleExpand: handleToggleExpand, onUpdateQuantity, onDelete };
+  const sectionProps = { members, currentUserId, sort, expandedId, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
 
   return (
     <div className="flex flex-col gap-4">
-      <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} />
+      <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} />
 
       {items.length > 0 && (
         /* Sort + category filter bar */
@@ -207,7 +255,7 @@ export default function PantryList({
             <button
               key={key}
               onClick={() => setSort(key)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 active:scale-[0.94] ${
                 sort === key
                   ? "bg-gray-900 text-white"
                   : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
@@ -219,7 +267,7 @@ export default function PantryList({
           <div className="w-px h-4 bg-gray-200 flex-shrink-0 mx-0.5" />
           <button
             onClick={() => setFilterCategory("")}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 active:scale-[0.94] ${
               !filterCategory
                 ? "bg-gray-900 text-white"
                 : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
@@ -231,7 +279,7 @@ export default function PantryList({
             <button
               key={value}
               onClick={() => setFilterCategory(filterCategory === value ? "" : value)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 active:scale-[0.94] ${
                 filterCategory === value
                   ? "bg-gray-900 text-white"
                   : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
