@@ -152,15 +152,20 @@ export function usePantry(householdId: string) {
     fields: Partial<Omit<PantryItem, "id" | "household_id" | "created_at" | "added_by">>
   ) {
     const now = new Date().toISOString();
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, ...fields, updated_at: now } : i
-      )
+    // Snapshot for rollback
+    const prev = items.find((i) => i.id === id);
+    setItems((all) =>
+      all.map((i) => (i.id === id ? { ...i, ...fields, updated_at: now } : i))
     );
-    await supabase
+    const { error } = await supabase
       .from("pantry_items")
       .update({ ...fields, updated_at: now })
       .eq("id", id);
+    if (error) {
+      console.error("pantry updateItem failed:", error.message);
+      // Roll back optimistic update
+      if (prev) setItems((all) => all.map((i) => (i.id === id ? prev : i)));
+    }
   }
 
   async function deleteItem(id: string) {
