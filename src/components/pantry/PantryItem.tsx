@@ -235,28 +235,29 @@ export default function PantryItem({
             <div className="overflow-y-auto flex-1 px-5 pb-6 flex flex-col gap-5">
 
               {/* Quantity stepper */}
-              <div className="flex items-center justify-center gap-5 py-2">
+              <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-1">Quantity</span>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.88 }}
                   onClick={decrement}
                   animate={{
-                    backgroundColor: flashDecrement ? "#dcfce7" : "#f3f4f6",
+                    backgroundColor: flashDecrement ? "#dcfce7" : "#e5e7eb",
                     color: flashDecrement ? "#15803d" : "#374151",
                   }}
                   transition={{ duration: 0.15 }}
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl leading-none font-light select-none"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
                 >
                   −
                 </motion.button>
-                <div className="w-20 text-center select-none">
+                <div className="w-10 text-center select-none">
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.p
                       key={qtyDisplay}
-                      initial={{ scale: 1.25, opacity: 0.5 }}
+                      initial={{ scale: 1.2, opacity: 0.5 }}
                       animate={{ scale: 1, opacity: 1, color: flashDecrement ? "#15803d" : "#111827" }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="text-3xl font-bold tabular-nums"
+                      className="text-base font-bold tabular-nums"
                     >
                       {qtyDisplay}
                     </motion.p>
@@ -266,7 +267,7 @@ export default function PantryItem({
                   type="button"
                   whileTap={{ scale: 0.88 }}
                   onClick={increment}
-                  className="w-14 h-14 rounded-2xl bg-gray-900 text-white flex items-center justify-center text-3xl leading-none font-light select-none"
+                  className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
                 >
                   +
                 </motion.button>
@@ -404,31 +405,35 @@ export default function PantryItem({
               <AnimatePresence>
                 {confirmDelete && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 flex flex-col gap-2">
-                      <p className="text-sm font-semibold text-amber-800 text-center">Remove from pantry?</p>
-                      <button type="button" onClick={() => { setConfirmDelete(false); onUpdateQuantity(item.id, 1); }}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-xl active:scale-[0.97] transition-all">
-                        Keep (set to 1)
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 flex flex-col gap-2">
+                      <p className="text-sm font-semibold text-gray-800 text-center">Are you sure?</p>
+                      <button type="button" onClick={() => { setConfirmDelete(false); onUpdateQuantity(item.id, Math.max(1, item.quantity - 1)); }}
+                        className="w-full px-3 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl active:scale-[0.97] transition-all">
+                        Just reduce the quantity
                       </button>
                       {onAddToShoppingList && (
                         <button type="button" onClick={handleAddToListAndRemove}
-                          className="w-full px-3 py-2 bg-gray-900 text-white text-xs font-medium rounded-xl active:scale-[0.97] transition-all">
+                          className="w-full px-3 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl active:scale-[0.97] transition-all">
                           Add to shopping list & remove
                         </button>
                       )}
                       <button type="button" onClick={() => triggerExit("delete")}
-                        className="w-full px-3 py-2 text-red-500 text-xs font-medium active:opacity-60 transition-colors">
+                        className="w-full px-3 py-2.5 text-red-500 text-sm font-medium active:opacity-60 transition-colors">
                         Remove from pantry
+                      </button>
+                      <button type="button" onClick={() => setConfirmDelete(false)}
+                        className="w-full px-3 py-1.5 text-gray-400 text-xs active:opacity-60 transition-colors">
+                        Cancel
                       </button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Remove link */}
+              {/* Remove link — always shows confirm */}
               {!confirmDelete && (
                 <button type="button"
-                  onClick={() => item.quantity <= 1 ? setConfirmDelete(true) : triggerExit("delete")}
+                  onClick={() => setConfirmDelete(true)}
                   className="text-sm text-gray-400 hover:text-red-500 transition-colors py-1 active:opacity-60 self-center">
                   Remove from pantry
                 </button>
