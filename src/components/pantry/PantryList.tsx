@@ -123,7 +123,7 @@ function StorageSection({
 
   function ItemList({ group }: { group: PantryItemType[] }) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         <AnimatePresence>
           {sortItems(group, sort).map((item) => (
             <PantryItem

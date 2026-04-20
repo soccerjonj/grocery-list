@@ -163,51 +163,59 @@ export default function PantryItem({
           ? { duration: exitVariant === "consume" ? 0.3 : 0.24, ease: [0.4, 0, 1, 1] }
           : { duration: 0.2, ease: "easeOut" }
       }
-      className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
+      className={`bg-white rounded-2xl border border-gray-100 overflow-hidden${expanded ? " col-span-2" : ""}`}
     >
-      {/* ── Compact row ──────────────────────────────────────── */}
+      {/* ── Card / compact row ───────────────────────────────── */}
       <button
         type="button"
         onClick={onToggleExpand}
-        className="w-full flex items-center gap-2.5 px-4 py-3 text-left active:bg-gray-50 transition-colors"
+        className="w-full text-left active:bg-gray-50 transition-colors"
       >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {item.running_low && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-            )}
-            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-            {item.opened && (
-              <span className="text-[10px] bg-orange-50 text-orange-400 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 leading-none">
-                Opened
-              </span>
-            )}
-            {ownerLabel && (
-              <span className="text-[10px] bg-indigo-50 text-indigo-400 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 leading-none">
-                {ownerLabel}
-              </span>
-            )}
+        {expanded ? (
+          /* Full-width header when expanded */
+          <div className="flex items-center gap-2.5 px-4 py-3">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+              {item.running_low && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />}
+              <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+              {item.opened && (
+                <span className="text-[10px] bg-orange-50 text-orange-400 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 leading-none">Opened</span>
+              )}
+              {ownerLabel && (
+                <span className="text-[10px] bg-indigo-50 text-indigo-400 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 leading-none">{ownerLabel}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {expiry && <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>}
+              <span className="text-xs font-semibold text-gray-500 tabular-nums">×{qtyDisplay}</span>
+              <motion.svg
+                animate={{ rotate: 90 }}
+                transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                className="w-3.5 h-3.5 text-gray-300 flex-shrink-0"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </motion.svg>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {expiry && <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>}
-          {category && <span className="text-xs text-gray-400">{category.label}</span>}
-          <span className="text-xs font-semibold text-gray-500 tabular-nums min-w-[1.5rem] text-right">
-            ×{qtyDisplay}
-          </span>
-          <motion.svg
-            animate={{ rotate: expanded ? 90 : 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 32 }}
-            className="w-3.5 h-3.5 text-gray-300 flex-shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </motion.svg>
-        </div>
+        ) : (
+          /* Card layout when compact */
+          <div className="p-3 flex flex-col gap-2 min-h-[76px]">
+            <div className="flex items-start gap-1.5">
+              {item.running_low && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 mt-[3px]" />}
+              <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2 flex-1">{item.name}</p>
+            </div>
+            <div className="flex items-center justify-between mt-auto">
+              <div className="flex items-center gap-1.5">
+                {expiry
+                  ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
+                  : <span className="text-xs text-gray-300">—</span>
+                }
+                {item.opened && <span className="w-1 h-1 rounded-full bg-orange-300 flex-shrink-0" />}
+              </div>
+              <span className="text-xs font-semibold text-gray-400 tabular-nums">×{qtyDisplay}</span>
+            </div>
+          </div>
+        )}
       </button>
 
       {/* ── Expanded detail panel ────────────────────────────── */}
