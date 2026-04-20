@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
+import { DEFAULT_COLOR } from "@/lib/memberColors";
 
 interface ShoppingItemProps {
   item: ShoppingItemType;
@@ -13,28 +14,26 @@ interface ShoppingItemProps {
   currentUserId?: string | null;
 }
 
-function assignedLabel(
+interface AssignedInfo { label: string; color: string }
+
+function getAssignedInfo(
   assignedTo: string[] | null,
   members: MemberProfile[],
   currentUserId: string | null
-): string | null {
+): AssignedInfo | null {
   if (!assignedTo || assignedTo.length === 0) return null;
   if (assignedTo.length >= members.length && members.length > 0) return null;
   if (assignedTo.length === 1) {
-    if (assignedTo[0] === currentUserId) return "For me";
     const m = members.find((m) => m.user_id === assignedTo[0]);
-    return m ? `For ${m.short_name}` : null;
+    const label = assignedTo[0] === currentUserId ? "For me" : (m ? `For ${m.short_name}` : null);
+    if (!label) return null;
+    return { label, color: m?.color ?? DEFAULT_COLOR };
   }
-  return (
-    "For " +
-    assignedTo
-      .map((uid) =>
-        uid === currentUserId
-          ? "me"
-          : (members.find((m) => m.user_id === uid)?.short_name ?? "?")
-      )
-      .join(" & ")
-  );
+  const first = members.find((m) => m.user_id === assignedTo[0]);
+  return {
+    label: "For " + assignedTo.map((uid) => uid === currentUserId ? "me" : (members.find((m) => m.user_id === uid)?.short_name ?? "?")).join(" & "),
+    color: first?.color ?? DEFAULT_COLOR,
+  };
 }
 
 // Total time the check animation plays before the item exits
@@ -141,18 +140,19 @@ export default function ShoppingItem({ item, onToggle, onDelete, members = [], c
         </motion.p>
 
         {/* Store tag + member assignment */}
-        {!isChecked && (item.store || assignedLabel(item.assigned_to, members, currentUserId)) && (
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {item.store && (
-              <p className="text-xs text-gray-400 truncate">{item.store}</p>
-            )}
-            {assignedLabel(item.assigned_to, members, currentUserId) && (
-              <span className="text-xs text-indigo-400 font-medium flex-shrink-0">
-                {assignedLabel(item.assigned_to, members, currentUserId)}
-              </span>
-            )}
-          </div>
-        )}
+        {!isChecked && (() => {
+          const assigned = getAssignedInfo(item.assigned_to, members, currentUserId);
+          return (item.store || assigned) ? (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {item.store && <p className="text-xs text-gray-400 truncate">{item.store}</p>}
+              {assigned && (
+                <span className="text-xs font-medium flex-shrink-0" style={{ color: assigned.color }}>
+                  {assigned.label}
+                </span>
+              )}
+            </div>
+          ) : null;
+        })()}
 
         {/* Strikethrough line — sweeps left to right */}
         <AnimatePresence>

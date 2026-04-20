@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
+import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 
 interface AddShoppingItemProps {
   onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null) => void;
@@ -255,7 +256,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                       onClick={() => setAssignedTo(null)}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                         !assignedTo || assignedTo.length === 0
-                          ? "bg-indigo-600 text-white"
+                          ? "bg-gray-900 text-white"
                           : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                       }`}
                     >
@@ -263,18 +264,23 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     </button>
                     {members.map((m) => {
                       const selected = !!assignedTo?.includes(m.user_id);
+                      const color = m.color ?? DEFAULT_COLOR;
                       return (
                         <button
                           key={m.user_id}
                           type="button"
                           onClick={() => toggleMember(m.user_id)}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
+                          style={
                             selected
-                              ? "bg-indigo-600 text-white"
-                              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                          }`}
+                              ? { backgroundColor: color, color: "#fff" }
+                              : { backgroundColor: hexAlpha(color, 0.1), color }
+                          }
                         >
-                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${selected ? "bg-white/25" : "bg-gray-300 text-white"}`}>
+                          <span
+                            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+                            style={selected ? { backgroundColor: "rgba(255,255,255,0.25)" } : { backgroundColor: hexAlpha(color, 0.2) }}
+                          >
                             {m.initials}
                           </span>
                           {m.user_id === currentUserId ? "Me" : m.short_name}

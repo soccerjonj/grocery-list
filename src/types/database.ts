@@ -14,15 +14,18 @@ export interface Database {
           id: string;
           display_name: string;
           created_at: string;
+          color: string | null;
         };
         Insert: {
           id: string;
           display_name: string;
           created_at?: string;
+          color?: string | null;
         };
         Update: {
           id?: string;
           display_name?: string;
+          color?: string | null;
           created_at?: string;
         };
       };

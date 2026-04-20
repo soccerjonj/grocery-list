@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { PantryItem as PantryItemType } from "@/types/database";
 import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
+import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 
 interface PantryItemProps {
   item: PantryItemType;
@@ -53,16 +54,27 @@ function getExpiryBadge(expiresAt: string | null) {
   return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}`, detailColor: "text-green-600", bg: "bg-green-50 border-green-200" };
 }
 
-function getOwnerLabel(assignedTo: string[] | null, members: MemberProfile[], currentUserId: string | null): string | null {
+interface OwnerInfo { label: string; color: string }
+
+function getOwnerInfo(
+  assignedTo: string[] | null,
+  members: MemberProfile[],
+  currentUserId: string | null
+): OwnerInfo | null {
   if (!assignedTo || assignedTo.length === 0) return null;
   if (assignedTo.length >= members.length && members.length > 0) return null;
   if (assignedTo.length === 1) {
-    if (assignedTo[0] === currentUserId) return "Mine";
-    return members.find((m) => m.user_id === assignedTo[0])?.short_name ?? null;
+    const m = members.find((m) => m.user_id === assignedTo[0]);
+    const label = assignedTo[0] === currentUserId ? "Mine" : (m?.short_name ?? null);
+    if (!label) return null;
+    return { label, color: m?.color ?? DEFAULT_COLOR };
   }
-  return assignedTo
+  // Multiple: use first assigned member's color
+  const first = members.find((m) => m.user_id === assignedTo[0]);
+  const label = assignedTo
     .map((uid) => (uid === currentUserId ? "Me" : members.find((m) => m.user_id === uid)?.short_name ?? "?"))
     .join(" & ");
+  return { label, color: first?.color ?? DEFAULT_COLOR };
 }
 
 // ── Component ─────────────────────────────────────────────────────
@@ -120,7 +132,7 @@ export default function PantryItem({
   }, [expanded]);
 
   const expiry = getExpiryBadge(item.expires_at);
-  const ownerLabel = getOwnerLabel(item.assigned_to, members, currentUserId);
+  const ownerInfo = getOwnerInfo(item.assigned_to, members, currentUserId);
   const qtyDisplay = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(1);
 
   function increment() { onUpdateQuantity(item.id, item.quantity + 1); }
@@ -217,7 +229,9 @@ export default function PantryItem({
                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   {expiry && <span className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</span>}
                   {item.running_low && <span className="text-xs text-amber-500 font-medium">· Running low</span>}
-                  {ownerLabel && <span className="text-xs text-indigo-400">{ownerLabel}</span>}
+                  {ownerInfo && (
+                    <span className="text-xs font-medium" style={{ color: ownerInfo.color }}>{ownerInfo.label}</span>
+                  )}
                 </div>
               </div>
               <button
@@ -412,7 +426,7 @@ export default function PantryItem({
                       onClick={() => onUpdateItem(item.id, { assigned_to: null })}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                         !item.assigned_to || item.assigned_to.length === 0
-                          ? "bg-indigo-600 text-white"
+                          ? "bg-gray-900 text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
@@ -420,33 +434,33 @@ export default function PantryItem({
                     </button>
                     {members.map((member) => {
                       const selected = !!item.assigned_to?.includes(member.user_id);
+                      const color = member.color ?? DEFAULT_COLOR;
                       function toggleMember() {
                         const current = item.assigned_to ?? [];
-                        let next: string[];
-                        if (selected) {
-                          next = current.filter((id) => id !== member.user_id);
-                        } else {
-                          next = [...current, member.user_id];
-                        }
-                        // If all members selected, treat as "everyone"
+                        const next = selected
+                          ? current.filter((id) => id !== member.user_id)
+                          : [...current, member.user_id];
                         onUpdateItem(item.id, { assigned_to: next.length === 0 ? null : next });
                       }
-                      const isMe = member.user_id === currentUserId;
                       return (
                         <button
                           key={member.user_id}
                           type="button"
                           onClick={toggleMember}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
+                          style={
                             selected
-                              ? "bg-indigo-600 text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
+                              ? { backgroundColor: color, color: "#fff" }
+                              : { backgroundColor: hexAlpha(color, 0.1), color }
+                          }
                         >
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${selected ? "bg-white/20" : "bg-gray-300 text-white"}`}>
+                          <span
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                            style={selected ? { backgroundColor: "rgba(255,255,255,0.25)", color: "#fff" } : { backgroundColor: hexAlpha(color, 0.2), color }}
+                          >
                             {member.initials}
                           </span>
-                          {isMe ? "Me" : member.short_name}
+                          {member.user_id === currentUserId ? "Me" : member.short_name}
                         </button>
                       );
                     })}

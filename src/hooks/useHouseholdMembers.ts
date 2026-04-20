@@ -11,6 +11,8 @@ export interface MemberProfile {
   short_name: string;
   /** Two-letter initials */
   initials: string;
+  /** Hex color chosen by the member, or null */
+  color: string | null;
 }
 
 export function useHouseholdMembers(householdId: string) {
@@ -39,18 +41,19 @@ export function useHouseholdMembers(householdId: string) {
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, display_name")
+        .select("id, display_name, color")
         .in(
           "id",
           memberRows.map((m) => m.user_id)
         );
 
       const profileMap = new Map(
-        (profiles ?? []).map((p) => [p.id, p.display_name])
+        (profiles ?? []).map((p) => [p.id, { display_name: p.display_name, color: p.color }])
       );
 
       const built = memberRows.map((m) => {
-        const name = profileMap.get(m.user_id) || "Unknown";
+        const prof = profileMap.get(m.user_id);
+        const name = prof?.display_name || "Unknown";
         const parts = name.trim().split(/\s+/);
         const short = parts[0] || name;
         const initials =
@@ -63,6 +66,7 @@ export function useHouseholdMembers(householdId: string) {
           display_name: name,
           short_name: short,
           initials,
+          color: prof?.color ?? null,
         };
       });
 
