@@ -69,12 +69,21 @@ function getOwnerInfo(
     if (!label) return null;
     return { label, color: m?.color ?? DEFAULT_COLOR };
   }
-  // Multiple: use first assigned member's color
   const first = members.find((m) => m.user_id === assignedTo[0]);
   const label = assignedTo
     .map((uid) => (uid === currentUserId ? "Me" : members.find((m) => m.user_id === uid)?.short_name ?? "?"))
     .join(" & ");
   return { label, color: first?.color ?? DEFAULT_COLOR };
+}
+
+/** Returns member objects for assigned users, empty when assigned to everyone. */
+function getAssignedMembers(assignedTo: string[] | null, members: MemberProfile[]): MemberProfile[] {
+  if (!assignedTo || assignedTo.length === 0) return [];
+  if (assignedTo.length >= members.length && members.length > 0) return [];
+  return assignedTo.flatMap((uid) => {
+    const m = members.find((m) => m.user_id === uid);
+    return m ? [m] : [];
+  });
 }
 
 // ── Component ─────────────────────────────────────────────────────
@@ -133,6 +142,7 @@ export default function PantryItem({
 
   const expiry = getExpiryBadge(item.expires_at);
   const ownerInfo = getOwnerInfo(item.assigned_to, members, currentUserId);
+  const assignedMembers = getAssignedMembers(item.assigned_to, members);
   const qtyDisplay = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(1);
 
   function increment() { onUpdateQuantity(item.id, item.quantity + 1); }
@@ -538,6 +548,28 @@ export default function PantryItem({
           <div className="flex items-start gap-1.5">
             {item.running_low && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 mt-[3px]" />}
             <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2 flex-1">{item.name}</p>
+            {assignedMembers.length > 0 && (
+              <div className="flex -space-x-1 flex-shrink-0 mt-[1px]">
+                {assignedMembers.slice(0, 2).map((m) => {
+                  const c = m.color ?? DEFAULT_COLOR;
+                  return (
+                    <span
+                      key={m.user_id}
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ring-1 ring-white"
+                      style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
+                      title={m.short_name}
+                    >
+                      {m.initials[0]}
+                    </span>
+                  );
+                })}
+                {assignedMembers.length > 2 && (
+                  <span className="w-4 h-4 rounded-full bg-gray-100 ring-1 ring-white flex items-center justify-center text-[7px] font-bold text-gray-400">
+                    +{assignedMembers.length - 2}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-between mt-auto">
             <div className="flex items-center gap-1.5">

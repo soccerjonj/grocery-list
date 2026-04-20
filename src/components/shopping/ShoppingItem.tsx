@@ -16,26 +16,13 @@ interface ShoppingItemProps {
   currentUserId?: string | null;
 }
 
-interface AssignedInfo { label: string; color: string }
-
-function getAssignedInfo(
-  assignedTo: string[] | null,
-  members: MemberProfile[],
-  currentUserId: string | null
-): AssignedInfo | null {
-  if (!assignedTo || assignedTo.length === 0) return null;
-  if (assignedTo.length >= members.length && members.length > 0) return null;
-  if (assignedTo.length === 1) {
-    const m = members.find((m) => m.user_id === assignedTo[0]);
-    const label = assignedTo[0] === currentUserId ? "For me" : (m ? `For ${m.short_name}` : null);
-    if (!label) return null;
-    return { label, color: m?.color ?? DEFAULT_COLOR };
-  }
-  const first = members.find((m) => m.user_id === assignedTo[0]);
-  return {
-    label: "For " + assignedTo.map((uid) => uid === currentUserId ? "me" : (members.find((m) => m.user_id === uid)?.short_name ?? "?")).join(" & "),
-    color: first?.color ?? DEFAULT_COLOR,
-  };
+function getAssignedMembers(assignedTo: string[] | null, members: MemberProfile[]): MemberProfile[] {
+  if (!assignedTo || assignedTo.length === 0) return [];
+  if (assignedTo.length >= members.length && members.length > 0) return [];
+  return assignedTo.flatMap((uid) => {
+    const m = members.find((m) => m.user_id === uid);
+    return m ? [m] : [];
+  });
 }
 
 const CHECK_ANIMATION_MS = 850;
@@ -123,7 +110,7 @@ export default function ShoppingItem({
   }
 
   const isChecked = checking || item.completed;
-  const assigned = getAssignedInfo(item.assigned_to, members, currentUserId);
+  const assignedMembers = getAssignedMembers(item.assigned_to, members);
 
   // ── Edit sheet ───────────────────────────────────────────────────
   const sheet = (
@@ -352,15 +339,8 @@ export default function ShoppingItem({
             )}
           </motion.p>
 
-          {!isChecked && (item.store || assigned) && (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {item.store && <p className="text-xs text-gray-400 truncate">{item.store}</p>}
-              {assigned && (
-                <span className="text-xs font-medium flex-shrink-0" style={{ color: assigned.color }}>
-                  {assigned.label}
-                </span>
-              )}
-            </div>
+          {!isChecked && item.store && (
+            <p className="text-xs text-gray-400 truncate mt-0.5">{item.store}</p>
           )}
 
           {/* Strikethrough */}
@@ -382,6 +362,25 @@ export default function ShoppingItem({
             )}
           </AnimatePresence>
         </button>
+
+        {/* ── Member avatars ── */}
+        {assignedMembers.length > 0 && !isChecked && (
+          <div className="flex -space-x-1 flex-shrink-0">
+            {assignedMembers.slice(0, 3).map((m) => {
+              const c = m.color ?? DEFAULT_COLOR;
+              return (
+                <span
+                  key={m.user_id}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ring-1 ring-white"
+                  style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
+                  title={m.short_name}
+                >
+                  {m.initials}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── Delete ── */}
         <motion.button
