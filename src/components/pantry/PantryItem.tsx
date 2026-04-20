@@ -41,10 +41,10 @@ function getExpiryBadge(expiresAt: string | null) {
   if (diff === 0)
     return { label: "Today", dot: "bg-red-500", text: "text-red-500", detail: "Expires today", detailColor: "text-red-500" };
   if (diff === 1)
-    return { label: "Tmw", dot: "bg-orange-400", text: "text-orange-500", detail: "Expires tomorrow", detailColor: "text-orange-500" };
-  if (diff <= 3)
-    return { label: `${diff}d`, dot: "bg-orange-400", text: "text-orange-500", detail: `Expires in ${diff} days`, detailColor: "text-orange-500" };
+    return { label: "Tmw", dot: "bg-red-500", text: "text-red-500", detail: "Expires tomorrow", detailColor: "text-red-500" };
   if (diff <= 7)
+    return { label: `${diff}d`, dot: "bg-red-400", text: "text-red-500", detail: `Expires in ${diff} days`, detailColor: "text-red-500" };
+  if (diff <= 28)
     return { label: `${diff}d`, dot: "bg-yellow-400", text: "text-yellow-600", detail: `Expires in ${diff} days`, detailColor: "text-yellow-600" };
 
   if (diff >= 364)
