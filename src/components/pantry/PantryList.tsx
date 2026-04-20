@@ -121,7 +121,9 @@ function StorageSection({
   const longTerm  = isFridge ? items.filter((i) => i.fridge_zone === "long_term") : [];
   const unzoned   = isFridge ? items.filter((i) => !i.fridge_zone) : items;
 
-  function ItemList({ group }: { group: PantryItemType[] }) {
+  const itemProps = { members, currentUserId, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
+
+  function renderGrid(group: PantryItemType[]) {
     return (
       <div className="grid grid-cols-2 gap-2">
         <AnimatePresence>
@@ -131,12 +133,7 @@ function StorageSection({
               item={item}
               expanded={expandedId === item.id}
               onToggleExpand={() => onToggleExpand(item.id)}
-              members={members}
-              currentUserId={currentUserId}
-              onUpdateQuantity={onUpdateQuantity}
-              onUpdateItem={onUpdateItem}
-              onDelete={onDelete}
-              onAddToShoppingList={onAddToShoppingList}
+              {...itemProps}
             />
           ))}
         </AnimatePresence>
@@ -181,19 +178,19 @@ function StorageSection({
                 {quickUse.length > 0 && (
                   <div className="flex flex-col gap-1.5">
                     <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider pl-1">Quick-use</p>
-                    <ItemList group={quickUse} />
+                    {renderGrid(quickUse)}
                   </div>
                 )}
                 {longTerm.length > 0 && (
                   <div className="flex flex-col gap-1.5">
                     <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider pl-1">Long-term</p>
-                    <ItemList group={longTerm} />
+                    {renderGrid(longTerm)}
                   </div>
                 )}
-                {unzoned.length > 0 && <ItemList group={unzoned} />}
+                {unzoned.length > 0 && renderGrid(unzoned)}
               </div>
             ) : (
-              <ItemList group={unzoned} />
+              renderGrid(unzoned)
             )}
           </motion.div>
         )}
