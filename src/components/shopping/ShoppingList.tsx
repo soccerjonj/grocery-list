@@ -16,6 +16,7 @@ interface ShoppingListProps {
   members?: MemberProfile[];
   currentUserId?: string | null;
   onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null) => void;
+  onUpdate?: (id: string, fields: Partial<Pick<ShoppingItemType, "name" | "quantity" | "unit" | "store" | "assigned_to">>) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onClearAll: () => void;
@@ -31,6 +32,7 @@ export default function ShoppingList({
   members = [],
   currentUserId = null,
   onAdd,
+  onUpdate,
   onToggle,
   onDelete,
   onClearAll,
@@ -81,6 +83,7 @@ export default function ShoppingList({
                     item={item}
                     onToggle={onToggle}
                     onDelete={onDelete}
+                    onUpdate={onUpdate}
                     members={members}
                     currentUserId={currentUserId}
                   />

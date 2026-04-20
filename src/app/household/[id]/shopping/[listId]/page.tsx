@@ -21,6 +21,7 @@ export default function ShoppingListDetailPage() {
     completedItems,
     loading,
     addItem,
+    updateItem,
     toggleComplete,
     clearCompleted,
     deleteItem,
@@ -109,6 +110,7 @@ export default function ShoppingListDetailPage() {
         members={members}
         currentUserId={currentUserId}
         onAdd={addItem}
+        onUpdate={updateItem}
         onToggle={toggleComplete}
         onDelete={deleteItem}
         onClearAll={clearCompleted}

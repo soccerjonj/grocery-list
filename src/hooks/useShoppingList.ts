@@ -181,6 +181,19 @@ export function useShoppingList(householdId: string, listId: string) {
       .in("id", completedIds);
   }
 
+  async function updateItem(
+    id: string,
+    fields: Partial<Pick<ShoppingItem, "name" | "quantity" | "unit" | "store" | "assigned_to">>
+  ) {
+    const prev = items.find((i) => i.id === id);
+    setItems((all) => all.map((i) => (i.id === id ? { ...i, ...fields } : i)));
+    const { error } = await supabase.from("shopping_items").update(fields).eq("id", id);
+    if (error) {
+      console.error("shopping updateItem failed:", error.message);
+      if (prev) setItems((all) => all.map((i) => (i.id === id ? prev : i)));
+    }
+  }
+
   async function deleteItem(id: string) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     await supabase.from("shopping_items").delete().eq("id", id);
@@ -196,6 +209,7 @@ export function useShoppingList(householdId: string, listId: string) {
     loading,
     error,
     addItem,
+    updateItem,
     toggleComplete,
     clearCompleted,
     deleteItem,
