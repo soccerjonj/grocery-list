@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useHouseholdContext } from "@/context/HouseholdContext";
 import { useShoppingLists } from "@/hooks/useShoppingLists";
 import { useShoppingList } from "@/hooks/useShoppingList";
+import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import Spinner from "@/components/ui/Spinner";
 import type { ShoppingList as ShoppingListType } from "@/types/database";
@@ -67,6 +68,7 @@ function PastListRow({
 
 export default function ShoppingPage() {
   const { householdId, householdName } = useHouseholdContext();
+  const { members, currentUserId } = useHouseholdMembers(householdId);
   const {
     activeLists,
     pastLists,
@@ -244,6 +246,8 @@ export default function ShoppingPage() {
               completedItems={completedItems}
               loading={itemsLoading}
               householdId={householdId}
+              members={members}
+              currentUserId={currentUserId}
               onAdd={addItem}
               onToggle={toggleComplete}
               onDelete={deleteItem}

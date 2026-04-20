@@ -82,7 +82,8 @@ export function useShoppingList(householdId: string, listId: string) {
     name: string,
     quantity?: number,
     unit?: string,
-    store?: string
+    store?: string,
+    assignedTo?: string[] | null
   ) {
     const {
       data: { user },
@@ -102,6 +103,7 @@ export function useShoppingList(householdId: string, listId: string) {
       cleared_at: null,
       added_by: user?.id ?? null,
       created_at: new Date().toISOString(),
+      assigned_to: assignedTo ?? null,
     };
 
     setItems((prev) => [...prev, optimistic]);
@@ -116,6 +118,7 @@ export function useShoppingList(householdId: string, listId: string) {
         unit: unit ?? null,
         store: store ?? null,
         added_by: user?.id ?? null,
+        assigned_to: assignedTo ?? null,
       })
       .select()
       .single();

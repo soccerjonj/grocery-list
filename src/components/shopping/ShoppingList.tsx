@@ -6,13 +6,16 @@ import CompletedSection from "./CompletedSection";
 import AddShoppingItem from "./AddShoppingItem";
 import Spinner from "@/components/ui/Spinner";
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
+import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 
 interface ShoppingListProps {
   activeItems: ShoppingItemType[];
   completedItems: ShoppingItemType[];
   loading: boolean;
   householdId: string;
-  onAdd: (name: string, quantity?: number, unit?: string, store?: string) => void;
+  members?: MemberProfile[];
+  currentUserId?: string | null;
+  onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onClearAll: () => void;
@@ -25,6 +28,8 @@ export default function ShoppingList({
   completedItems,
   loading,
   householdId,
+  members = [],
+  currentUserId = null,
   onAdd,
   onToggle,
   onDelete,
@@ -43,7 +48,7 @@ export default function ShoppingList({
 
   return (
     <div className="flex flex-col gap-3">
-      {!readOnly && <AddShoppingItem onAdd={onAdd} householdId={householdId} />}
+      {!readOnly && <AddShoppingItem onAdd={onAdd} householdId={householdId} members={members} currentUserId={currentUserId} />}
 
       {isEmpty ? (
         <div className="text-center py-12 text-gray-400">
@@ -76,6 +81,8 @@ export default function ShoppingList({
                     item={item}
                     onToggle={onToggle}
                     onDelete={onDelete}
+                    members={members}
+                    currentUserId={currentUserId}
                   />
                 ))}
               </AnimatePresence>

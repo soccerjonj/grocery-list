@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useHouseholdContext } from "@/context/HouseholdContext";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { useShoppingLists } from "@/hooks/useShoppingLists";
+import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import Spinner from "@/components/ui/Spinner";
 
@@ -14,6 +15,7 @@ export default function ShoppingListDetailPage() {
   const listId = params.listId as string;
 
   const { householdId, householdName } = useHouseholdContext();
+  const { members, currentUserId } = useHouseholdMembers(householdId);
   const {
     activeItems,
     completedItems,
@@ -104,6 +106,8 @@ export default function ShoppingListDetailPage() {
         completedItems={completedItems}
         loading={loading}
         householdId={householdId}
+        members={members}
+        currentUserId={currentUserId}
         onAdd={addItem}
         onToggle={toggleComplete}
         onDelete={deleteItem}

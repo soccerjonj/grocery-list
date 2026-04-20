@@ -3,17 +3,21 @@
 import { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
+import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 
 interface AddShoppingItemProps {
-  onAdd: (name: string, quantity?: number, unit?: string, store?: string) => void;
+  onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null) => void;
   householdId: string;
+  members?: MemberProfile[];
+  currentUserId?: string | null;
 }
 
-export default function AddShoppingItem({ onAdd, householdId }: AddShoppingItemProps) {
+export default function AddShoppingItem({ onAdd, householdId, members = [], currentUserId }: AddShoppingItemProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("");
   const [store, setStore] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -50,6 +54,16 @@ export default function AddShoppingItem({ onAdd, householdId }: AddShoppingItemP
     nameRef.current?.blur();
   }
 
+  function toggleMember(userId: string) {
+    setAssignedTo((prev) => {
+      const current = prev ?? [];
+      const next = current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId];
+      return next.length === 0 ? null : next;
+    });
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -57,12 +71,14 @@ export default function AddShoppingItem({ onAdd, householdId }: AddShoppingItemP
       name.trim(),
       quantity ? parseFloat(quantity) : undefined,
       unit || undefined,
-      store.trim() || undefined
+      store.trim() || undefined,
+      assignedTo
     );
     setName("");
     setQuantity("");
     setUnit("");
     setStore("");
+    setAssignedTo(null);
     setShowSuggestions(false);
     setSubmitted(true);
     setTimeout(() => {
@@ -231,6 +247,42 @@ export default function AddShoppingItem({ onAdd, householdId }: AddShoppingItemP
                   onChange={(e) => setStore(e.target.value)}
                   className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
                 />
+                {members.length > 1 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="text-xs text-gray-400 font-medium mr-0.5">For:</span>
+                    <button
+                      type="button"
+                      onClick={() => setAssignedTo(null)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        !assignedTo || assignedTo.length === 0
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      Everyone
+                    </button>
+                    {members.map((m) => {
+                      const selected = !!assignedTo?.includes(m.user_id);
+                      return (
+                        <button
+                          key={m.user_id}
+                          type="button"
+                          onClick={() => toggleMember(m.user_id)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                            selected
+                              ? "bg-indigo-600 text-white"
+                              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${selected ? "bg-white/25" : "bg-gray-300 text-white"}`}>
+                            {m.initials}
+                          </span>
+                          {m.user_id === currentUserId ? "Me" : m.short_name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

@@ -3,17 +3,44 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
+import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 
 interface ShoppingItemProps {
   item: ShoppingItemType;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  members?: MemberProfile[];
+  currentUserId?: string | null;
+}
+
+function assignedLabel(
+  assignedTo: string[] | null,
+  members: MemberProfile[],
+  currentUserId: string | null
+): string | null {
+  if (!assignedTo || assignedTo.length === 0) return null;
+  if (assignedTo.length >= members.length && members.length > 0) return null;
+  if (assignedTo.length === 1) {
+    if (assignedTo[0] === currentUserId) return "For me";
+    const m = members.find((m) => m.user_id === assignedTo[0]);
+    return m ? `For ${m.short_name}` : null;
+  }
+  return (
+    "For " +
+    assignedTo
+      .map((uid) =>
+        uid === currentUserId
+          ? "me"
+          : (members.find((m) => m.user_id === uid)?.short_name ?? "?")
+      )
+      .join(" & ")
+  );
 }
 
 // Total time the check animation plays before the item exits
 const CHECK_ANIMATION_MS = 850;
 
-export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemProps) {
+export default function ShoppingItem({ item, onToggle, onDelete, members = [], currentUserId = null }: ShoppingItemProps) {
   // "checking" is true during the animation window between tap and exit
   const [checking, setChecking] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,7 +124,7 @@ export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemP
         </motion.div>
       </button>
 
-      {/* ── Label + store + animated strikethrough ── */}
+      {/* ── Label + store + member tag + animated strikethrough ── */}
       <div className="flex-1 min-w-0 relative">
         <motion.p
           animate={{ opacity: isChecked ? 0.38 : 1 }}
@@ -113,11 +140,18 @@ export default function ShoppingItem({ item, onToggle, onDelete }: ShoppingItemP
           )}
         </motion.p>
 
-        {/* Store tag */}
-        {item.store && !isChecked && (
-          <p className="text-xs text-gray-400 mt-0.5 truncate">
-            {item.store}
-          </p>
+        {/* Store tag + member assignment */}
+        {!isChecked && (item.store || assignedLabel(item.assigned_to, members, currentUserId)) && (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {item.store && (
+              <p className="text-xs text-gray-400 truncate">{item.store}</p>
+            )}
+            {assignedLabel(item.assigned_to, members, currentUserId) && (
+              <span className="text-xs text-indigo-400 font-medium flex-shrink-0">
+                {assignedLabel(item.assigned_to, members, currentUserId)}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Strikethrough line — sweeps left to right */}

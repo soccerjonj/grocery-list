@@ -401,6 +401,59 @@ export default function PantryItem({
                 </div>
               </div>
 
+              {/* Assigned to */}
+              {members.length > 1 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned to</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {/* "Everyone" chip */}
+                    <button
+                      type="button"
+                      onClick={() => onUpdateItem(item.id, { assigned_to: null })}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        !item.assigned_to || item.assigned_to.length === 0
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      Everyone
+                    </button>
+                    {members.map((member) => {
+                      const selected = !!item.assigned_to?.includes(member.user_id);
+                      function toggleMember() {
+                        const current = item.assigned_to ?? [];
+                        let next: string[];
+                        if (selected) {
+                          next = current.filter((id) => id !== member.user_id);
+                        } else {
+                          next = [...current, member.user_id];
+                        }
+                        // If all members selected, treat as "everyone"
+                        onUpdateItem(item.id, { assigned_to: next.length === 0 ? null : next });
+                      }
+                      const isMe = member.user_id === currentUserId;
+                      return (
+                        <button
+                          key={member.user_id}
+                          type="button"
+                          onClick={toggleMember}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                            selected
+                              ? "bg-indigo-600 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${selected ? "bg-white/20" : "bg-gray-300 text-white"}`}>
+                            {member.initials}
+                          </span>
+                          {isMe ? "Me" : member.short_name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Delete confirmation */}
               <AnimatePresence>
                 {confirmDelete && (

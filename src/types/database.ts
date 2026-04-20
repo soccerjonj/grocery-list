@@ -169,6 +169,7 @@ export interface Database {
           cleared_at: string | null;
           added_by: string | null;
           created_at: string;
+          assigned_to: string[] | null;   // null=everyone, [uuid,...]=specific members
         };
         Insert: {
           id?: string;
@@ -184,6 +185,7 @@ export interface Database {
           cleared_at?: string | null;
           added_by?: string | null;
           created_at?: string;
+          assigned_to?: string[] | null;
         };
         Update: {
           id?: string;
@@ -199,6 +201,7 @@ export interface Database {
           cleared_at?: string | null;
           added_by?: string | null;
           created_at?: string;
+          assigned_to?: string[] | null;
         };
       };
     };
