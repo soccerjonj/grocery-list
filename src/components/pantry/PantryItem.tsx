@@ -47,6 +47,8 @@ function getExpiryBadge(expiresAt: string | null) {
   if (diff <= 7)
     return { label: `${diff}d`, dot: "bg-yellow-400", text: "text-yellow-600", detail: `Expires in ${diff} days`, detailColor: "text-yellow-600" };
 
+  if (diff >= 364)
+    return { label: "1yr+", dot: "bg-green-300", text: "text-green-500", detail: "Expires in over a year", detailColor: "text-green-500" };
   const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return { label: formatted, dot: "bg-green-400", text: "text-green-600", detail: `Expires ${formatted}`, detailColor: "text-green-600" };
 }
