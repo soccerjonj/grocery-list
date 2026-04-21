@@ -164,8 +164,8 @@ function DraftCard({
               {new Date(item.expiresAt + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               <input
                 type="date"
-                value={item.expiresAt}
-                onChange={(e) => onChange({ expiresAt: e.target.value || null })}
+                defaultValue={item.expiresAt}
+                onChange={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full"
               />
             </label>
@@ -187,7 +187,7 @@ function DraftCard({
             Set expiry
             <input
               type="date"
-              onChange={(e) => onChange({ expiresAt: e.target.value || null })}
+              onChange={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
               className="absolute inset-0 opacity-0 cursor-pointer w-full"
             />
           </label>

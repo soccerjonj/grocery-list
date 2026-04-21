@@ -130,14 +130,21 @@ export default function PantryItem({
     if (!expanded) setConfirmDelete(false);
   }, [expanded]);
 
-  // Lock body scroll when sheet is open
+  // Lock body scroll when sheet is open (iOS-safe: fixed position trick)
   useEffect(() => {
-    if (expanded) {
-      document.body.style.overflow = "hidden";
-    } else {
+    if (!expanded) return;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    return () => {
       document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
   }, [expanded]);
 
   const expiry = getExpiryBadge(item.expires_at);
@@ -256,7 +263,7 @@ export default function PantryItem({
             </div>
 
             {/* Scrollable content */}
-            <div className="overflow-y-auto flex-1 px-5 pb-6 flex flex-col gap-5">
+            <div className="overflow-y-auto overscroll-contain flex-1 px-5 pb-6 flex flex-col gap-5">
 
               {/* Quantity stepper */}
               <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3">
@@ -367,7 +374,7 @@ export default function PantryItem({
                     </svg>
                     <label className={`relative text-xs font-medium cursor-pointer ${expiry?.detailColor ?? "text-green-700"}`}>
                       {formatDateDisplay(item.expires_at)}
-                      <input type="date" value={item.expires_at ?? ""} onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
+                      <input type="date" defaultValue={item.expires_at ?? undefined} onChange={(e) => { if (e.target.value) onUpdateItem(item.id, { expires_at: e.target.value }); }} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
                     </label>
                     <button type="button" onClick={() => onUpdateItem(item.id, { expires_at: null })} className={`${expiry?.detailColor ?? "text-green-600"} hover:opacity-70 transition-opacity ml-0.5`}>
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -377,7 +384,7 @@ export default function PantryItem({
                   <label className="inline-flex items-center gap-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors self-start cursor-pointer relative">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     Set expiry date
-                    <input type="date" value={item.expires_at ?? ""} onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
+                    <input type="date" onChange={(e) => { if (e.target.value) onUpdateItem(item.id, { expires_at: e.target.value }); }} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
                   </label>
                 )}
               </div>
