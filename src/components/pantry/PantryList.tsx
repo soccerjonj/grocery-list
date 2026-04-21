@@ -86,6 +86,59 @@ function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
   });
 }
 
+function RunningLowRow({
+  item,
+  locationLabel,
+  onMarkStocked,
+  onAddToList,
+}: {
+  item: PantryItemType;
+  locationLabel: string | null;
+  onMarkStocked: () => void;
+  onAddToList?: () => Promise<boolean>;
+}) {
+  const [added, setAdded] = useState(false);
+
+  async function handleAddToList() {
+    if (!onAddToList) return;
+    const ok = await onAddToList();
+    if (ok) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1500);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 border-l-[3px] border-l-amber-400 rounded-2xl px-4 py-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+        {locationLabel && <p className="text-xs text-gray-400 mt-0.5">{locationLabel}</p>}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {onAddToList && (
+          <button
+            type="button"
+            onClick={handleAddToList}
+            disabled={added}
+            className={`text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all active:scale-95 ${
+              added ? "bg-green-100 text-green-600" : "bg-white border border-gray-200 text-gray-600 hover:border-gray-400"
+            }`}
+          >
+            {added ? "Added!" : "+ List"}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onMarkStocked}
+          className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors active:scale-95"
+        >
+          Stocked
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface SectionProps {
   label: string;
   items: PantryItemType[];
@@ -238,6 +291,8 @@ export default function PantryList({
     ? items.filter((i) => i.food_category === filterCategory)
     : items;
 
+  const runningLowItems = items.filter((i) => i.running_low);
+
   const fridgeItems   = filtered.filter((i) => i.storage_location === "fridge");
   const freezerItems  = filtered.filter((i) => i.storage_location === "freezer");
   const pantryItems   = filtered.filter((i) => i.storage_location === "pantry");
@@ -245,6 +300,10 @@ export default function PantryList({
   const unsortedItems = filtered.filter((i) => !i.storage_location);
 
   const hasItems = filtered.length > 0;
+
+  const LOCATION_LABEL: Record<string, string> = {
+    fridge: "Fridge", freezer: "Freezer", pantry: "Pantry", room_temp: "Counter",
+  };
 
   const sectionProps = { members, currentUserId, sort, expandedId, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
 
@@ -307,6 +366,40 @@ export default function PantryList({
         <p className="text-center text-sm text-gray-400 py-8">No items in this category</p>
       ) : (
         <div className="flex flex-col gap-4">
+
+          {/* ── Running Low ─────────────────────────────────── */}
+          <AnimatePresence>
+            {runningLowItems.length > 0 && (
+              <motion.div
+                key="running-low"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-2"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Running Low</span>
+                  <span className="text-xs text-amber-300">({runningLowItems.length})</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {runningLowItems.map((item) => (
+                    <RunningLowRow
+                      key={item.id}
+                      item={item}
+                      locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
+                      onMarkStocked={() => onUpdateItem(item.id, { running_low: false })}
+                      onAddToList={onAddToShoppingList ? () => onAddToShoppingList(item.name) : undefined}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <StorageSection label="Fridge"  items={fridgeItems}   {...sectionProps} />
           <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} />
           <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} />

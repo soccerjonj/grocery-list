@@ -527,12 +527,11 @@ export default function PantryItem({
             : { duration: 0.18, ease: "easeOut" }
         }
         style={{ gridColumn: "span 1" }}
-        className="bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer active:scale-[0.97] transition-transform"
+        className={`bg-white rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border border-gray-100 ${item.running_low ? "border-l-[3px] border-l-amber-400" : ""}`}
         onClick={onToggleExpand}
       >
         <div className="p-3 flex flex-col gap-2 min-h-[76px]">
           <div className="flex items-start gap-1.5">
-            {item.running_low && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 mt-[3px]" />}
             <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2 flex-1">{item.name}</p>
             {assignedMembers.length > 0 && (
               <div className="flex -space-x-1 flex-shrink-0 mt-[1px]">
