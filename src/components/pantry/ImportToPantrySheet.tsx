@@ -154,43 +154,21 @@ function DraftCard({
       </div>
 
       {/* Row 4: expiry date */}
-      <div>
-        {item.expiresAt ? (
-          <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-xl px-3 py-1.5">
-            <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <label className="relative text-xs font-medium text-green-700 cursor-pointer">
-              {new Date(item.expiresAt + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-              <input
-                type="date"
-                defaultValue={item.expiresAt}
-                onBlur={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => onChange({ expiresAt: null })}
-              className="text-green-600 hover:opacity-70 transition-opacity ml-0.5"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        ) : (
-          <label className="inline-flex items-center gap-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors cursor-pointer relative">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Set expiry
-            <input
-              type="date"
-              onBlur={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full"
-            />
-          </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={item.expiresAt ?? ""}
+          onChange={(e) => onChange({ expiresAt: e.target.value || null })}
+          className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors"
+        />
+        {item.expiresAt && (
+          <button
+            type="button"
+            onClick={() => onChange({ expiresAt: null })}
+            className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors active:opacity-60"
+          >
+            Clear
+          </button>
         )}
       </div>
     </motion.div>

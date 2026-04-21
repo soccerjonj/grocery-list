@@ -203,7 +203,7 @@ export default function PantryItem({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 380, damping: 40 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[88vh] flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {/* Handle */}
@@ -367,26 +367,17 @@ export default function PantryItem({
               {/* Expiry */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Expires</p>
-                {item.expires_at ? (
-                  <div className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 self-start border ${expiry?.bg ?? "bg-green-50 border-green-200"}`}>
-                    <svg className={`w-3.5 h-3.5 flex-shrink-0 ${expiry?.detailColor ?? "text-green-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <label className={`relative text-xs font-medium cursor-pointer ${expiry?.detailColor ?? "text-green-700"}`}>
-                      {formatDateDisplay(item.expires_at)}
-                      <input type="date" defaultValue={item.expires_at ?? undefined} onBlur={(e) => { if (e.target.value) onUpdateItem(item.id, { expires_at: e.target.value }); }} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
-                    </label>
-                    <button type="button" onClick={() => onUpdateItem(item.id, { expires_at: null })} className={`${expiry?.detailColor ?? "text-green-600"} hover:opacity-70 transition-opacity ml-0.5`}>
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                ) : (
-                  <label className="inline-flex items-center gap-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors self-start cursor-pointer relative">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    Set expiry date
-                    <input type="date" onBlur={(e) => { if (e.target.value) onUpdateItem(item.id, { expires_at: e.target.value }); }} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
-                  </label>
-                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={item.expires_at ?? ""}
+                    onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
+                    className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors"
+                  />
+                  {item.expires_at && expiry && (
+                    <span className={`text-xs font-medium flex-shrink-0 ${expiry.text}`}>{expiry.detail}</span>
+                  )}
+                </div>
               </div>
 
               {/* Storage */}
