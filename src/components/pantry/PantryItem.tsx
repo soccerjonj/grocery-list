@@ -511,7 +511,6 @@ export default function PantryItem({
     <>
       {/* ── Compact card (always) ─────────────────────────────── */}
       <motion.div
-        layout
         initial={{ opacity: 0, scale: 0.96 }}
         animate={
           exitVariant === "consume"

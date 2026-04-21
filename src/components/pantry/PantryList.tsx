@@ -126,7 +126,7 @@ function StorageSection({
   function renderGrid(group: PantryItemType[]) {
     return (
       <div className="grid grid-cols-2 gap-2">
-        <AnimatePresence>
+        <AnimatePresence mode="popLayout">
           {sortItems(group, sort).map((item) => (
             <PantryItem
               key={item.id}
