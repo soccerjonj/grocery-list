@@ -126,12 +126,14 @@ export function usePantry(householdId: string) {
     if (insertError) {
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
     } else if (data) {
-      // Register the real ID so the Realtime INSERT event doesn't double-add it
       selfInsertedIds.current.add(data.id);
       setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
-      setItems((prev) =>
-        prev.map((i) => (i.id === optimistic.id ? data : i))
-      );
+      setItems((prev) => {
+        // Strip any Realtime-added copy of the real item (race condition: Realtime
+        // INSERT event can arrive before this response and add a duplicate)
+        const deduped = prev.filter((i) => i.id !== data.id);
+        return deduped.map((i) => (i.id === optimistic.id ? data : i));
+      });
     }
   }
 

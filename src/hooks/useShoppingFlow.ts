@@ -157,7 +157,10 @@ export function useShoppingFlow(householdId: string) {
     } else if (data) {
       selfInsertedIds.current.add(data.id);
       setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
-      setItems((prev) => prev.map((i) => (i.id === optimistic.id ? data : i)));
+      setItems((prev) => {
+        const deduped = prev.filter((i) => i.id !== data.id);
+        return deduped.map((i) => (i.id === optimistic.id ? data : i));
+      });
     }
   }
 
