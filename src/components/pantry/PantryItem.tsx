@@ -377,6 +377,15 @@ export default function PantryItem({
                   {item.expires_at && expiry && (
                     <span className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</span>
                   )}
+                  {item.expires_at && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateItem(item.id, { expires_at: null })}
+                      className="text-xs text-gray-400 hover:text-red-400 transition-colors active:opacity-60"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               </div>
 
