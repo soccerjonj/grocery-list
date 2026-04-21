@@ -126,17 +126,15 @@ function StorageSection({
   function renderGrid(group: PantryItemType[]) {
     return (
       <div className="grid grid-cols-2 gap-2">
-        <AnimatePresence mode="popLayout">
-          {sortItems(group, sort).map((item) => (
-            <PantryItem
-              key={item.id}
-              item={item}
-              expanded={expandedId === item.id}
-              onToggleExpand={() => onToggleExpand(item.id)}
-              {...itemProps}
-            />
-          ))}
-        </AnimatePresence>
+        {sortItems(group, sort).map((item) => (
+          <PantryItem
+            key={item.id}
+            item={item}
+            expanded={expandedId === item.id}
+            onToggleExpand={() => onToggleExpand(item.id)}
+            {...itemProps}
+          />
+        ))}
       </div>
     );
   }
