@@ -196,7 +196,14 @@ function StorageSection({
                     {renderGrid(longTerm)}
                   </div>
                 )}
-                {unzoned.length > 0 && renderGrid(unzoned)}
+                {unzoned.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    {(quickUse.length > 0 || longTerm.length > 0) && (
+                      <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider pl-1">General</p>
+                    )}
+                    {renderGrid(unzoned)}
+                  </div>
+                )}
               </div>
             ) : (
               renderGrid(unzoned)
