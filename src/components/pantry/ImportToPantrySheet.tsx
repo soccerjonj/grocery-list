@@ -165,7 +165,7 @@ function DraftCard({
               <input
                 type="date"
                 defaultValue={item.expiresAt}
-                onChange={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
+                onBlur={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full"
               />
             </label>
@@ -187,7 +187,7 @@ function DraftCard({
             Set expiry
             <input
               type="date"
-              onChange={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
+              onBlur={(e) => { if (e.target.value) onChange({ expiresAt: e.target.value }); }}
               className="absolute inset-0 opacity-0 cursor-pointer w-full"
             />
           </label>
