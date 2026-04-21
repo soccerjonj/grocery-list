@@ -511,6 +511,7 @@ export default function PantryItem({
     <>
       {/* ── Compact card (always) ─────────────────────────────── */}
       <motion.div
+        layout
         initial={{ opacity: 0, scale: 0.96 }}
         animate={
           exitVariant === "consume"
@@ -525,6 +526,7 @@ export default function PantryItem({
             ? { duration: exitVariant === "consume" ? 0.3 : 0.24, ease: [0.4, 0, 1, 1] }
             : { duration: 0.18, ease: "easeOut" }
         }
+        style={{ gridColumn: "span 1" }}
         className="bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer active:scale-[0.97] transition-transform"
         onClick={onToggleExpand}
       >

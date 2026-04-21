@@ -124,28 +124,19 @@ function StorageSection({
   const itemProps = { members, currentUserId, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
 
   function renderGrid(group: PantryItemType[]) {
-    const sorted = sortItems(group, sort);
-    const rows: PantryItemType[][] = [];
-    for (let i = 0; i < sorted.length; i += 2) {
-      rows.push(sorted.slice(i, i + 2));
-    }
     return (
-      <div className="flex flex-col gap-2">
-        {rows.map((row, rowIdx) => (
-          <div key={rowIdx} className="flex gap-2">
-            {row.map((item) => (
-              <div key={item.id} className="flex-1 min-w-0">
-                <PantryItem
-                  item={item}
-                  expanded={expandedId === item.id}
-                  onToggleExpand={() => onToggleExpand(item.id)}
-                  {...itemProps}
-                />
-              </div>
-            ))}
-            {row.length === 1 && <div className="flex-1" />}
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-2">
+        <AnimatePresence mode="popLayout">
+          {sortItems(group, sort).map((item) => (
+            <PantryItem
+              key={item.id}
+              item={item}
+              expanded={expandedId === item.id}
+              onToggleExpand={() => onToggleExpand(item.id)}
+              {...itemProps}
+            />
+          ))}
+        </AnimatePresence>
       </div>
     );
   }
