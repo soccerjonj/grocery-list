@@ -366,7 +366,7 @@ export default function ShoppingItem({
         {/* ── Member avatars ── */}
         {assignedMembers.length > 0 && !isChecked && (
           <div className="flex -space-x-1 flex-shrink-0">
-            {assignedMembers.slice(0, 3).map((m) => {
+            {assignedMembers.map((m) => {
               const c = m.color ?? DEFAULT_COLOR;
               return (
                 <span

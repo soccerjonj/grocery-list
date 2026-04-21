@@ -521,7 +521,7 @@ export default function PantryItem({
             <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2 flex-1">{item.name}</p>
             {assignedMembers.length > 0 && (
               <div className="flex -space-x-1 flex-shrink-0 mt-[1px]">
-                {assignedMembers.slice(0, 2).map((m) => {
+                {assignedMembers.map((m) => {
                   const c = m.color ?? DEFAULT_COLOR;
                   return (
                     <span
@@ -534,11 +534,6 @@ export default function PantryItem({
                     </span>
                   );
                 })}
-                {assignedMembers.length > 2 && (
-                  <span className="w-4 h-4 rounded-full bg-gray-100 ring-1 ring-white flex items-center justify-center text-[7px] font-bold text-gray-400">
-                    +{assignedMembers.length - 2}
-                  </span>
-                )}
               </div>
             )}
           </div>
