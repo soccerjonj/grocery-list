@@ -1,21 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useHouseholdContext } from "@/context/HouseholdContext";
 import { usePantry } from "@/hooks/usePantry";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import PantryList from "@/components/pantry/PantryList";
 import InviteModal from "@/components/household/InviteModal";
+import ImportToPantrySheet from "@/components/pantry/ImportToPantrySheet";
 import { createClient } from "@/lib/supabase/client";
 
-export default function PantryPage() {
+function PantryPageInner() {
   const { householdId, householdName } = useHouseholdContext();
   const { items, loading, addItem, updateQuantity, updateItem, deleteItem } = usePantry(householdId);
   const { members, currentUserId } = useHouseholdMembers(householdId);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [activeShoppingListId, setActiveShoppingListId] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const importListId = searchParams.get("import");
 
   useEffect(() => {
     const supabase = createClient();
@@ -54,6 +60,10 @@ export default function PantryPage() {
       added_by: user?.id ?? null,
     });
     return !error;
+  }
+
+  function handleImportClose() {
+    router.replace(`/household/${householdId}/pantry`);
   }
 
   return (
@@ -107,6 +117,24 @@ export default function PantryPage() {
         inviteCode={inviteCode}
         householdName={householdName}
       />
+
+      {/* Import sheet — shown when ?import=<listId> is in the URL */}
+      {importListId && (
+        <ImportToPantrySheet
+          listId={importListId}
+          householdId={householdId}
+          onAddItem={addItem}
+          onClose={handleImportClose}
+        />
+      )}
     </div>
+  );
+}
+
+export default function PantryPage() {
+  return (
+    <Suspense>
+      <PantryPageInner />
+    </Suspense>
   );
 }

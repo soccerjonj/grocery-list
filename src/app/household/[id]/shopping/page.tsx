@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useHouseholdContext } from "@/context/HouseholdContext";
 import { useShoppingFlow } from "@/hooks/useShoppingFlow";
@@ -51,14 +52,22 @@ export default function ShoppingPage() {
     finishTrip,
   } = useShoppingFlow(householdId);
 
+  const router = useRouter();
   const [showPast, setShowPast] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [lastTripId, setLastTripId] = useState<string | null>(null);
+  const [lastTripCount, setLastTripCount] = useState(0);
 
   const hasCompleted = completedItems.length > 0;
 
   async function handleFinishTrip() {
+    const count = completedItems.length;
     setConfirmFinish(false);
-    await finishTrip();
+    const archivedId = await finishTrip();
+    if (archivedId) {
+      setLastTripId(archivedId);
+      setLastTripCount(count);
+    }
   }
 
   return (
@@ -154,6 +163,51 @@ export default function ShoppingPage() {
                 >
                   Cancel
                 </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── Add to pantry prompt (after finishing a trip) ─ */}
+          <AnimatePresence>
+            {lastTripId && (
+              <motion.div
+                key="import-prompt"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.22 }}
+                className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Trip saved!</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Want to add your {lastTripCount} item{lastTripCount !== 1 ? "s" : ""} to the pantry?
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => router.push(`/household/${householdId}/pantry?import=${lastTripId}`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl active:scale-[0.97] transition-all"
+                  >
+                    Add to pantry
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setLastTripId(null)}
+                    className="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
+                  >
+                    Later
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

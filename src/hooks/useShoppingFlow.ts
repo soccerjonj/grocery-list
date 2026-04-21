@@ -204,9 +204,11 @@ export function useShoppingFlow(householdId: string) {
   // ── Finish trip ───────────────────────────────────────────────
   // Archives current list (saves it as a past trip), creates a new active
   // list, and carries over any unchecked items.
-  async function finishTrip() {
-    if (!activeListId || finishing) return;
+  // Returns the archived list ID so the caller can offer pantry import.
+  async function finishTrip(): Promise<string | null> {
+    if (!activeListId || finishing) return null;
     setFinishing(true);
+    const archivedListId = activeListId;
 
     const now = new Date().toISOString();
     const unchecked = items.filter((i) => !i.completed);
@@ -224,7 +226,7 @@ export function useShoppingFlow(householdId: string) {
       .select()
       .single();
 
-    if (!newList) { setFinishing(false); return; }
+    if (!newList) { setFinishing(false); return null; }
 
     // Move unchecked items to the new list
     if (unchecked.length > 0) {
@@ -238,8 +240,9 @@ export function useShoppingFlow(householdId: string) {
     const carried = unchecked.map((i) => ({ ...i, list_id: newList.id, completed: false, completed_by: null, completed_at: null }));
     setItems(carried);
     setActiveListId(newList.id);
-    setPastLists((prev) => [{ ...newList, id: activeListId, archived_at: now, name: tripName() }, ...prev]);
+    setPastLists((prev) => [{ ...newList, id: archivedListId, archived_at: now, name: tripName() }, ...prev]);
     setFinishing(false);
+    return archivedListId;
   }
 
   const activeItems = items.filter((i) => !i.completed);
