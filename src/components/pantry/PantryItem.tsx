@@ -477,45 +477,15 @@ export default function PantryItem({
               )}
 
               {/* Delete confirmation */}
-              <AnimatePresence>
-                {confirmDelete && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 flex flex-col gap-2">
-                      <p className="text-sm font-semibold text-gray-800 text-center">Are you sure?</p>
-                      <button type="button" onClick={() => { setConfirmDelete(false); onUpdateQuantity(item.id, Math.max(1, item.quantity - 1)); }}
-                        className="w-full px-3 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl active:scale-[0.97] transition-all">
-                        Just reduce the quantity
-                      </button>
-                      {onAddToShoppingList && (
-                        <button type="button" onClick={handleAddToListAndRemove}
-                          className="w-full px-3 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl active:scale-[0.97] transition-all">
-                          Add to shopping list & remove
-                        </button>
-                      )}
-                      <button type="button" onClick={() => triggerExit("delete")}
-                        className="w-full px-3 py-2.5 text-red-500 text-sm font-medium active:opacity-60 transition-colors">
-                        Remove from pantry
-                      </button>
-                      <button type="button" onClick={() => setConfirmDelete(false)}
-                        className="w-full px-3 py-1.5 text-gray-400 text-xs active:opacity-60 transition-colors">
-                        Cancel
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Remove button — always shows confirm */}
-              {!confirmDelete && (
-                <button type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-50 text-red-500 text-sm font-medium hover:bg-red-100 transition-colors active:scale-[0.97]">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Remove from pantry
-                </button>
-              )}
+              {/* Remove button */}
+              <button type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-50 text-red-500 text-sm font-medium hover:bg-red-100 transition-colors active:scale-[0.97]">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Remove from pantry
+              </button>
             </div>
           </motion.div>
         </>
@@ -587,6 +557,76 @@ export default function PantryItem({
 
       {/* ── Bottom sheet (portal) ─────────────────────────────── */}
       {mounted && createPortal(sheet, document.body)}
+
+      {/* ── Confirm delete modal (portal) ────────────────────── */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {confirmDelete && (
+            <>
+              <motion.div
+                key="confirm-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="fixed inset-0 z-[60] bg-black/50"
+                onClick={() => setConfirmDelete(false)}
+              />
+              <motion.div
+                key="confirm-modal"
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                className="fixed z-[61] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-48px)] max-w-sm bg-white rounded-3xl shadow-2xl p-5 flex flex-col gap-3"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <p className="text-base font-semibold text-gray-900">Remove item?</p>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors active:scale-90"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <p className="text-sm text-gray-400 -mt-1">What would you like to do with <span className="font-medium text-gray-600">{item.name}</span>?</p>
+
+                <div className="flex flex-col gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmDelete(false); onUpdateQuantity(item.id, Math.max(1, item.quantity - 1)); }}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
+                  >
+                    Just reduce the quantity
+                  </button>
+                  {onAddToShoppingList && (
+                    <button
+                      type="button"
+                      onClick={handleAddToListAndRemove}
+                      className="w-full px-4 py-3 bg-gray-900 text-white text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
+                    >
+                      Add to shopping list &amp; remove
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmDelete(false); triggerExit("delete"); }}
+                    className="w-full px-4 py-3 bg-red-50 text-red-500 text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
+                  >
+                    Remove from pantry
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 }
