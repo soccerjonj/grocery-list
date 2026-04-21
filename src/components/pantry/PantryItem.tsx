@@ -367,26 +367,31 @@ export default function PantryItem({
               {/* Expiry */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Expires</p>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <input
                     type="date"
                     value={item.expires_at ?? ""}
                     onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
-                    className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors w-auto"
+                    className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors min-w-0"
                   />
-                  {item.expires_at && expiry && (
-                    <span className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</span>
-                  )}
-                  {item.expires_at && (
+                  {item.expires_at ? (
                     <button
                       type="button"
                       onClick={() => onUpdateItem(item.id, { expires_at: null })}
-                      className="text-xs text-gray-400 hover:text-red-400 transition-colors active:opacity-60"
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 transition-colors active:scale-[0.96]"
                     >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                       Clear
                     </button>
+                  ) : (
+                    expiry == null && null
                   )}
                 </div>
+                {item.expires_at && expiry && (
+                  <p className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</p>
+                )}
               </div>
 
               {/* Storage */}
