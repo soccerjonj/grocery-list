@@ -19,7 +19,7 @@ interface ShoppingListProps {
   onUpdate?: (id: string, fields: Partial<Pick<ShoppingItemType, "name" | "quantity" | "unit" | "store" | "assigned_to">>) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onClearAll: () => void;
+  onClearAll?: () => void;
   /** When true (archived list), hide the add form */
   readOnly?: boolean;
 }

@@ -8,7 +8,7 @@ interface CompletedSectionProps {
   items: ShoppingItem[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onClearAll: () => void;
+  onClearAll?: () => void;
 }
 
 export default function CompletedSection({
@@ -52,12 +52,14 @@ export default function CompletedSection({
           <span>Completed ({items.length})</span>
         </button>
 
-        <button
-          onClick={onClearAll}
-          className="text-xs text-gray-400 hover:text-red-500 transition-colors py-1 px-1 active:opacity-60"
-        >
-          Clear all
-        </button>
+        {onClearAll && (
+          <button
+            onClick={onClearAll}
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors py-1 px-1 active:opacity-60"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
       {/* Collapsible list */}
