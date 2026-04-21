@@ -30,7 +30,14 @@ export function usePantry(householdId: string) {
     if (fetchError) {
       setError(fetchError.message);
     } else {
-      setItems(data ?? []);
+      // Deduplicate by ID in case of any DB or Realtime race duplicates
+      const seen = new Set<string>();
+      const deduped = (data ?? []).filter((i) => {
+        if (seen.has(i.id)) return false;
+        seen.add(i.id);
+        return true;
+      });
+      setItems(deduped);
     }
     setLoading(false);
   }, [householdId, supabase]);
