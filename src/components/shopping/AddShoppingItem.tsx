@@ -26,10 +26,11 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   const nameRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { getSuggestions, getStores } = useItemSuggestions(householdId);
+  const { getSuggestions, getStores, saveStore, deleteStore, savedStores } = useItemSuggestions(householdId);
   const suggestions = getSuggestions(name, 5);
   const knownStores = getStores();
   const [customStoreMode, setCustomStoreMode] = useState(false);
+  const [managingStores, setManagingStores] = useState(false);
 
   // Close on outside tap
   useEffect(() => {
@@ -82,8 +83,10 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
     setUnit("");
     setStore("");
     setAssignedTo(null);
+    if (customStoreMode && store.trim()) saveStore(store.trim());
     setShowSuggestions(false);
     setCustomStoreMode(false);
+    setManagingStores(false);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
@@ -250,29 +253,56 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     <button
                       key={s}
                       type="button"
-                      onClick={() => { setStore(store === s ? "" : s); setCustomStoreMode(false); }}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        store === s ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      onClick={() => { if (!managingStores) { setStore(store === s ? "" : s); setCustomStoreMode(false); } }}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        store === s && !managingStores ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
-                    >{s}</button>
+                    >
+                      {s}
+                      {managingStores && (
+                        <span
+                          role="button"
+                          onClick={(e) => { e.stopPropagation(); deleteStore(s); if (store === s) setStore(""); }}
+                          className="ml-0.5 text-gray-400 hover:text-red-500"
+                        >×</span>
+                      )}
+                    </button>
                   ))}
                   <button
                     type="button"
-                    onClick={() => { setCustomStoreMode((v) => !v); if (customStoreMode) setStore(""); }}
+                    onClick={() => { setCustomStoreMode((v) => !v); setManagingStores(false); if (customStoreMode) setStore(""); }}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                       customStoreMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                     }`}
                   >{knownStores.length === 0 ? "Add store" : "+ New"}</button>
+                  {knownStores.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setManagingStores((v) => !v); setCustomStoreMode(false); }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        managingStores ? "bg-red-50 text-red-400" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                      }`}
+                    >{managingStores ? "Done" : "Edit"}</button>
+                  )}
                 </div>
                 {customStoreMode && (
-                  <input
-                    type="text"
-                    placeholder="Store name"
-                    value={store}
-                    onChange={(e) => setStore(e.target.value)}
-                    autoFocus
-                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Store name"
+                      value={store}
+                      onChange={(e) => setStore(e.target.value)}
+                      autoFocus
+                      className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
+                    />
+                    {store.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => { saveStore(store.trim()); setCustomStoreMode(false); }}
+                        className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium active:scale-[0.94]"
+                      >Save</button>
+                    )}
+                  </div>
                 )}
                 {members.length > 1 && (
                   <div className="flex items-center gap-1.5 flex-wrap pt-0.5">

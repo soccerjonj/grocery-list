@@ -17,10 +17,18 @@ export interface ItemSuggestion {
 
 export function useItemSuggestions(householdId: string) {
   const [suggestions, setSuggestions] = useState<ItemSuggestion[]>([]);
+  const [savedStores, setSavedStores] = useState<string[]>([]);
 
   useEffect(() => {
     if (!householdId) return;
     const supabase = createClient();
+
+    supabase
+      .from("household_stores")
+      .select("name")
+      .eq("household_id", householdId)
+      .order("name")
+      .then(({ data }) => setSavedStores((data ?? []).map((r) => r.name)));
 
     Promise.all([
       supabase
@@ -80,14 +88,32 @@ export function useItemSuggestions(householdId: string) {
       .slice(0, limit);
   }
 
-  /** All unique stores seen in shopping history, sorted A-Z. */
+  /** All unique stores (saved + history), sorted A-Z. */
   function getStores(): string[] {
-    const seen = new Set<string>();
+    const seen = new Set<string>(savedStores);
     for (const s of suggestions) {
       if (s.store?.trim()) seen.add(s.store.trim());
     }
     return [...seen].sort();
   }
 
-  return { suggestions, getSuggestions, getStores };
+  /** Persist a store name to the household_stores table. */
+  async function saveStore(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("household_stores")
+      .upsert({ household_id: householdId, name: trimmed }, { onConflict: "household_id,name" });
+    if (!error) setSavedStores((prev) => [...new Set([...prev, trimmed])].sort());
+  }
+
+  /** Delete a saved store. */
+  async function deleteStore(name: string) {
+    const supabase = createClient();
+    await supabase.from("household_stores").delete().eq("household_id", householdId).eq("name", name);
+    setSavedStores((prev) => prev.filter((s) => s !== name));
+  }
+
+  return { suggestions, getSuggestions, getStores, saveStore, deleteStore, savedStores };
 }
