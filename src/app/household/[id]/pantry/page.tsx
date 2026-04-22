@@ -47,16 +47,24 @@ function PantryPageInner() {
       .then(({ data }) => setActiveShoppingListId(data?.[0]?.id ?? null));
   }, [householdId]);
 
-  async function addToShoppingList(name: string): Promise<boolean> {
+  async function addToShoppingList(
+    name: string,
+    quantity?: number | null,
+    unit?: string | null,
+    store?: string | null,
+    assignedTo?: string[] | null,
+  ): Promise<boolean> {
     if (!activeShoppingListId) return false;
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("shopping_items").insert({
       household_id: householdId,
       list_id: activeShoppingListId,
       name,
+      quantity: quantity ?? null,
+      unit: unit ?? null,
+      store: store ?? null,
+      assigned_to: assignedTo ?? null,
       added_by: user?.id ?? null,
     });
     return !error;

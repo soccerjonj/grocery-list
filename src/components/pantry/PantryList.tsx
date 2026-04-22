@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import PantryItem from "./PantryItem";
 import AddPantryItem from "./AddPantryItem";
@@ -9,6 +10,7 @@ import type { PantryItem as PantryItemType } from "@/types/database";
 import { FOOD_CATEGORIES } from "@/types/database";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
+import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 
 interface PantryListProps {
   items: PantryItemType[];
@@ -20,7 +22,7 @@ interface PantryListProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
-  onAddToShoppingList?: (name: string) => Promise<boolean>;
+  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null) => Promise<boolean>;
 }
 
 type SortKey = "freshness" | "expiry" | "name" | "category" | "added";
@@ -86,68 +88,251 @@ function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
   });
 }
 
+function AddToListModal({
+  itemName,
+  members,
+  currentUserId,
+  onConfirm,
+  onClose,
+}: {
+  itemName: string;
+  members: MemberProfile[];
+  currentUserId: string | null;
+  onConfirm: (qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [qty, setQty] = useState("");
+  const [unit, setUnit] = useState("");
+  const [store, setStore] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  function toggleMember(uid: string) {
+    setAssignedTo((prev) => {
+      const cur = prev ?? [];
+      const next = cur.includes(uid) ? cur.filter((id) => id !== uid) : [...cur, uid];
+      return next.length === 0 ? null : next;
+    });
+  }
+
+  async function handleConfirm() {
+    setSaving(true);
+    await onConfirm(
+      qty ? parseFloat(qty) : null,
+      unit.trim() || null,
+      store.trim() || null,
+      assignedTo,
+    );
+    setSaving(false);
+    onClose();
+  }
+
+  const modal = (
+    <AnimatePresence>
+      <motion.div
+        key="backdrop"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-5"
+        onClick={onClose}
+      >
+        <motion.div
+          key="card"
+          initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 420, damping: 36 }}
+          className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-5 flex flex-col gap-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Add to shopping list</p>
+              <p className="text-base font-semibold text-gray-900">{itemName}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors active:scale-90 flex-shrink-0 mt-0.5"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Qty + unit */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Quantity &amp; unit</p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="1"
+                step="any"
+                placeholder="Qty"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                className="w-20 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 text-center transition-colors"
+              />
+              <input
+                type="text"
+                placeholder="Unit (optional)"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Store */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Store</p>
+            <input
+              type="text"
+              placeholder="e.g. Trader Joe's"
+              value={store}
+              onChange={(e) => setStore(e.target.value)}
+              className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors"
+            />
+          </div>
+
+          {/* Member assignment */}
+          {members.length > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">For</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAssignedTo(null)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                    !assignedTo || assignedTo.length === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  Everyone
+                </button>
+                {members.map((m) => {
+                  const selected = !!assignedTo?.includes(m.user_id);
+                  const color = m.color ?? DEFAULT_COLOR;
+                  return (
+                    <button
+                      key={m.user_id}
+                      type="button"
+                      onClick={() => toggleMember(m.user_id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
+                      style={selected ? { backgroundColor: color, color: "#fff" } : { backgroundColor: hexAlpha(color, 0.1), color }}
+                    >
+                      <span
+                        className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                        style={selected ? { backgroundColor: "rgba(255,255,255,0.25)" } : { backgroundColor: hexAlpha(color, 0.2) }}
+                      >
+                        {m.initials}
+                      </span>
+                      {m.user_id === currentUserId ? "Me" : m.short_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Confirm */}
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={saving}
+            className="w-full py-3 bg-gray-900 text-white text-sm font-medium rounded-2xl disabled:opacity-40 active:scale-[0.98] transition-all"
+          >
+            {saving ? "Adding…" : "Add to list"}
+          </button>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+
+  return mounted ? createPortal(modal, document.body) : null;
+}
+
 function RunningLowRow({
   item,
   locationLabel,
+  members,
+  currentUserId,
   onMarkStocked,
   onIgnore,
   onAddToList,
 }: {
   item: PantryItemType;
   locationLabel: string | null;
+  members: MemberProfile[];
+  currentUserId: string | null;
   onMarkStocked: () => void;
   onIgnore: () => void;
-  onAddToList?: () => Promise<boolean>;
+  onAddToList?: (qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) => Promise<boolean>;
 }) {
+  const [modalOpen, setModalOpen] = useState(false);
   const [added, setAdded] = useState(false);
 
-  async function handleAddToList() {
+  async function handleConfirm(qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) {
     if (!onAddToList) return;
-    const ok = await onAddToList();
+    const ok = await onAddToList(qty, unit, store, assignedTo);
     if (ok) {
       setAdded(true);
-      setTimeout(() => setAdded(false), 1500);
+      setTimeout(() => setAdded(false), 2000);
     }
   }
 
   return (
-    <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 border-l-[3px] border-l-amber-400 rounded-xl px-3 py-2">
-      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-        <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
-        {locationLabel && <p className="text-[10px] text-gray-400 flex-shrink-0">{locationLabel}</p>}
-      </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        {onAddToList && (
+    <>
+      <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 border-l-[3px] border-l-amber-400 rounded-xl px-3 py-2">
+        <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+          <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
+          {locationLabel && <p className="text-[10px] text-gray-400 flex-shrink-0">{locationLabel}</p>}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {onAddToList && (
+            <button
+              type="button"
+              onClick={() => !added && setModalOpen(true)}
+              disabled={added}
+              className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-all active:scale-95 ${
+                added ? "bg-green-100 text-green-600" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
+              }`}
+            >
+              {added ? "Added!" : "+ List"}
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleAddToList}
-            disabled={added}
-            className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-all active:scale-95 ${
-              added ? "bg-green-100 text-green-600" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
-            }`}
+            onClick={onMarkStocked}
+            className="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors active:scale-95"
           >
-            {added ? "Added!" : "+ List"}
+            Stocked
           </button>
-        )}
-        <button
-          type="button"
-          onClick={onMarkStocked}
-          className="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors active:scale-95"
-        >
-          Stocked
-        </button>
-        <button
-          type="button"
-          onClick={onIgnore}
-          className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors active:scale-90"
-          aria-label="Ignore"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+          <button
+            type="button"
+            onClick={onIgnore}
+            className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors active:scale-90"
+            aria-label="Ignore"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
-    </div>
+
+      {modalOpen && (
+        <AddToListModal
+          itemName={item.name}
+          members={members}
+          currentUserId={currentUserId}
+          onConfirm={handleConfirm}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -162,7 +347,7 @@ interface SectionProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
-  onAddToShoppingList?: (name: string) => Promise<boolean>;
+  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null) => Promise<boolean>;
 }
 
 function StorageSection({
@@ -413,7 +598,9 @@ export default function PantryList({
                       locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
                       onMarkStocked={() => onUpdateItem(item.id, { running_low: false })}
                       onIgnore={() => setIgnoredIds((prev) => new Set([...prev, item.id]))}
-                      onAddToList={onAddToShoppingList ? () => onAddToShoppingList(item.name) : undefined}
+                      members={members}
+                      currentUserId={currentUserId}
+                      onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo) : undefined}
                     />
                   ))}
                 </div>
