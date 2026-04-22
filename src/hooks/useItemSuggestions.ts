@@ -101,11 +101,12 @@ export function useItemSuggestions(householdId: string) {
   async function saveStore(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
+    // Optimistic update immediately
+    setSavedStores((prev) => [...new Set([...prev, trimmed])].sort());
     const supabase = createClient();
-    const { error } = await supabase
+    await supabase
       .from("household_stores")
       .upsert({ household_id: householdId, name: trimmed }, { onConflict: "household_id,name" });
-    if (!error) setSavedStores((prev) => [...new Set([...prev, trimmed])].sort());
   }
 
   /** Delete a saved store. */
