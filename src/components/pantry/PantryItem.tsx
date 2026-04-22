@@ -107,6 +107,8 @@ export default function PantryItem({
   const [exitVariant, setExitVariant] = useState<"consume" | "delete" | null>(null);
   const [mounted, setMounted] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -162,6 +164,24 @@ export default function PantryItem({
       setTimeout(() => setFlashDecrement(false), 500);
       onUpdateQuantity(item.id, item.quantity - 1);
     }
+  }
+
+  function handleLongPressStart() {
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(30);
+      onUpdateItem(item.id, { running_low: true });
+    }, 500);
+  }
+
+  function handleLongPressEnd() {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }
+
+  function handleCardClick() {
+    if (longPressFired.current) { longPressFired.current = false; return; }
+    onToggleExpand();
   }
 
   function handleSaveName() {
@@ -528,7 +548,11 @@ export default function PantryItem({
         }
         style={{ gridColumn: "span 1" }}
         className={`bg-white rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border border-gray-100 ${item.running_low ? "border-l-[3px] border-l-amber-400" : ""}`}
-        onClick={onToggleExpand}
+        onClick={handleCardClick}
+        onPointerDown={handleLongPressStart}
+        onPointerUp={handleLongPressEnd}
+        onPointerLeave={handleLongPressEnd}
+        onPointerCancel={handleLongPressEnd}
       >
         <div className="p-3 flex flex-col gap-2 min-h-[76px]">
           <div className="flex items-start gap-1.5">
@@ -559,7 +583,7 @@ export default function PantryItem({
               }
               {item.opened && <span className="w-1 h-1 rounded-full bg-orange-300 flex-shrink-0" />}
             </div>
-            <span className="text-xs font-semibold text-gray-400 tabular-nums">×{qtyDisplay}</span>
+            <span className={`text-xs font-semibold tabular-nums ${item.quantity <= 1 ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
           </div>
         </div>
       </motion.div>
