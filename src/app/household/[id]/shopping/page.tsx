@@ -9,6 +9,7 @@ import { useShoppingFlow } from "@/hooks/useShoppingFlow";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import Spinner from "@/components/ui/Spinner";
+import ActivityBellButton from "@/components/household/ActivityBellFloat";
 import type { ShoppingList as ShoppingListType } from "@/types/database";
 
 function formatDate(iso: string) {
@@ -80,6 +81,7 @@ export default function ShoppingPage() {
           </p>
           <h1 className="text-2xl font-semibold text-gray-900">Shopping</h1>
         </div>
+        <ActivityBellButton householdId={householdId} />
         <Link
           href={`/household/${householdId}/members`}
           className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors active:opacity-60"

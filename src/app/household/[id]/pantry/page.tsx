@@ -9,6 +9,7 @@ import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import PantryList from "@/components/pantry/PantryList";
 import InviteModal from "@/components/household/InviteModal";
 import ImportToPantrySheet from "@/components/pantry/ImportToPantrySheet";
+import ActivityBellButton from "@/components/household/ActivityBellFloat";
 import { createClient } from "@/lib/supabase/client";
 
 function PantryPageInner() {
@@ -85,6 +86,7 @@ function PantryPageInner() {
           <h1 className="text-2xl font-semibold text-gray-900">Pantry</h1>
         </div>
         <div className="flex items-center gap-2">
+          <ActivityBellButton householdId={householdId} />
           <button
             onClick={() => setInviteOpen(true)}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl px-3 py-2 transition-colors active:scale-[0.95] active:bg-gray-200"

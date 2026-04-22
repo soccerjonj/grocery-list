@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { HouseholdProvider } from "@/context/HouseholdContext";
 import BottomNav from "@/components/ui/BottomNav";
 import PageTransition from "@/components/ui/PageTransition";
-import ActivityBellFloat from "@/components/household/ActivityBellFloat";
 
 export default async function HouseholdLayout({
   children,
@@ -47,7 +46,6 @@ export default async function HouseholdLayout({
         <PageTransition>{children}</PageTransition>
       </div>
       <BottomNav householdId={household.id} />
-      <ActivityBellFloat householdId={household.id} />
     </HouseholdProvider>
   );
 }
