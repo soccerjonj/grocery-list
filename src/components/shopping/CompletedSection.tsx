@@ -3,12 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ShoppingItem } from "@/types/database";
+import type { MemberProfile } from "@/hooks/useHouseholdMembers";
+import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 
 interface CompletedSectionProps {
   items: ShoppingItem[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onClearAll?: () => void;
+  members?: MemberProfile[];
+  currentUserId?: string | null;
 }
 
 export default function CompletedSection({
@@ -16,6 +20,8 @@ export default function CompletedSection({
   onToggle,
   onDelete,
   onClearAll,
+  members = [],
+  currentUserId,
 }: CompletedSectionProps) {
   const [open, setOpen] = useState(false);
   const prevLengthRef = useRef(0);
@@ -115,6 +121,21 @@ export default function CompletedSection({
                     {item.store && (
                       <span className="text-xs text-gray-300 flex-shrink-0">{item.store}</span>
                     )}
+
+                    {item.completed_by && (() => {
+                      const m = members.find((m) => m.user_id === item.completed_by);
+                      if (!m) return null;
+                      const c = m.color ?? DEFAULT_COLOR;
+                      return (
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ring-1 ring-white"
+                          style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
+                          title={m.user_id === currentUserId ? "You" : m.short_name}
+                        >
+                          {m.initials}
+                        </span>
+                      );
+                    })()}
 
                     <button
                       onClick={() => onDelete(item.id)}

@@ -97,6 +97,8 @@ export default function ShoppingList({
             onToggle={onToggle}
             onDelete={onDelete}
             onClearAll={onClearAll}
+            members={members}
+            currentUserId={currentUserId}
           />
         </>
       )}
