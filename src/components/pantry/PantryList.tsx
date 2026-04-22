@@ -384,6 +384,13 @@ export default function PantryList({
                   </svg>
                   <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Running Low</span>
                   <span className="text-xs text-amber-300">({runningLowItems.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => runningLowItems.forEach((i) => onUpdateItem(i.id, { running_low: false }))}
+                    className="ml-auto text-[11px] text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
+                  >
+                    Ignore all
+                  </button>
                 </div>
                 <div className="flex flex-col gap-1">
                   {runningLowItems.map((item) => (
