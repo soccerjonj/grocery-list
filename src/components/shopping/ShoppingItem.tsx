@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-mo
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import { useItemSuggestions } from "@/hooks/useItemSuggestions";
 
 interface ShoppingItemProps {
   item: ShoppingItemType;
@@ -46,6 +47,10 @@ export default function ShoppingItem({
   const [editStore, setEditStore] = useState(item.store ?? "");
   const [editAssigned, setEditAssigned] = useState<string[] | null>(item.assigned_to ?? null);
 
+  const { getStores } = useItemSuggestions(item.household_id);
+  const knownStores = getStores();
+  const [customStoreMode, setCustomStoreMode] = useState(false);
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +76,7 @@ export default function ShoppingItem({
 
   function openSheet() {
     if (item.completed || checking) return;
+    setCustomStoreMode(!!item.store && !knownStores.includes(item.store));
     setSheetOpen(true);
     setTimeout(() => nameInputRef.current?.focus(), 80);
   }
@@ -197,13 +203,35 @@ export default function ShoppingItem({
               {/* Store */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Store</p>
-                <input
-                  type="text"
-                  placeholder="e.g. Trader Joe's"
-                  value={editStore}
-                  onChange={(e) => setEditStore(e.target.value)}
-                  className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
-                />
+                <div className="flex flex-wrap gap-1.5">
+                  {knownStores.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => { setEditStore(editStore === s ? "" : s); setCustomStoreMode(false); }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        editStore === s ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >{s}</button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { setCustomStoreMode((v) => !v); if (customStoreMode) setEditStore(""); }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                      customStoreMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >{knownStores.length === 0 ? "Add store" : "+ New"}</button>
+                </div>
+                {customStoreMode && (
+                  <input
+                    type="text"
+                    placeholder="Store name"
+                    value={editStore}
+                    onChange={(e) => setEditStore(e.target.value)}
+                    autoFocus
+                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
+                  />
+                )}
               </div>
 
               {/* Assigned to */}

@@ -80,5 +80,14 @@ export function useItemSuggestions(householdId: string) {
       .slice(0, limit);
   }
 
-  return { suggestions, getSuggestions };
+  /** All unique stores seen in shopping history, sorted A-Z. */
+  function getStores(): string[] {
+    const seen = new Set<string>();
+    for (const s of suggestions) {
+      if (s.store?.trim()) seen.add(s.store.trim());
+    }
+    return [...seen].sort();
+  }
+
+  return { suggestions, getSuggestions, getStores };
 }

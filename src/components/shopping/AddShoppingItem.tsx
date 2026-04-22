@@ -26,8 +26,10 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   const nameRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { getSuggestions } = useItemSuggestions(householdId);
+  const { getSuggestions, getStores } = useItemSuggestions(householdId);
   const suggestions = getSuggestions(name, 5);
+  const knownStores = getStores();
+  const [customStoreMode, setCustomStoreMode] = useState(false);
 
   // Close on outside tap
   useEffect(() => {
@@ -43,7 +45,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
 
   function applySuggestion(s: ItemSuggestion) {
     setName(s.name);
-    if (s.store) setStore(s.store);
+    if (s.store) { setStore(s.store); setCustomStoreMode(false); }
     if (s.unit) setUnit(s.unit);
     setShowSuggestions(false);
     setTimeout(() => nameRef.current?.focus(), 50);
@@ -81,6 +83,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
     setStore("");
     setAssignedTo(null);
     setShowSuggestions(false);
+    setCustomStoreMode(false);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
@@ -241,13 +244,36 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
                   />
                 </div>
-                <input
-                  type="text"
-                  placeholder="Store (e.g. Trader Joe's)"
-                  value={store}
-                  onChange={(e) => setStore(e.target.value)}
-                  className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
-                />
+                {/* Store picker */}
+                <div className="flex flex-wrap gap-1.5">
+                  {knownStores.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => { setStore(store === s ? "" : s); setCustomStoreMode(false); }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        store === s ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >{s}</button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { setCustomStoreMode((v) => !v); if (customStoreMode) setStore(""); }}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                      customStoreMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >{knownStores.length === 0 ? "Add store" : "+ New"}</button>
+                </div>
+                {customStoreMode && (
+                  <input
+                    type="text"
+                    placeholder="Store name"
+                    value={store}
+                    onChange={(e) => setStore(e.target.value)}
+                    autoFocus
+                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
+                  />
+                )}
                 {members.length > 1 && (
                   <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                     <span className="text-xs text-gray-400 font-medium mr-0.5">For:</span>
