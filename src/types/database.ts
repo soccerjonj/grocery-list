@@ -118,6 +118,7 @@ export interface Database {
           food_category: string | null;    // 'produce'|'meat'|'dairy'|'drinks'|'condiments'|'grains'|'snacks'|'prepared'|'other'
           assigned_to: string[] | null;    // null=household, [uuid,...]=specific people
           running_low: boolean;
+          running_low_dismissed: boolean;
           opened: boolean;
         };
         Insert: {
@@ -136,6 +137,7 @@ export interface Database {
           food_category?: string | null;
           assigned_to?: string[] | null;
           running_low?: boolean;
+          running_low_dismissed?: boolean;
           opened?: boolean;
         };
         Update: {
@@ -154,6 +156,7 @@ export interface Database {
           food_category?: string | null;
           assigned_to?: string[] | null;
           running_low?: boolean;
+          running_low_dismissed?: boolean;
           opened?: boolean;
         };
       };

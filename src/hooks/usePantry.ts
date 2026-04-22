@@ -108,6 +108,7 @@ export function usePantry(householdId: string) {
       food_category: options?.foodCategory ?? null,
       assigned_to: options?.assignedTo ?? null,
       running_low: false,
+      running_low_dismissed: false,
       opened: false,
     };
 
@@ -161,6 +162,8 @@ export function usePantry(householdId: string) {
     fields: Partial<Omit<PantryItem, "id" | "household_id" | "created_at" | "added_by">>
   ) {
     const now = new Date().toISOString();
+    // When re-marking running low, reset dismissed so the notification reappears
+    if (fields.running_low === true) fields = { ...fields, running_low_dismissed: false };
     // Snapshot for rollback
     const prev = items.find((i) => i.id === id);
     setItems((all) =>

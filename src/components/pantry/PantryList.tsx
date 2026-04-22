@@ -471,7 +471,6 @@ export default function PantryList({
   const [sort, setSort] = useState<SortKey>("freshness");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
 
   function handleToggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -489,7 +488,7 @@ export default function PantryList({
     ? items.filter((i) => i.food_category === filterCategory)
     : items;
 
-  const runningLowItems = items.filter((i) => i.running_low && !ignoredIds.has(i.id));
+  const runningLowItems = items.filter((i) => i.running_low && !i.running_low_dismissed);
 
   const fridgeItems   = filtered.filter((i) => i.storage_location === "fridge");
   const freezerItems  = filtered.filter((i) => i.storage_location === "freezer");
@@ -584,7 +583,7 @@ export default function PantryList({
                   <span className="text-xs text-amber-300">({runningLowItems.length})</span>
                   <button
                     type="button"
-                    onClick={() => setIgnoredIds((prev) => new Set([...prev, ...runningLowItems.map((i) => i.id)]))}
+                    onClick={() => runningLowItems.forEach((i) => onUpdateItem(i.id, { running_low_dismissed: true }))}
                     className="ml-auto text-[11px] text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
                   >
                     Ignore all
@@ -597,7 +596,7 @@ export default function PantryList({
                       item={item}
                       locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
                       onMarkStocked={() => onUpdateItem(item.id, { running_low: false })}
-                      onIgnore={() => setIgnoredIds((prev) => new Set([...prev, item.id]))}
+                      onIgnore={() => onUpdateItem(item.id, { running_low_dismissed: true })}
                       members={members}
                       currentUserId={currentUserId}
                       onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo) : undefined}
