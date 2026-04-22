@@ -171,7 +171,7 @@ export default function PantryItem({
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(30);
-      onUpdateItem(item.id, { running_low: true });
+      onUpdateItem(item.id, { running_low: !item.running_low });
     }, 500);
   }
 
