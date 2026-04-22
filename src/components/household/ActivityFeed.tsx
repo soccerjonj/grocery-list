@@ -33,43 +33,6 @@ function dayGroup(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
-interface Props {
-  householdId: string;
-  currentUserId: string | null;
-  unreadCount: number;
-  onOpen: () => void;
-}
-
-export function ActivityBell({ householdId, currentUserId, unreadCount, onOpen }: Props) {
-  void householdId; void currentUserId;
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="relative flex flex-col items-center gap-1 pt-2.5 pb-3 min-h-[52px] text-[11px] font-medium tracking-wide transition-colors duration-150 active:opacity-70 text-gray-400 px-6"
-      aria-label="Activity feed"
-    >
-      <span className="relative">
-        <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-        </svg>
-        <AnimatePresence>
-          {unreadCount > 0 && (
-            <motion.span
-              key="badge"
-              initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
-              className="absolute -top-1 -right-1.5 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5"
-            >
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </span>
-      Activity
-    </button>
-  );
-}
-
 export function ActivityFeedSheet({
   householdId,
   currentUserId,
