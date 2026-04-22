@@ -167,6 +167,7 @@ export default function PantryItem({
   }
 
   function handleLongPressStart() {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
     longPressFired.current = false;
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;

@@ -13,6 +13,9 @@ export interface AddPantryOptions {
   assignedTo?: string[] | null;
 }
 
+// Debounce running_low activity logs — key: itemId, value: timer
+const runningLowLogTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export function usePantry(householdId: string) {
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,8 +179,18 @@ export function usePantry(householdId: string) {
     if (error) {
       console.error("pantry updateItem failed:", error.message);
       if (prev) setItems((all) => all.map((i) => (i.id === id ? prev : i)));
-    } else {
-      if (fields.running_low === true && prev) logActivity(householdId, "pantry_running_low", prev.name);
+    } else if ("running_low" in fields && prev) {
+      // Debounce: only log after 3s of no further toggles
+      const existing = runningLowLogTimers.get(id);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        runningLowLogTimers.delete(id);
+        // Re-read current state to only log if still marked low
+        if (fields.running_low === true) {
+          logActivity(householdId, "pantry_running_low", prev.name);
+        }
+      }, 3000);
+      runningLowLogTimers.set(id, timer);
     }
   }
 
