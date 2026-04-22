@@ -1,5 +1,9 @@
 CREATE OR REPLACE FUNCTION cleanup_stale_activity(p_household_id uuid)
 RETURNS void LANGUAGE sql SECURITY DEFINER AS $$
+  -- Delete notifications older than 7 days
+  DELETE FROM activity_log
+  WHERE household_id = p_household_id
+    AND created_at < now() - interval '7 days';
   -- Remove running_low notifications for items no longer marked low
   DELETE FROM activity_log
   WHERE household_id = p_household_id

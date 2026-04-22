@@ -26,10 +26,12 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
     try {
       // Clean up stale/duplicate running_low notifications first
       await supabase.rpc("cleanup_stale_activity", { p_household_id: householdId }).catch(() => {});
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("activity_log")
         .select("*")
         .eq("household_id", householdId)
+        .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(LIMIT);
       const items = data ?? [];
