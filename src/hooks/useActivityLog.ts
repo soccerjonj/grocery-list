@@ -7,7 +7,7 @@ import type { ActivityLog } from "@/types/database";
 const LAST_SEEN_KEY = (householdId: string) => `activity_last_seen_${householdId}`;
 const LIMIT = 40;
 
-export function useActivityLog(householdId: string) {
+export function useActivityLog(householdId: string, currentUserId?: string | null) {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -15,11 +15,12 @@ export function useActivityLog(householdId: string) {
 
   const computeUnread = useCallback((items: ActivityLog[]) => {
     if (typeof window === "undefined") return;
+    const others = items.filter((a) => !currentUserId || a.user_id !== currentUserId);
     const raw = localStorage.getItem(LAST_SEEN_KEY(householdId));
-    if (!raw) { setUnreadCount(items.length); return; }
+    if (!raw) { setUnreadCount(others.length); return; }
     const lastSeen = new Date(raw).getTime();
-    setUnreadCount(items.filter((a) => new Date(a.created_at).getTime() > lastSeen).length);
-  }, [householdId]);
+    setUnreadCount(others.filter((a) => new Date(a.created_at).getTime() > lastSeen).length);
+  }, [householdId, currentUserId]);
 
   const fetchActivities = useCallback(async () => {
     try {

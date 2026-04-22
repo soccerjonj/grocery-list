@@ -9,8 +9,8 @@ import { ActivityFeedSheet } from "@/components/household/ActivityFeed";
 /** Inline bell button — drop directly inside a header button group. */
 export default function ActivityBellButton({ householdId }: { householdId: string }) {
   const [open, setOpen] = useState(false);
-  const { activities, loading, unreadCount, markAllRead } = useActivityLog(householdId);
   const { currentUserId } = useHouseholdMembers(householdId);
+  const { activities, loading, unreadCount, markAllRead } = useActivityLog(householdId, currentUserId);
 
   return (
     <>
