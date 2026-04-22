@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import ColorPicker from "@/components/ui/ColorPicker";
 import { getErrorMessage } from "@/lib/utils";
 import { Suspense } from "react";
 
@@ -20,6 +21,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [error, setError] = useState(
     searchParams.get("error") === "confirmation_failed"
       ? "That confirmation link has expired or is invalid. Please request a new one by signing up again."
@@ -35,6 +37,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
 
     try {
       if (mode === "signup") {
+        if (!selectedColor) throw new Error("Please choose a color for your profile.");
         const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -44,6 +47,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
               first_name: firstName.trim(),
               last_name: lastName.trim(),
               display_name: fullName,
+              color: selectedColor,
             },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
@@ -51,11 +55,16 @@ function AuthFormInner({ mode }: { mode: Mode }) {
         if (signUpError) throw signUpError;
         // Supabase returns a session immediately if email confirmation is disabled,
         // or identities[] is empty if the user already exists.
-        if (data.session) {
+        if (data.session && data.user) {
+          await supabase.from("profiles").upsert({
+            id: data.user.id,
+            display_name: fullName,
+            color: selectedColor,
+          });
           router.push("/dashboard");
           router.refresh();
         } else {
-          // Email confirmation required — show the check-your-email screen
+          // Email confirmation required — color is in user_metadata, applied on confirm
           setConfirming(true);
         }
       } else {
@@ -164,28 +173,38 @@ function AuthFormInner({ mode }: { mode: Mode }) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {mode === "signup" && (
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  id="first-name"
-                  label="First name"
-                  type="text"
-                  placeholder="Jane"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  autoComplete="given-name"
-                />
-                <Input
-                  id="last-name"
-                  label="Last name"
-                  type="text"
-                  placeholder="Smith"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  autoComplete="family-name"
-                />
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    id="first-name"
+                    label="First name"
+                    type="text"
+                    placeholder="Jane"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    autoComplete="given-name"
+                  />
+                  <Input
+                    id="last-name"
+                    label="Last name"
+                    type="text"
+                    placeholder="Smith"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    autoComplete="family-name"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    Your color
+                    <span className="text-red-400 ml-0.5">*</span>
+                  </p>
+                  <p className="text-xs text-gray-400 -mt-1">Shown to your household so they know it&apos;s you</p>
+                  <ColorPicker value={selectedColor} onChange={setSelectedColor} />
+                </div>
+              </>
             )}
             <Input
               id="email"
@@ -214,7 +233,13 @@ function AuthFormInner({ mode }: { mode: Mode }) {
               </p>
             )}
 
-            <Button type="submit" size="lg" loading={loading} className="w-full mt-1">
+            <Button
+              type="submit"
+              size="lg"
+              loading={loading}
+              disabled={mode === "signup" && !selectedColor}
+              className="w-full mt-1"
+            >
               {mode === "login" ? "Sign in" : "Create account"}
             </Button>
           </form>
