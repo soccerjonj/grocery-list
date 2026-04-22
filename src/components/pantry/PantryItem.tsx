@@ -583,7 +583,7 @@ export default function PantryItem({
               }
               {item.opened && <span className="w-1 h-1 rounded-full bg-orange-300 flex-shrink-0" />}
             </div>
-            <span className={`text-xs font-semibold tabular-nums ${item.quantity <= 1 ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
+            <span className={`text-xs font-semibold tabular-nums ${item.running_low ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
           </div>
         </div>
       </motion.div>
