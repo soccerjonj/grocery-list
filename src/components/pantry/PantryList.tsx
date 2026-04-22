@@ -259,70 +259,81 @@ function RunningLowRow({
   locationLabel,
   members,
   currentUserId,
-  onMarkStocked,
+  isFlashing,
   onIgnore,
+  onAddedToList,
   onAddToList,
 }: {
   item: PantryItemType;
   locationLabel: string | null;
   members: MemberProfile[];
   currentUserId: string | null;
-  onMarkStocked: () => void;
+  isFlashing: boolean;
   onIgnore: () => void;
+  onAddedToList: () => void;
   onAddToList?: (qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) => Promise<boolean>;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [added, setAdded] = useState(false);
 
   async function handleConfirm(qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) {
     if (!onAddToList) return;
     const ok = await onAddToList(qty, unit, store, assignedTo);
-    if (ok) {
-      onIgnore(); // dismiss from Running Low — item has been actioned
-      setAdded(true);
-      setTimeout(() => setAdded(false), 2000);
-    }
+    if (ok) onAddedToList();
   }
 
   return (
     <>
-      <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 border-l-[3px] border-l-amber-400 rounded-xl px-3 py-2">
+      <motion.div
+        animate={{
+          backgroundColor: isFlashing ? "#f0fdf4" : "#fffbeb",
+          borderColor: isFlashing ? "#bbf7d0" : "#fde68a",
+        }}
+        transition={{ duration: 0.25 }}
+        className="flex items-center gap-2 border border-l-[3px] border-l-amber-400 rounded-xl px-3 py-2"
+      >
         <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-          <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
-          {locationLabel && <p className="text-[10px] text-gray-400 flex-shrink-0">{locationLabel}</p>}
+          <p className={`text-xs font-semibold truncate transition-colors duration-250 ${isFlashing ? "text-green-700" : "text-gray-800"}`}>
+            {item.name}
+          </p>
+          {locationLabel && (
+            <p className={`text-[10px] flex-shrink-0 transition-colors duration-250 ${isFlashing ? "text-green-400" : "text-gray-400"}`}>
+              {locationLabel}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {onAddToList && (
-            <button
-              type="button"
-              onClick={() => !added && setModalOpen(true)}
-              disabled={added}
-              className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-all active:scale-95 ${
-                added ? "bg-green-100 text-green-600" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
-              }`}
-            >
-              {added ? "Added!" : "+ List"}
-            </button>
+          {isFlashing ? (
+            <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-green-100 text-green-600 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              Added
+            </span>
+          ) : (
+            <>
+              {onAddToList && (
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  className="text-[11px] font-medium px-2 py-1 rounded-lg bg-white border border-gray-200 text-gray-500 hover:border-gray-400 transition-all active:scale-95"
+                >
+                  + List
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onIgnore}
+                className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors active:scale-90"
+                aria-label="Dismiss"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={onMarkStocked}
-            className="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors active:scale-95"
-          >
-            Stocked
-          </button>
-          <button
-            type="button"
-            onClick={onIgnore}
-            className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors active:scale-90"
-            aria-label="Ignore"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
-      </div>
+      </motion.div>
 
       {modalOpen && (
         <AddToListModal
@@ -472,6 +483,21 @@ export default function PantryList({
   const [sort, setSort] = useState<SortKey>("freshness");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
+  const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
+
+  function dismissItem(id: string, reason: "dismiss" | "added") {
+    setExitReasons((prev) => ({ ...prev, [id]: reason }));
+    onUpdateItem(id, { running_low_dismissed: true });
+  }
+
+  function handleAddedToList(id: string) {
+    setFlashingIds((prev) => new Set([...prev, id]));
+    setTimeout(() => {
+      setFlashingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      dismissItem(id, "added");
+    }, 600);
+  }
 
   function handleToggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -584,25 +610,49 @@ export default function PantryList({
                   <span className="text-xs text-amber-300">({runningLowItems.length})</span>
                   <button
                     type="button"
-                    onClick={() => runningLowItems.forEach((i) => onUpdateItem(i.id, { running_low_dismissed: true }))}
+                    onClick={() => runningLowItems.forEach((i) => dismissItem(i.id, "dismiss"))}
                     className="ml-auto text-[11px] text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
                   >
                     Ignore all
                   </button>
                 </div>
                 <div className="flex flex-col gap-1">
-                  {runningLowItems.map((item) => (
-                    <RunningLowRow
-                      key={item.id}
-                      item={item}
-                      locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
-                      onMarkStocked={() => onUpdateItem(item.id, { running_low: false })}
-                      onIgnore={() => onUpdateItem(item.id, { running_low_dismissed: true })}
-                      members={members}
-                      currentUserId={currentUserId}
-                      onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo) : undefined}
-                    />
-                  ))}
+                  <AnimatePresence mode="popLayout">
+                    {runningLowItems.map((item, index) => (
+                      <motion.div
+                        key={item.id}
+                        layout
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0, transition: { duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] } }}
+                        exit="exit"
+                        custom={{ reason: exitReasons[item.id] ?? "dismiss", index }}
+                        variants={{
+                          exit: ({ reason, index: i }: { reason: string; index: number }) => ({
+                            opacity: 0,
+                            x: reason === "dismiss" ? 56 : 0,
+                            y: reason === "added" ? -10 : 0,
+                            scale: reason === "added" ? 0.93 : 1,
+                            transition: {
+                              duration: reason === "dismiss" ? 0.22 : 0.3,
+                              delay: i * 0.07,
+                              ease: [0.4, 0, 1, 1],
+                            },
+                          }),
+                        }}
+                      >
+                        <RunningLowRow
+                          item={item}
+                          locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
+                          isFlashing={flashingIds.has(item.id)}
+                          onIgnore={() => dismissItem(item.id, "dismiss")}
+                          onAddedToList={() => handleAddedToList(item.id)}
+                          members={members}
+                          currentUserId={currentUserId}
+                          onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo) : undefined}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}
