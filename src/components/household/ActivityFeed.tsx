@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useActivityLog } from "@/hooks/useActivityLog";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import type { ActivityLog } from "@/types/database";
@@ -74,15 +73,20 @@ export function ActivityBell({ householdId, currentUserId, unreadCount, onOpen }
 export function ActivityFeedSheet({
   householdId,
   currentUserId,
+  activities,
+  loading,
   open,
   onClose,
+  onMarkAllRead,
 }: {
   householdId: string;
   currentUserId: string | null;
+  activities: ActivityLog[];
+  loading: boolean;
   open: boolean;
   onClose: () => void;
+  onMarkAllRead: () => void;
 }) {
-  const { activities, loading, markAllRead } = useActivityLog(householdId);
   const { members } = useHouseholdMembers(householdId);
   const [mounted, setMounted] = useState(false);
 
@@ -90,7 +94,7 @@ export function ActivityFeedSheet({
 
   useEffect(() => {
     if (open) {
-      markAllRead();
+      onMarkAllRead();
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";

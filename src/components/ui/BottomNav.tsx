@@ -57,7 +57,7 @@ const tabs = [
 export default function BottomNav({ householdId }: BottomNavProps) {
   const pathname = usePathname();
   const [feedOpen, setFeedOpen] = useState(false);
-  const { unreadCount } = useActivityLog(householdId);
+  const { activities, loading, unreadCount, markAllRead } = useActivityLog(householdId);
   const { currentUserId } = useHouseholdMembers(householdId);
 
   return (
@@ -107,8 +107,11 @@ export default function BottomNav({ householdId }: BottomNavProps) {
       <ActivityFeedSheet
         householdId={householdId}
         currentUserId={currentUserId}
+        activities={activities}
+        loading={loading}
         open={feedOpen}
         onClose={() => setFeedOpen(false)}
+        onMarkAllRead={markAllRead}
       />
     </>
   );

@@ -14,6 +14,7 @@ export function useActivityLog(householdId: string) {
   const supabase = createClient();
 
   const computeUnread = useCallback((items: ActivityLog[]) => {
+    if (typeof window === "undefined") return;
     const raw = localStorage.getItem(LAST_SEEN_KEY(householdId));
     if (!raw) { setUnreadCount(items.length); return; }
     const lastSeen = new Date(raw).getTime();
@@ -21,16 +22,21 @@ export function useActivityLog(householdId: string) {
   }, [householdId]);
 
   const fetchActivities = useCallback(async () => {
-    const { data } = await supabase
-      .from("activity_log")
-      .select("*")
-      .eq("household_id", householdId)
-      .order("created_at", { ascending: false })
-      .limit(LIMIT);
-    const items = data ?? [];
-    setActivities(items);
-    computeUnread(items);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from("activity_log")
+        .select("*")
+        .eq("household_id", householdId)
+        .order("created_at", { ascending: false })
+        .limit(LIMIT);
+      const items = data ?? [];
+      setActivities(items);
+      computeUnread(items);
+    } catch {
+      // table may not exist yet — fail silently
+    } finally {
+      setLoading(false);
+    }
   }, [householdId, supabase, computeUnread]);
 
   useEffect(() => {
@@ -57,7 +63,9 @@ export function useActivityLog(householdId: string) {
   }, [householdId, fetchActivities, supabase, computeUnread]);
 
   function markAllRead() {
-    localStorage.setItem(LAST_SEEN_KEY(householdId), new Date().toISOString());
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LAST_SEEN_KEY(householdId), new Date().toISOString());
+    }
     setUnreadCount(0);
   }
 
