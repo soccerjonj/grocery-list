@@ -278,6 +278,7 @@ function RunningLowRow({
     if (!onAddToList) return;
     const ok = await onAddToList(qty, unit, store, assignedTo);
     if (ok) {
+      onIgnore(); // dismiss from Running Low — item has been actioned
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
     }
