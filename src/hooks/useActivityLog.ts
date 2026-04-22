@@ -1,0 +1,65 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { ActivityLog } from "@/types/database";
+
+const LAST_SEEN_KEY = (householdId: string) => `activity_last_seen_${householdId}`;
+const LIMIT = 40;
+
+export function useActivityLog(householdId: string) {
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const supabase = createClient();
+
+  const computeUnread = useCallback((items: ActivityLog[]) => {
+    const raw = localStorage.getItem(LAST_SEEN_KEY(householdId));
+    if (!raw) { setUnreadCount(items.length); return; }
+    const lastSeen = new Date(raw).getTime();
+    setUnreadCount(items.filter((a) => new Date(a.created_at).getTime() > lastSeen).length);
+  }, [householdId]);
+
+  const fetchActivities = useCallback(async () => {
+    const { data } = await supabase
+      .from("activity_log")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("created_at", { ascending: false })
+      .limit(LIMIT);
+    const items = data ?? [];
+    setActivities(items);
+    computeUnread(items);
+    setLoading(false);
+  }, [householdId, supabase, computeUnread]);
+
+  useEffect(() => {
+    fetchActivities();
+
+    const channel = supabase
+      .channel(`activity-${householdId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "activity_log", filter: `household_id=eq.${householdId}` },
+        (payload) => {
+          const newItem = payload.new as ActivityLog;
+          setActivities((prev) => {
+            if (prev.some((a) => a.id === newItem.id)) return prev;
+            const updated = [newItem, ...prev].slice(0, LIMIT);
+            computeUnread(updated);
+            return updated;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [householdId, fetchActivities, supabase, computeUnread]);
+
+  function markAllRead() {
+    localStorage.setItem(LAST_SEEN_KEY(householdId), new Date().toISOString());
+    setUnreadCount(0);
+  }
+
+  return { activities, loading, unreadCount, markAllRead };
+}

@@ -210,11 +210,31 @@ export interface Database {
           assigned_to?: string[] | null;
         };
       };
+      activity_log: {
+        Row: {
+          id: string;
+          household_id: string;
+          user_id: string | null;
+          action: string;
+          item_name: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          user_id?: string | null;
+          action: string;
+          item_name?: string | null;
+          created_at?: string;
+        };
+        Update: Record<string, never>;
+      };
     };
   };
 }
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type ActivityLog = Database["public"]["Tables"]["activity_log"]["Row"];
 export type Household = Database["public"]["Tables"]["households"]["Row"];
 export type HouseholdMember = Database["public"]["Tables"]["household_members"]["Row"];
 export type ShoppingList = Database["public"]["Tables"]["shopping_lists"]["Row"];

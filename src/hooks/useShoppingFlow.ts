@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem, ShoppingList } from "@/types/database";
+import { logActivity } from "@/lib/logActivity";
 
 function tripName() {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -161,6 +162,7 @@ export function useShoppingFlow(householdId: string) {
         const deduped = prev.filter((i) => i.id !== data.id);
         return deduped.map((i) => (i.id === optimistic.id ? data : i));
       });
+      logActivity(householdId, "shopping_add", name);
     }
   }
 
@@ -197,6 +199,8 @@ export function useShoppingFlow(householdId: string) {
       completed_by: completed ? user?.id : null,
       completed_at: completed ? now : null,
     }).eq("id", id);
+
+    if (completed) logActivity(householdId, "shopping_check", item.name);
   }
 
   async function deleteItem(id: string) {
@@ -244,6 +248,7 @@ export function useShoppingFlow(householdId: string) {
     setItems(carried);
     setActiveListId(newList.id);
     setPastLists((prev) => [{ ...newList, id: archivedListId, archived_at: now, name: tripName() }, ...prev]);
+    logActivity(householdId, "trip_finished");
     setFinishing(false);
     return archivedListId;
   }

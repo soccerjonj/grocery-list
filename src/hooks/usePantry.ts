@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PantryItem } from "@/types/database";
+import { logActivity } from "@/lib/logActivity";
 
 export interface AddPantryOptions {
   expiresAt?: string | null;
@@ -137,11 +138,10 @@ export function usePantry(householdId: string) {
       selfInsertedIds.current.add(data.id);
       setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
       setItems((prev) => {
-        // Strip any Realtime-added copy of the real item (race condition: Realtime
-        // INSERT event can arrive before this response and add a duplicate)
         const deduped = prev.filter((i) => i.id !== data.id);
         return deduped.map((i) => (i.id === optimistic.id ? data : i));
       });
+      logActivity(householdId, "pantry_add", name);
     }
   }
 
@@ -175,14 +175,17 @@ export function usePantry(householdId: string) {
       .eq("id", id);
     if (error) {
       console.error("pantry updateItem failed:", error.message);
-      // Roll back optimistic update
       if (prev) setItems((all) => all.map((i) => (i.id === id ? prev : i)));
+    } else {
+      if (fields.running_low === true && prev) logActivity(householdId, "pantry_running_low", prev.name);
     }
   }
 
   async function deleteItem(id: string) {
+    const item = items.find((i) => i.id === id);
     setItems((prev) => prev.filter((i) => i.id !== id));
     await supabase.from("pantry_items").delete().eq("id", id);
+    if (item) logActivity(householdId, "pantry_delete", item.name);
   }
 
   return { items, loading, error, addItem, updateQuantity, updateItem, deleteItem };
