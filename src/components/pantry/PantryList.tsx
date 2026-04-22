@@ -90,11 +90,13 @@ function RunningLowRow({
   item,
   locationLabel,
   onMarkStocked,
+  onIgnore,
   onAddToList,
 }: {
   item: PantryItemType;
   locationLabel: string | null;
   onMarkStocked: () => void;
+  onIgnore: () => void;
   onAddToList?: () => Promise<boolean>;
 }) {
   const [added, setAdded] = useState(false);
@@ -136,7 +138,7 @@ function RunningLowRow({
         </button>
         <button
           type="button"
-          onClick={onMarkStocked}
+          onClick={onIgnore}
           className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors active:scale-90"
           aria-label="Ignore"
         >
@@ -284,6 +286,7 @@ export default function PantryList({
   const [sort, setSort] = useState<SortKey>("freshness");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
 
   function handleToggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -301,7 +304,7 @@ export default function PantryList({
     ? items.filter((i) => i.food_category === filterCategory)
     : items;
 
-  const runningLowItems = items.filter((i) => i.running_low);
+  const runningLowItems = items.filter((i) => i.running_low && !ignoredIds.has(i.id));
 
   const fridgeItems   = filtered.filter((i) => i.storage_location === "fridge");
   const freezerItems  = filtered.filter((i) => i.storage_location === "freezer");
@@ -396,7 +399,7 @@ export default function PantryList({
                   <span className="text-xs text-amber-300">({runningLowItems.length})</span>
                   <button
                     type="button"
-                    onClick={() => runningLowItems.forEach((i) => onUpdateItem(i.id, { running_low: false }))}
+                    onClick={() => setIgnoredIds((prev) => new Set([...prev, ...runningLowItems.map((i) => i.id)]))}
                     className="ml-auto text-[11px] text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
                   >
                     Ignore all
@@ -409,6 +412,7 @@ export default function PantryList({
                       item={item}
                       locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
                       onMarkStocked={() => onUpdateItem(item.id, { running_low: false })}
+                      onIgnore={() => setIgnoredIds((prev) => new Set([...prev, item.id]))}
                       onAddToList={onAddToShoppingList ? () => onAddToShoppingList(item.name) : undefined}
                     />
                   ))}
