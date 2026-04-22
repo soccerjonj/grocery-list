@@ -24,6 +24,8 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
 
   const fetchActivities = useCallback(async () => {
     try {
+      // Clean up stale/duplicate running_low notifications first
+      await supabase.rpc("cleanup_stale_activity", { p_household_id: householdId }).catch(() => {});
       const { data } = await supabase
         .from("activity_log")
         .select("*")
