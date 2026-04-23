@@ -25,7 +25,7 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
   const fetchActivities = useCallback(async () => {
     try {
       // Clean up stale/duplicate running_low notifications first
-      await supabase.rpc("cleanup_stale_activity", { p_household_id: householdId }).catch(() => {});
+      try { await supabase.rpc("cleanup_stale_activity", { p_household_id: householdId }); } catch { /* ignore */ }
       const clearedAt = typeof window !== "undefined" ? localStorage.getItem(`activity_cleared_${householdId}`) : null;
       const since = clearedAt ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
