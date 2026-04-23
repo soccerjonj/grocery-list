@@ -26,7 +26,8 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
     try {
       // Clean up stale/duplicate running_low notifications first
       await supabase.rpc("cleanup_stale_activity", { p_household_id: householdId }).catch(() => {});
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const clearedAt = typeof window !== "undefined" ? localStorage.getItem(`activity_cleared_${householdId}`) : null;
+      const since = clearedAt ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("activity_log")
         .select("*")
@@ -74,5 +75,15 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
     setUnreadCount(0);
   }
 
-  return { activities, loading, unreadCount, markAllRead };
+  function clearAll() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LAST_SEEN_KEY(householdId), new Date().toISOString());
+      // Store a "cleared at" timestamp so activities before this are hidden
+      localStorage.setItem(`activity_cleared_${householdId}`, new Date().toISOString());
+    }
+    setActivities([]);
+    setUnreadCount(0);
+  }
+
+  return { activities, loading, unreadCount, markAllRead, clearAll };
 }

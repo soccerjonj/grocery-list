@@ -10,7 +10,7 @@ import { ActivityFeedSheet } from "@/components/household/ActivityFeed";
 export default function ActivityBellButton({ householdId }: { householdId: string }) {
   const [open, setOpen] = useState(false);
   const { currentUserId } = useHouseholdMembers(householdId);
-  const { activities, loading, unreadCount, markAllRead } = useActivityLog(householdId, currentUserId);
+  const { activities, loading, unreadCount, markAllRead, clearAll } = useActivityLog(householdId, currentUserId);
 
   return (
     <>
@@ -42,6 +42,7 @@ export default function ActivityBellButton({ householdId }: { householdId: strin
         open={open}
         onClose={() => setOpen(false)}
         onMarkAllRead={markAllRead}
+        onClearAll={clearAll}
       />
     </>
   );

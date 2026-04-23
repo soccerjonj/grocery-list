@@ -41,6 +41,7 @@ export function ActivityFeedSheet({
   open,
   onClose,
   onMarkAllRead,
+  onClearAll,
 }: {
   householdId: string;
   currentUserId: string | null;
@@ -49,6 +50,7 @@ export function ActivityFeedSheet({
   open: boolean;
   onClose: () => void;
   onMarkAllRead: () => void;
+  onClearAll: () => void;
 }) {
   const { members } = useHouseholdMembers(householdId);
   const [mounted, setMounted] = useState(false);
@@ -101,6 +103,13 @@ export function ActivityFeedSheet({
             {/* Header */}
             <div className="flex items-center gap-3 px-5 pt-1 pb-3 flex-shrink-0 border-b border-gray-50">
               <h2 className="text-base font-semibold text-gray-900 flex-1">Activity</h2>
+              {activities.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  className="text-xs text-gray-400 hover:text-red-500 transition-colors active:opacity-60 px-1"
+                >Clear all</button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
