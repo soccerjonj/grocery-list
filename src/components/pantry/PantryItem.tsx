@@ -7,6 +7,7 @@ import type { PantryItem as PantryItemType } from "@/types/database";
 import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import AddToListModal from "./AddToListModal";
 
 interface PantryItemProps {
   item: PantryItemType;
@@ -15,8 +16,9 @@ interface PantryItemProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
-  onAddToShoppingList?: (name: string) => Promise<boolean>;
+  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null) => Promise<boolean>;
   members: MemberProfile[];
+  householdId: string;
   currentUserId: string | null;
 }
 
@@ -98,6 +100,7 @@ export default function PantryItem({
   onAddToShoppingList,
   members,
   currentUserId,
+  householdId,
 }: PantryItemProps) {
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(item.name);
@@ -119,8 +122,16 @@ export default function PantryItem({
     setTimeout(() => onDelete(item.id), type === "consume" ? 320 : 260);
   }
 
+  const [showAddModal, setShowAddModal] = useState(false);
+
   async function handleAddToListAndRemove() {
-    if (onAddToShoppingList) await onAddToShoppingList(item.name);
+    setConfirmDelete(false);
+    setShowAddModal(true);
+  }
+
+  async function handleAddModalConfirm(qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) {
+    if (onAddToShoppingList) await onAddToShoppingList(item.name, qty, unit, store, assignedTo);
+    setShowAddModal(false);
     triggerExit("consume");
   }
 
@@ -660,6 +671,17 @@ export default function PantryItem({
           )}
         </AnimatePresence>,
         document.body
+      )}
+
+      {mounted && showAddModal && onAddToShoppingList && (
+        <AddToListModal
+          itemName={item.name}
+          householdId={householdId}
+          members={members}
+          currentUserId={currentUserId}
+          onConfirm={handleAddModalConfirm}
+          onClose={() => setShowAddModal(false)}
+        />
       )}
     </>
   );
