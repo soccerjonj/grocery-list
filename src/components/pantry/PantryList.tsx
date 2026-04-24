@@ -11,6 +11,7 @@ import { FOOD_CATEGORIES } from "@/types/database";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import { useItemSuggestions } from "@/hooks/useItemSuggestions";
 
 interface PantryListProps {
   items: PantryItemType[];
@@ -90,12 +91,14 @@ function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
 
 function AddToListModal({
   itemName,
+  householdId,
   members,
   currentUserId,
   onConfirm,
   onClose,
 }: {
   itemName: string;
+  householdId: string;
   members: MemberProfile[];
   currentUserId: string | null;
   onConfirm: (qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) => Promise<void>;
@@ -107,6 +110,9 @@ function AddToListModal({
   const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [customStoreMode, setCustomStoreMode] = useState(false);
+  const { getStores, saveStore } = useItemSuggestions(householdId);
+  const knownStores = getStores();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -189,13 +195,36 @@ function AddToListModal({
           {/* Store */}
           <div className="flex flex-col gap-1.5">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Store</p>
-            <input
-              type="text"
-              placeholder="e.g. Trader Joe's"
-              value={store}
-              onChange={(e) => setStore(e.target.value)}
-              className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors"
-            />
+            <div className="flex flex-wrap gap-1.5">
+              {knownStores.map((s) => (
+                <button key={s} type="button"
+                  onClick={() => { setStore(store === s ? "" : s); setCustomStoreMode(false); }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${store === s ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >{s}</button>
+              ))}
+              <button type="button"
+                onClick={() => { setCustomStoreMode((v) => !v); if (customStoreMode) setStore(""); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${customStoreMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+              >{knownStores.length === 0 ? "Add store" : "+ New"}</button>
+            </div>
+            {customStoreMode && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Store name"
+                  value={store}
+                  onChange={(e) => setStore(e.target.value)}
+                  autoFocus
+                  className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 transition-colors"
+                />
+                {store.trim() && (
+                  <button type="button"
+                    onClick={() => { saveStore(store.trim()); setCustomStoreMode(false); }}
+                    className="px-3 py-1.5 rounded-xl bg-gray-900 text-white text-xs font-medium active:scale-[0.94]"
+                  >Save</button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Member assignment */}
@@ -257,6 +286,7 @@ function AddToListModal({
 function RunningLowRow({
   item,
   locationLabel,
+  householdId,
   members,
   currentUserId,
   isFlashing,
@@ -266,6 +296,7 @@ function RunningLowRow({
 }: {
   item: PantryItemType;
   locationLabel: string | null;
+  householdId: string;
   members: MemberProfile[];
   currentUserId: string | null;
   isFlashing: boolean;
@@ -338,6 +369,7 @@ function RunningLowRow({
       {modalOpen && (
         <AddToListModal
           itemName={item.name}
+          householdId={householdId}
           members={members}
           currentUserId={currentUserId}
           onConfirm={handleConfirm}
@@ -648,6 +680,7 @@ export default function PantryList({
                           onAddedToList={() => handleAddedToList(item.id)}
                           members={members}
                           currentUserId={currentUserId}
+                          householdId={householdId}
                           onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo) : undefined}
                         />
                       </motion.div>
