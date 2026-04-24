@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 
 interface AddShoppingItemProps {
   onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null) => void;
@@ -31,6 +32,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   const knownStores = getStores();
   const [customStoreMode, setCustomStoreMode] = useState(false);
   const [managingStores, setManagingStores] = useState(false);
+  const [duplicate, setDuplicate] = useState<{ id: string; quantity: number } | null>(null);
 
   // Close on outside tap
   useEffect(() => {
@@ -68,30 +70,29 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
     });
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onAdd(
-      name.trim(),
-      quantity ? parseFloat(quantity) : undefined,
-      unit || undefined,
-      store.trim() || undefined,
-      assignedTo
-    );
-    setName("");
-    setQuantity("");
-    setUnit("");
-    setStore("");
-    setAssignedTo(null);
+    const dup = await checkShoppingDuplicate(householdId, name.trim());
+    if (dup) { setDuplicate(dup); return; }
+    doAdd();
+  }
+
+  function doAdd() {
+    onAdd(name.trim(), quantity ? parseFloat(quantity) : undefined, unit || undefined, store.trim() || undefined, assignedTo);
+    setName(""); setQuantity(""); setUnit(""); setStore(""); setAssignedTo(null);
     if (customStoreMode && store.trim()) saveStore(store.trim());
-    setShowSuggestions(false);
-    setCustomStoreMode(false);
-    setManagingStores(false);
+    setShowSuggestions(false); setCustomStoreMode(false); setManagingStores(false); setDuplicate(null);
     setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      nameRef.current?.focus();
-    }, 700);
+    setTimeout(() => { setSubmitted(false); nameRef.current?.focus(); }, 700);
+  }
+
+  async function handleIncreaseQty() {
+    if (!duplicate) return;
+    await increaseShoppingQty(duplicate.id, duplicate.quantity, quantity ? parseFloat(quantity) : 1);
+    setDuplicate(null);
+    setName(""); setQuantity(""); setUnit(""); setStore(""); setAssignedTo(null);
+    collapse();
   }
 
   return (
@@ -229,6 +230,22 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
               className="overflow-hidden"
             >
               <div className="flex flex-col gap-2 px-4 pb-4 pt-3 border-t border-gray-100">
+                {duplicate && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
+                    <p className="text-xs font-semibold text-amber-700">Already on the list (×{duplicate.quantity})</p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handleIncreaseQty}
+                        className="flex-1 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg active:scale-[0.97]"
+                      >Increase qty</button>
+                      <button type="button" onClick={doAdd}
+                        className="flex-1 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg active:scale-[0.97]"
+                      >Add anyway</button>
+                      <button type="button" onClick={() => setDuplicate(null)}
+                        className="px-3 text-gray-400 text-xs active:opacity-60"
+                      >Cancel</button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     type="number"

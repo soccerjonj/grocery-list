@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { useItemSuggestions } from "@/hooks/useItemSuggestions";
+import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 
@@ -41,22 +41,8 @@ export default function AddToListModal({ itemName, householdId, members, current
 
   async function handleConfirm() {
     setSaving(true);
-    const supabase = createClient();
-    // Check for duplicate in active shopping list
-    const { data } = await supabase
-      .from("shopping_items")
-      .select("id, quantity")
-      .eq("household_id", householdId)
-      .eq("completed", false)
-      .is("cleared_at", null)
-      .ilike("name", itemName.trim())
-      .maybeSingle();
-
-    if (data) {
-      setDuplicate({ id: data.id, quantity: data.quantity ?? 1 });
-      setSaving(false);
-      return;
-    }
+    const dup = await checkShoppingDuplicate(householdId, itemName);
+    if (dup) { setDuplicate(dup); setSaving(false); return; }
 
     await onConfirm(qty ? parseFloat(qty) : null, unit.trim() || null, store.trim() || null, assignedTo);
     if (customStoreMode && store.trim()) saveStore(store.trim());
@@ -67,9 +53,7 @@ export default function AddToListModal({ itemName, householdId, members, current
   async function handleIncreaseQty() {
     if (!duplicate) return;
     setSaving(true);
-    const supabase = createClient();
-    const addAmt = qty ? parseFloat(qty) : 1;
-    await supabase.from("shopping_items").update({ quantity: duplicate.quantity + addAmt }).eq("id", duplicate.id);
+    await increaseShoppingQty(duplicate.id, duplicate.quantity, qty ? parseFloat(qty) : 1);
     setSaving(false);
     onClose();
   }

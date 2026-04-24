@@ -123,16 +123,24 @@ export default function PantryItem({
   }
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalIsDelete, setAddModalIsDelete] = useState(false);
 
   async function handleAddToListAndRemove() {
     setConfirmDelete(false);
+    setAddModalIsDelete(true);
     setShowAddModal(true);
   }
 
   async function handleAddModalConfirm(qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) {
     if (onAddToShoppingList) await onAddToShoppingList(item.name, qty, unit, store, assignedTo);
     setShowAddModal(false);
-    triggerExit("consume");
+    if (addModalIsDelete) {
+      triggerExit("consume");
+    } else {
+      setAddedToList(true);
+      setTimeout(() => setAddedToList(false), 1500);
+    }
+    setAddModalIsDelete(false);
   }
 
   useEffect(() => {
@@ -203,13 +211,8 @@ export default function PantryItem({
     setEditingName(false);
   }
 
-  async function handleAddToList() {
-    if (!onAddToShoppingList) return;
-    const ok = await onAddToShoppingList(item.name);
-    if (ok) {
-      setAddedToList(true);
-      setTimeout(() => setAddedToList(false), 1500);
-    }
+  function handleAddToList() {
+    setShowAddModal(true);
   }
 
   // ── Bottom sheet content ─────────────────────────────────────────
