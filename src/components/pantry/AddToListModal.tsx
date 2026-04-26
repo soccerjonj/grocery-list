@@ -29,7 +29,10 @@ export default function AddToListModal({ itemName, householdId, members, current
   const { getStores, saveStore } = useItemSuggestions(householdId);
   const knownStores = getStores();
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    checkShoppingDuplicate(householdId, itemName).then((dup) => { if (dup) setDuplicate(dup); });
+  }, []);
 
   function toggleMember(uid: string) {
     setAssignedTo((prev) => {
@@ -41,9 +44,6 @@ export default function AddToListModal({ itemName, householdId, members, current
 
   async function handleConfirm() {
     setSaving(true);
-    const dup = await checkShoppingDuplicate(householdId, itemName);
-    if (dup) { setDuplicate(dup); setSaving(false); return; }
-
     await onConfirm(qty ? parseFloat(qty) : null, unit.trim() || null, store.trim() || null, assignedTo);
     if (customStoreMode && store.trim()) saveStore(store.trim());
     setSaving(false);
@@ -98,13 +98,7 @@ export default function AddToListModal({ itemName, householdId, members, current
                 <button type="button" onClick={handleIncreaseQty} disabled={saving}
                   className="flex-1 py-2 bg-amber-500 text-white text-xs font-medium rounded-xl active:scale-[0.97] disabled:opacity-40"
                 >Increase qty</button>
-                <button type="button" onClick={async () => {
-                  setDuplicate(null);
-                  setSaving(true);
-                  await onConfirm(qty ? parseFloat(qty) : null, unit.trim() || null, store.trim() || null, assignedTo);
-                  setSaving(false);
-                  onClose();
-                }} disabled={saving}
+                <button type="button" onClick={() => setDuplicate(null)} disabled={saving}
                   className="flex-1 py-2 bg-gray-100 text-gray-600 text-xs font-medium rounded-xl active:scale-[0.97] disabled:opacity-40"
                 >Add anyway</button>
                 <button type="button" onClick={() => setDuplicate(null)}
