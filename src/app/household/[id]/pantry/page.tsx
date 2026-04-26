@@ -124,6 +124,8 @@ function PantryPageInner() {
         <ImportToPantrySheet
           listId={importListId}
           householdId={householdId}
+          members={members}
+          currentUserId={currentUserId}
           onAddItem={addItem}
           onClose={handleImportClose}
         />

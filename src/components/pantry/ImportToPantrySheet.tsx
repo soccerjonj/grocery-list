@@ -4,22 +4,28 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { STORAGE_LOCATIONS } from "@/types/database";
+import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/database";
 import type { AddPantryOptions } from "@/hooks/usePantry";
+import type { MemberProfile } from "@/hooks/useHouseholdMembers";
+import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 
 interface DraftItem {
-  /** original shopping_item id — used as React key */
   key: string;
   name: string;
   quantity: number;
   unit: string;
   storageLocation: string | null;
+  fridgeZone: string | null;
+  foodCategory: string | null;
+  assignedTo: string[] | null;
   expiresAt: string | null;
 }
 
 interface ImportToPantrySheetProps {
   listId: string;
   householdId: string;
+  members?: MemberProfile[];
+  currentUserId?: string | null;
   onAddItem: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => Promise<void>;
   onClose: () => void;
 }
@@ -61,10 +67,14 @@ function DraftCard({
   item,
   onChange,
   onDelete,
+  members = [],
+  currentUserId,
 }: {
   item: DraftItem;
   onChange: (patch: Partial<DraftItem>) => void;
   onDelete: () => void;
+  members?: MemberProfile[];
+  currentUserId?: string | null;
 }) {
   const [nameVal, setNameVal] = useState(item.name);
   const [unitVal, setUnitVal] = useState(item.unit);
@@ -153,6 +163,58 @@ function DraftCard({
         ))}
       </div>
 
+      {/* Fridge zone */}
+      {item.storageLocation === "fridge" && (
+        <div className="flex flex-wrap gap-1.5">
+          {FRIDGE_ZONES.map(({ value, label }) => (
+            <button key={value} type="button"
+              onClick={() => onChange({ fridgeZone: item.fridgeZone === value ? null : value })}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.fridgeZone === value ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
+            >{label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Food category */}
+      <div className="flex flex-wrap gap-1.5">
+        {FOOD_CATEGORIES.map(({ value, label }) => (
+          <button key={value} type="button"
+            onClick={() => onChange({ foodCategory: item.foodCategory === value ? null : value })}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.foodCategory === value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+          >{label}</button>
+        ))}
+      </div>
+
+      {/* Assigned to */}
+      {members.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button"
+            onClick={() => onChange({ assignedTo: null })}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${!item.assignedTo || item.assignedTo.length === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+          >Everyone</button>
+          {members.map((m) => {
+            const selected = !!item.assignedTo?.includes(m.user_id);
+            const color = m.color ?? DEFAULT_COLOR;
+            return (
+              <button key={m.user_id} type="button"
+                onClick={() => {
+                  const cur = item.assignedTo ?? [];
+                  const next = selected ? cur.filter((id) => id !== m.user_id) : [...cur, m.user_id];
+                  onChange({ assignedTo: next.length === 0 ? null : next });
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
+                style={selected ? { backgroundColor: color, color: "#fff" } : { backgroundColor: hexAlpha(color, 0.1), color }}
+              >
+                <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+                  style={selected ? { backgroundColor: "rgba(255,255,255,0.25)" } : { backgroundColor: hexAlpha(color, 0.2) }}
+                >{m.initials}</span>
+                {m.user_id === currentUserId ? "Me" : m.short_name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Row 4: expiry date */}
       <div className="flex items-center gap-2">
         <input
@@ -179,6 +241,8 @@ function DraftCard({
 export default function ImportToPantrySheet({
   listId,
   householdId,
+  members = [],
+  currentUserId = null,
   onAddItem,
   onClose,
 }: ImportToPantrySheetProps) {
@@ -217,6 +281,9 @@ export default function ImportToPantrySheet({
             quantity: item.quantity ?? 1,
             unit: item.unit ?? "",
             storageLocation: null,
+            fridgeZone: null,
+            foodCategory: null,
+            assignedTo: null,
             expiresAt: null,
           }))
         );
@@ -247,6 +314,9 @@ export default function ImportToPantrySheet({
         draft.unit || undefined,
         {
           storageLocation: draft.storageLocation,
+          fridgeZone: draft.fridgeZone,
+          foodCategory: draft.foodCategory,
+          assignedTo: draft.assignedTo,
           expiresAt: draft.expiresAt,
         }
       );
@@ -326,6 +396,8 @@ export default function ImportToPantrySheet({
                       item={draft}
                       onChange={(patch) => updateDraft(draft.key, patch)}
                       onDelete={() => deleteDraft(draft.key)}
+                      members={members}
+                      currentUserId={currentUserId}
                     />
                   ))}
                 </AnimatePresence>
