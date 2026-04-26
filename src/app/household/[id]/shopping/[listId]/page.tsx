@@ -65,9 +65,17 @@ export default function ShoppingListDetailPage() {
               </button>
             )}
             {isArchived && (
-              <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1.5 rounded-lg">
-                Archived
-              </span>
+              <>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1.5 rounded-lg">
+                  Archived
+                </span>
+                <Link
+                  href={`/household/${householdId}/pantry?import=${listId}`}
+                  className="text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                >
+                  Add to pantry
+                </Link>
+              </>
             )}
             <Link
               href="/settings"
