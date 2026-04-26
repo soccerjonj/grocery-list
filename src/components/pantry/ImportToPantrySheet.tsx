@@ -8,6 +8,7 @@ import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/databa
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import { getPantryDuplicates, increasePantryQty } from "@/lib/checkPantryDuplicate";
 
 interface DraftItem {
   key: string;
@@ -19,6 +20,10 @@ interface DraftItem {
   foodCategory: string | null;
   assignedTo: string[] | null;
   expiresAt: string | null;
+  /** Set when an existing pantry item has the same name */
+  conflict?: { existingId: string; existingQty: number };
+  /** "merge" = add qty to existing, "add" = create new entry */
+  conflictAction?: "merge" | "add";
 }
 
 interface ImportToPantrySheetProps {
@@ -101,8 +106,25 @@ function DraftCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
       transition={{ duration: 0.18 }}
-      className="bg-white border border-gray-100 rounded-2xl px-4 py-3.5 flex flex-col gap-3"
+      className={`bg-white border rounded-2xl px-4 py-3.5 flex flex-col gap-3 ${item.conflict ? "border-amber-200" : "border-gray-100"}`}
     >
+      {/* Conflict banner */}
+      {item.conflict && (
+        <div className="bg-amber-50 rounded-xl px-3 py-2 flex flex-col gap-1.5">
+          <p className="text-xs font-semibold text-amber-700">Already in pantry (×{item.conflict.existingQty})</p>
+          <div className="flex gap-1.5">
+            <button type="button"
+              onClick={() => onChange({ conflictAction: "merge" })}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.97] ${(item.conflictAction ?? "merge") === "merge" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-600"}`}
+            >Add to existing</button>
+            <button type="button"
+              onClick={() => onChange({ conflictAction: "add" })}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.97] ${item.conflictAction === "add" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"}`}
+            >Add as new entry</button>
+          </div>
+        </div>
+      )}
+
       {/* Row 1: name + delete */}
       <div className="flex items-center gap-2">
         <input
@@ -261,7 +283,7 @@ export default function ImportToPantrySheet({
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Fetch completed items from the archived list
+  // Fetch completed items from the archived list, then check for pantry duplicates
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -273,26 +295,38 @@ export default function ImportToPantrySheet({
         .eq("completed", true)
         .order("completed_at", { ascending: true });
 
+      if (cancelled) return;
+
+      const raw = (data ?? []).map((item) => ({
+        key: item.id,
+        name: item.name,
+        quantity: item.quantity ?? 1,
+        unit: item.unit ?? "",
+        storageLocation: null,
+        fridgeZone: null,
+        foodCategory: null,
+        assignedTo: null,
+        expiresAt: null,
+      }));
+
+      // Check for existing pantry items
+      const conflicts = await getPantryDuplicates(householdId, raw.map((r) => r.name));
+
       if (!cancelled) {
         setDrafts(
-          (data ?? []).map((item) => ({
-            key: item.id,
-            name: item.name,
-            quantity: item.quantity ?? 1,
-            unit: item.unit ?? "",
-            storageLocation: null,
-            fridgeZone: null,
-            foodCategory: null,
-            assignedTo: null,
-            expiresAt: null,
-          }))
+          raw.map((item) => {
+            const c = conflicts.get(item.name.toLowerCase());
+            return c
+              ? { ...item, conflict: { existingId: c.id, existingQty: c.quantity }, conflictAction: "merge" as const }
+              : item;
+          })
         );
         setLoadingItems(false);
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [listId, supabase]);
+  }, [listId, householdId, supabase]);
 
   function updateDraft(key: string, patch: Partial<DraftItem>) {
     setDrafts((prev) =>
@@ -308,18 +342,22 @@ export default function ImportToPantrySheet({
     if (saving || drafts.length === 0) return;
     setSaving(true);
     for (const draft of drafts) {
-      await onAddItem(
-        draft.name,
-        draft.quantity,
-        draft.unit || undefined,
-        {
-          storageLocation: draft.storageLocation,
-          fridgeZone: draft.fridgeZone,
-          foodCategory: draft.foodCategory,
-          assignedTo: draft.assignedTo,
-          expiresAt: draft.expiresAt,
-        }
-      );
+      if (draft.conflict && (draft.conflictAction ?? "merge") === "merge") {
+        await increasePantryQty(draft.conflict.existingId, draft.conflict.existingQty, draft.quantity);
+      } else {
+        await onAddItem(
+          draft.name,
+          draft.quantity,
+          draft.unit || undefined,
+          {
+            storageLocation: draft.storageLocation,
+            fridgeZone: draft.fridgeZone,
+            foodCategory: draft.foodCategory,
+            assignedTo: draft.assignedTo,
+            expiresAt: draft.expiresAt,
+          }
+        );
+      }
     }
     setSaving(false);
     setDone(true);

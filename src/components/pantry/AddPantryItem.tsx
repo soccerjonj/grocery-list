@@ -6,6 +6,7 @@ import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
 import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/database";
+import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
 
 interface AddPantryItemProps {
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
@@ -43,16 +44,13 @@ export default function AddPantryItem({
 
   const [submitted, setSubmitted] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [duplicate, setDuplicate] = useState<{ id: string; quantity: number } | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { getSuggestions } = useItemSuggestions(householdId);
   const suggestions = getSuggestions(name, 5);
-
-  // Only show stockpile hint when the exact name is already in the pantry AND suggestions aren't visible
-  const nameLower = name.trim().toLowerCase();
-  const isStockpile = nameLower !== "" && existingNames.includes(nameLower) && !showSuggestions;
 
   // Close on outside tap
   useEffect(() => {
@@ -82,10 +80,15 @@ export default function AddPantryItem({
     setTimeout(() => nameRef.current?.focus(), 50);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const dup = await checkPantryDuplicate(householdId, name.trim());
+    if (dup) { setDuplicate(dup); return; }
+    doAdd();
+  }
 
+  function doAdd() {
     onAdd(name.trim(), parseFloat(quantity) || 1, undefined, {
       storageLocation: storageLocation || null,
       fridgeZone: storageLocation === "fridge" ? (fridgeZone || null) : null,
@@ -93,7 +96,16 @@ export default function AddPantryItem({
       expiresAt: expiresAt || null,
       assignedTo: assignedTo.length > 0 ? assignedTo : null,
     });
+    clearFields();
+  }
 
+  async function handleMergeQty() {
+    if (!duplicate) return;
+    await increasePantryQty(duplicate.id, duplicate.quantity, parseFloat(quantity) || 1);
+    clearFields();
+  }
+
+  function clearFields() {
     setName("");
     setQuantity("1");
     setStorageLocation("");
@@ -102,6 +114,7 @@ export default function AddPantryItem({
     setExpiresAt("");
     setAssignedTo([]);
     setShowSuggestions(false);
+    setDuplicate(null);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
@@ -248,9 +261,9 @@ export default function AddPantryItem({
           )}
         </AnimatePresence>
 
-        {/* ── Stockpile hint ────────────────────────────────────── */}
+        {/* ── Duplicate warning ─────────────────────────────────── */}
         <AnimatePresence>
-          {isStockpile && (
+          {duplicate && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -258,11 +271,19 @@ export default function AddPantryItem({
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <div className="mx-4 mb-2 flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-                <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-xs text-blue-600">Already in pantry — adding as a new batch</p>
+              <div className="mx-4 mb-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
+                <p className="text-xs font-semibold text-amber-700">Already in pantry (×{duplicate.quantity})</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={handleMergeQty}
+                    className="flex-1 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg active:scale-[0.97]"
+                  >Add to existing</button>
+                  <button type="button" onClick={doAdd}
+                    className="flex-1 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg active:scale-[0.97]"
+                  >Add as new entry</button>
+                  <button type="button" onClick={() => setDuplicate(null)}
+                    className="px-3 text-gray-400 text-xs active:opacity-60"
+                  >Cancel</button>
+                </div>
               </div>
             </motion.div>
           )}
