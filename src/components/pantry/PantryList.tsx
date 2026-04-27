@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import PantryItem from "./PantryItem";
 import AddPantryItem from "./AddPantryItem";
-import Spinner from "@/components/ui/Spinner";
 import type { PantryItem as PantryItemType } from "@/types/database";
 import { FOOD_CATEGORIES } from "@/types/database";
 import type { AddPantryOptions } from "@/hooks/usePantry";
@@ -251,7 +250,7 @@ function StorageSection({
       >
         <motion.svg
           animate={{ rotate: open ? 90 : 0 }}
-          transition={{ type: "spring", stiffness: 400, damping: 32 }}
+          transition={{ type: "spring", stiffness: 420, damping: 34 }}
           className="w-3 h-3 text-gray-400"
           fill="none"
           viewBox="0 0 24 24"
@@ -260,10 +259,8 @@ function StorageSection({
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </motion.svg>
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          {label}
-        </span>
-        <span className="text-xs text-gray-300">({items.length})</span>
+        <span className="text-xs font-semibold text-gray-500">{label}</span>
+        <span className="text-xs text-gray-300 tabular-nums">({items.length})</span>
       </button>
 
       <AnimatePresence initial={false}>
@@ -345,8 +342,13 @@ export default function PantryList({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <div className="h-[52px] bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" />
+        <div className="grid grid-cols-2 gap-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-28 bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -419,15 +421,22 @@ export default function PantryList({
       )}
 
       {!hasItems && items.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 2h6M8 6h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2zM10 11h4M10 15h4" />
-          </svg>
-          <p className="text-sm">Your pantry is empty</p>
-          <p className="text-xs mt-1 opacity-60">Add items to track what you have</p>
+        <div className="flex flex-col items-center py-14 gap-3">
+          <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 2h6M8 6h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2zM10 11h4M10 15h4" />
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-500">Your pantry is empty</p>
+            <p className="text-xs text-gray-400 mt-0.5">Add items to track what you have</p>
+          </div>
         </div>
       ) : !hasItems ? (
-        <p className="text-center text-sm text-gray-400 py-8">No items in this category</p>
+        <div className="flex flex-col items-center py-10 gap-2">
+          <p className="text-sm font-medium text-gray-400">Nothing in this category</p>
+          <button onClick={() => setFilterCategory("")} className="text-xs text-gray-400 underline underline-offset-2 active:opacity-60">Show all</button>
+        </div>
       ) : (
         <div className="flex flex-col gap-4">
 
@@ -443,17 +452,19 @@ export default function PantryList({
                 className="flex flex-col gap-2"
               >
                 <div className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
-                  </svg>
-                  <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Running Low</span>
-                  <span className="text-xs text-amber-300">({runningLowItems.length})</span>
+                  <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-2.5 h-2.5 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.25a.75.75 0 01.75.75v11.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM12 18a.75.75 0 100 1.5.75.75 0 000-1.5z" />
+                    </svg>
+                  </span>
+                  <span className="text-xs font-semibold text-amber-600">Running low</span>
+                  <span className="text-xs text-amber-400 tabular-nums">({runningLowItems.length})</span>
                   <button
                     type="button"
                     onClick={() => runningLowItems.forEach((i) => dismissItem(i.id, "dismiss"))}
-                    className="ml-auto text-[11px] text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
+                    className="ml-auto text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors active:opacity-60"
                   >
-                    Ignore all
+                    Dismiss all
                   </button>
                 </div>
                 <div className="flex flex-col gap-1">

@@ -393,8 +393,8 @@ export default function ImportToPantrySheet({
             }}
           >
             {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            <div className="flex justify-center pt-3.5 pb-1 flex-shrink-0">
+              <div className="w-10 h-[5px] bg-gray-200 rounded-full" />
             </div>
 
             {/* Header */}

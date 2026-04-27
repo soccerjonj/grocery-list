@@ -77,7 +77,7 @@ export default function AddToListModal({ itemName, householdId, members, current
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Add to shopping list</p>
+              <p className="text-xs font-medium text-gray-400 mb-0.5">Add to shopping list</p>
               <p className="text-base font-semibold text-gray-900">{itemName}</p>
             </div>
             <button type="button" onClick={onClose}
@@ -112,7 +112,7 @@ export default function AddToListModal({ itemName, householdId, members, current
             <>
               {/* Qty + unit */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Quantity &amp; unit</p>
+                <p className="text-xs font-medium text-gray-400">Quantity &amp; unit</p>
                 <div className="flex gap-2">
                   <input type="number" min="1" step="any" placeholder="Qty" value={qty} onChange={(e) => setQty(e.target.value)}
                     className="w-20 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-gray-400 text-center transition-colors" />
@@ -123,7 +123,7 @@ export default function AddToListModal({ itemName, householdId, members, current
 
               {/* Store */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Store</p>
+                <p className="text-xs font-medium text-gray-400">Store</p>
                 <div className="flex flex-wrap gap-1.5">
                   {knownStores.map((s) => (
                     <button key={s} type="button"
@@ -152,7 +152,7 @@ export default function AddToListModal({ itemName, householdId, members, current
               {/* Members */}
               {members.length > 1 && (
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">For</p>
+                  <p className="text-xs font-medium text-gray-400">For</p>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => setAssignedTo(null)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${!assignedTo || assignedTo.length === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}

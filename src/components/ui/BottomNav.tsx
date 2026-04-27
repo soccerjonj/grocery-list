@@ -17,7 +17,7 @@ const tabs = [
       <svg
         viewBox="0 0 24 24"
         fill="none"
-        strokeWidth={active ? 2.2 : 1.6}
+        strokeWidth={active ? 2.1 : 1.5}
         stroke="currentColor"
         className="w-[22px] h-[22px] transition-all duration-200"
       >
@@ -36,7 +36,7 @@ const tabs = [
       <svg
         viewBox="0 0 24 24"
         fill="none"
-        strokeWidth={active ? 2.2 : 1.6}
+        strokeWidth={active ? 2.1 : 1.5}
         stroke="currentColor"
         className="w-[22px] h-[22px] transition-all duration-200"
       >
@@ -55,8 +55,13 @@ export default function BottomNav({ householdId }: BottomNavProps) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white z-30 pb-safe"
-      style={{ boxShadow: "0 -1px 0 rgba(0,0,0,0.06), 0 -8px 24px rgba(0,0,0,0.05)" }}
+      className="fixed bottom-0 left-0 right-0 z-30 pb-safe"
+      style={{
+        background: "rgba(255,255,255,0.88)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        borderTop: "1px solid rgba(0,0,0,0.07)",
+      }}
     >
       <div className="max-w-lg mx-auto flex">
         {tabs.map((tab) => {
@@ -69,19 +74,28 @@ export default function BottomNav({ householdId }: BottomNavProps) {
               href={href}
               style={{ touchAction: "manipulation" }}
               className={cn(
-                "relative flex-1 flex flex-col items-center gap-1 pt-2.5 pb-3 min-h-[52px] text-[11px] font-medium tracking-wide transition-colors duration-150 active:opacity-70",
+                "relative flex-1 flex flex-col items-center gap-1 pt-2.5 pb-3 min-h-[56px] transition-colors duration-150 active:opacity-70",
                 active ? "text-gray-900" : "text-gray-400"
               )}
             >
+              {/* Sliding pill background */}
               {active && (
                 <motion.div
-                  layoutId="nav-indicator"
-                  className="absolute top-0 left-5 right-5 h-[2px] bg-gray-900 rounded-full"
+                  layoutId="nav-pill"
+                  className="absolute inset-x-5 inset-y-1.5 rounded-2xl"
+                  style={{ backgroundColor: "rgba(0,0,0,0.05)" }}
                   transition={{ type: "spring", stiffness: 500, damping: 42 }}
                 />
               )}
-              {tab.icon(active)}
-              {tab.label}
+              <span className="relative z-10">{tab.icon(active)}</span>
+              <span
+                className={cn(
+                  "relative z-10 text-[11px] tracking-wide transition-all duration-150",
+                  active ? "font-semibold" : "font-medium"
+                )}
+              >
+                {tab.label}
+              </span>
             </Link>
           );
         })}

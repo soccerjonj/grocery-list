@@ -143,13 +143,13 @@ export default function ShoppingItem({
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            <div className="flex justify-center pt-3.5 pb-1 flex-shrink-0">
+              <div className="w-10 h-[5px] bg-gray-200 rounded-full" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 pt-2 pb-3 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900 flex-1">Edit item</h2>
+            <div className="flex items-center gap-3 px-5 pt-3 pb-3 flex-shrink-0 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900 flex-1">Edit item</h2>
               <button
                 type="button"
                 onClick={closeSheet}
@@ -166,7 +166,7 @@ export default function ShoppingItem({
 
               {/* Name */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Item</p>
+                <p className="text-xs font-medium text-gray-400">Item</p>
                 <input
                   ref={nameInputRef}
                   type="text"
@@ -179,7 +179,7 @@ export default function ShoppingItem({
 
               {/* Qty + unit */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Quantity &amp; unit</p>
+                <p className="text-xs font-medium text-gray-400">Quantity &amp; unit</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -202,7 +202,7 @@ export default function ShoppingItem({
 
               {/* Store */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Store</p>
+                <p className="text-xs font-medium text-gray-400">Store</p>
                 <div className="flex flex-wrap gap-1.5">
                   {knownStores.map((s) => (
                     <button
@@ -237,7 +237,7 @@ export default function ShoppingItem({
               {/* Assigned to */}
               {members.length > 1 && (
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">For</p>
+                  <p className="text-xs font-medium text-gray-400">For</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -340,12 +340,40 @@ export default function ShoppingItem({
         {/* ── Checkbox ── */}
         <button
           onClick={handleCheck}
-          className="flex-shrink-0 w-6 h-6 focus-visible:outline-none"
+          className="relative flex-shrink-0 w-6 h-6 focus-visible:outline-none"
           aria-label={item.completed ? "Mark as not done" : "Mark as done"}
         >
+          {/* Ripple on check */}
+          <AnimatePresence>
+            {checking && (
+              <motion.span
+                key="ripple"
+                className="absolute inset-0 rounded-full bg-green-400 pointer-events-none"
+                initial={{ scale: 1, opacity: 0.45 }}
+                animate={{ scale: 3.8, opacity: 0 }}
+                exit={{}}
+                transition={{ duration: 0.55, ease: "easeOut" }}
+              />
+            )}
+          </AnimatePresence>
+
           <motion.div
-            animate={isChecked ? { backgroundColor: "#16a34a", borderColor: "#16a34a" } : { backgroundColor: "#ffffff", borderColor: "#d1d5db" }}
-            transition={{ duration: 0.18 }}
+            animate={isChecked ? {
+              backgroundColor: "#16a34a",
+              borderColor: "#16a34a",
+              scale: checking ? [1, 1.24, 0.9, 1] : 1,
+            } : {
+              backgroundColor: "#ffffff",
+              borderColor: "#d1d5db",
+              scale: 1,
+            }}
+            transition={{
+              backgroundColor: { duration: 0.2 },
+              borderColor: { duration: 0.2 },
+              scale: checking
+                ? { duration: 0.44, times: [0, 0.28, 0.65, 1], ease: "easeOut" }
+                : { duration: 0.18 },
+            }}
             className="w-6 h-6 rounded-full border-2 flex items-center justify-center"
           >
             <AnimatePresence>
@@ -359,16 +387,16 @@ export default function ShoppingItem({
                   strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  initial={{ scale: 0.6, opacity: 0 }}
+                  initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.6, opacity: 0 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.34, 1.56, 0.64, 1] }}
                 >
                   <motion.path
                     d="M2 7 L5.5 10.5 L12 4"
                     initial={{ pathLength: 0 }}
                     animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
                   />
                 </motion.svg>
               )}
