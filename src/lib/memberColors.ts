@@ -4,22 +4,27 @@ export interface MemberColor {
   label: string;
 }
 
+/**
+ * 8 perceptually distinct colors — spaced ~30-87° apart on the hue wheel
+ * so every avatar is immediately recognisable at a glance.
+ *
+ * Old palette had clusters: rose+orange+amber (all warm), emerald+teal+sky+blue (4 blue-greens).
+ * New palette removes those clusters.
+ */
 export const MEMBER_COLORS: MemberColor[] = [
-  { id: "rose",    hex: "#f43f5e", label: "Rose"    },
-  { id: "orange",  hex: "#f97316", label: "Orange"  },
-  { id: "amber",   hex: "#f59e0b", label: "Amber"   },
-  { id: "lime",    hex: "#84cc16", label: "Lime"    },
-  { id: "emerald", hex: "#10b981", label: "Emerald" },
-  { id: "teal",    hex: "#14b8a6", label: "Teal"    },
-  { id: "sky",     hex: "#0ea5e9", label: "Sky"     },
-  { id: "blue",    hex: "#3b82f6", label: "Blue"    },
-  { id: "violet",  hex: "#8b5cf6", label: "Violet"  },
-  { id: "pink",    hex: "#ec4899", label: "Pink"    },
+  { id: "red",    hex: "#ef4444", label: "Red"    }, // hue   0°
+  { id: "orange", hex: "#f97316", label: "Orange" }, // hue  31°
+  { id: "lime",   hex: "#84cc16", label: "Lime"   }, // hue  87°  — clearly yellow-green
+  { id: "green",  hex: "#22c55e", label: "Green"  }, // hue 142°
+  { id: "teal",   hex: "#14b8a6", label: "Teal"   }, // hue 174°
+  { id: "blue",   hex: "#3b82f6", label: "Blue"   }, // hue 217°
+  { id: "violet", hex: "#8b5cf6", label: "Violet" }, // hue 263°
+  { id: "pink",   hex: "#ec4899", label: "Pink"   }, // hue 328°  — hot magenta-pink
 ];
 
-export const DEFAULT_COLOR = "#6b7280"; // gray-500
+export const DEFAULT_COLOR = "#6b7280"; // gray-500 fallback for unset profiles
 
-/** Hex with given opacity (0–1) as a CSS rgba string */
+/** Convert hex + opacity to a CSS rgba() string */
 export function hexAlpha(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
