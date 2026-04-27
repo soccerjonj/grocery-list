@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { HouseholdProvider } from "@/context/HouseholdContext";
+import { ToastProvider } from "@/context/ToastContext";
 import BottomNav from "@/components/ui/BottomNav";
 import PageTransition from "@/components/ui/PageTransition";
 
@@ -41,11 +42,13 @@ export default async function HouseholdLayout({
   const household = householdData as { id: string; name: string };
 
   return (
-    <HouseholdProvider householdId={household.id} householdName={household.name}>
-      <div className="min-h-dvh pb-20">
-        <PageTransition>{children}</PageTransition>
-      </div>
-      <BottomNav householdId={household.id} />
-    </HouseholdProvider>
+    <ToastProvider>
+      <HouseholdProvider householdId={household.id} householdName={household.name}>
+        <div className="min-h-dvh pb-20">
+          <PageTransition>{children}</PageTransition>
+        </div>
+        <BottomNav householdId={household.id} />
+      </HouseholdProvider>
+    </ToastProvider>
   );
 }

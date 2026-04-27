@@ -91,7 +91,7 @@ export default function ShoppingListDetailPage() {
 
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-0.5">
+            <p className="text-xs text-gray-400 font-medium tracking-wide mb-0.5">
               {householdName}
             </p>
             {loading ? (

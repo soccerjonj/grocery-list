@@ -80,7 +80,7 @@ function PantryPageInner() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-0.5">
+          <p className="text-xs text-gray-400 font-medium tracking-wide mb-0.5">
             {householdName}
           </p>
           <h1 className="text-2xl font-semibold text-gray-900">Pantry</h1>

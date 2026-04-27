@@ -319,6 +319,7 @@ export default function PantryList({
 }: PantryListProps) {
   const [sort, setSort] = useState<SortKey>("freshness");
   const [filterCategory, setFilterCategory] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
@@ -353,9 +354,13 @@ export default function PantryList({
     );
   }
 
-  const filtered = filterCategory
-    ? items.filter((i) => i.food_category === filterCategory)
+  const searched = searchQuery.trim()
+    ? items.filter((i) => i.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
     : items;
+
+  const filtered = filterCategory
+    ? searched.filter((i) => i.food_category === filterCategory)
+    : searched;
 
   const runningLowItems = items.filter((i) => i.running_low && !i.running_low_dismissed);
 
@@ -378,7 +383,41 @@ export default function PantryList({
       <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} />
 
       {items.length > 0 && (
-        /* Sort + category filter bar */
+        /* Search bar */
+        <div className="relative">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+          </svg>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setSearchQuery("")}
+            placeholder="Search pantry…"
+            className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
+      {items.length > 0 && (
+        /* Sort + category filter bar — sticky */
+        <div className="sticky top-0 z-10 -mx-4 px-4 py-1.5 bg-gray-50/90 backdrop-blur-sm">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
           {SORT_OPTIONS.map(({ key, label }) => (
             <button
@@ -418,6 +457,7 @@ export default function PantryList({
             </button>
           ))}
         </div>
+        </div>
       )}
 
       {!hasItems && items.length === 0 ? (
@@ -434,8 +474,15 @@ export default function PantryList({
         </div>
       ) : !hasItems ? (
         <div className="flex flex-col items-center py-10 gap-2">
-          <p className="text-sm font-medium text-gray-400">Nothing in this category</p>
-          <button onClick={() => setFilterCategory("")} className="text-xs text-gray-400 underline underline-offset-2 active:opacity-60">Show all</button>
+          <p className="text-sm font-medium text-gray-400">
+            {searchQuery ? `No results for "${searchQuery}"` : "Nothing in this category"}
+          </p>
+          <button
+            onClick={() => { setSearchQuery(""); setFilterCategory(""); }}
+            className="text-xs text-gray-400 underline underline-offset-2 active:opacity-60"
+          >
+            Show all
+          </button>
         </div>
       ) : (
         <div className="flex flex-col gap-4">

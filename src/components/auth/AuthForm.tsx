@@ -85,7 +85,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
 
   if (confirming) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
+      <div className="min-h-dvh flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(160deg, #f8fafc 0%, #f1f5f9 60%, #e2e8f0 100%)" }}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,7 +136,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(160deg, #f8fafc 0%, #f1f5f9 60%, #e2e8f0 100%)" }}>
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -145,7 +145,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-900 rounded-2xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-900 rounded-2xl mb-4 shadow-lg shadow-gray-900/20">
             <svg
               className="w-7 h-7 text-white"
               fill="none"
@@ -170,7 +170,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white rounded-2xl shadow-md shadow-gray-200/60 border border-gray-100/80 p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {mode === "signup" && (
               <>
