@@ -57,9 +57,9 @@ export default async function DashboardPage() {
     >
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-900 rounded-2xl mb-4 shadow-lg shadow-gray-900/20">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-900 dark:bg-zinc-100 rounded-2xl mb-4 shadow-lg shadow-gray-900/20">
             <svg
-              className="w-8 h-8 text-white"
+              className="w-8 h-8 text-white dark:text-zinc-900"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -72,6 +72,7 @@ export default async function DashboardPage() {
               />
             </svg>
           </div>
+          <p className="text-xs font-semibold tracking-widest uppercase text-gray-400 dark:text-gray-500 mb-2">Our Pantry</p>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
             Hi, {firstName} 👋
           </h1>

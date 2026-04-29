@@ -9,13 +9,13 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Pantry & List",
-  description: "Household grocery tracking for two",
+  title: "Our Pantry",
+  description: "Shared grocery and pantry tracking for your household",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Pantry & List",
+    title: "Our Pantry",
   },
 };
 

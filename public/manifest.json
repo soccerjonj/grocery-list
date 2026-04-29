@@ -1,7 +1,7 @@
 {
-  "name": "Pantry & List",
-  "short_name": "Pantry",
-  "description": "Household grocery tracking for two",
+  "name": "Our Pantry",
+  "short_name": "Our Pantry",
+  "description": "Shared grocery and pantry tracking for your household",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#111111",

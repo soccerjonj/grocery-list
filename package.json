@@ -1,5 +1,6 @@
 {
-  "name": "grocerylist",
+  "name": "our-pantry",
+  "author": "jon caryl",
   "version": "0.1.0",
   "private": true,
   "scripts": {
