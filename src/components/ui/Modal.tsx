@@ -41,12 +41,12 @@ export default function Modal({ open, onClose, title, children, className }: Mod
             transition={{ duration: 0.15, ease: "easeOut" }}
             className={cn(
               "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50",
-              "w-full max-w-sm bg-white rounded-2xl shadow-xl p-6",
+              "w-full max-w-sm bg-white dark:bg-zinc-900 border border-transparent dark:border-zinc-800 rounded-2xl shadow-xl p-6",
               className
             )}
           >
             {title && (
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">{title}</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">{title}</h2>
             )}
             {children}
           </motion.div>

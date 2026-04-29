@@ -238,12 +238,12 @@ export default function PantryItem({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 380, damping: 40 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-700 rounded-full" />
             </div>
 
             {/* Header */}
@@ -261,15 +261,15 @@ export default function PantryItem({
                       if (e.key === "Escape") { setEditName(item.name); setEditingName(false); }
                     }}
                     autoFocus
-                    className="w-full text-lg font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-gray-400 transition-colors"
+                    className="w-full text-lg font-semibold text-gray-900 dark:text-gray-50 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
                   />
                 ) : (
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-gray-900 truncate">{item.name}</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 truncate">{item.name}</h2>
                     <button
                       type="button"
                       onClick={() => { setEditName(item.name); setEditingName(true); }}
-                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors active:scale-90"
+                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:scale-90"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
@@ -289,7 +289,7 @@ export default function PantryItem({
               <button
                 type="button"
                 onClick={onToggleExpand}
-                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors active:scale-90"
+                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-90"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -301,8 +301,8 @@ export default function PantryItem({
             <div className="overflow-y-auto overscroll-contain flex-1 min-h-0 px-5 pb-6 flex flex-col gap-5">
 
               {/* Quantity stepper */}
-              <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex-1">Quantity</span>
+              <div className="flex items-center gap-3 bg-gray-50 dark:bg-zinc-800 rounded-2xl px-4 py-3">
+                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-1">Quantity</span>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.88 }}
@@ -346,7 +346,7 @@ export default function PantryItem({
                   whileTap={{ scale: 0.94 }}
                   onClick={() => onUpdateItem(item.id, { running_low: !item.running_low })}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors flex-1 justify-center min-w-[90px] ${
-                    item.running_low ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-gray-100 text-gray-500"
+                    item.running_low ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -360,7 +360,7 @@ export default function PantryItem({
                   whileTap={{ scale: 0.94 }}
                   onClick={() => onUpdateItem(item.id, { opened: !item.opened })}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors flex-1 justify-center min-w-[80px] ${
-                    item.opened ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-gray-100 text-gray-500"
+                    item.opened ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -379,7 +379,7 @@ export default function PantryItem({
                     onClick={handleAddToList}
                     disabled={addedToList}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all flex-1 justify-center min-w-[90px] ${
-                      addedToList ? "bg-green-100 text-green-700 border border-green-200" : "bg-gray-100 text-gray-500"
+                      addedToList ? "bg-green-100 text-green-700 border border-green-200" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
                     }`}
                   >
                     <AnimatePresence mode="wait" initial={false}>
@@ -401,13 +401,13 @@ export default function PantryItem({
 
               {/* Expiry */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Expires</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Expires</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
                     value={item.expires_at ?? ""}
                     onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
-                    className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors min-w-0"
+                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
                   />
                   {item.expires_at ? (
                     <button
@@ -431,12 +431,12 @@ export default function PantryItem({
 
               {/* Storage */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Storage</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Storage</p>
                 <div className="flex flex-wrap gap-1.5">
                   {STORAGE_LOCATIONS.map(({ value, label }) => (
                     <button key={value} type="button"
                       onClick={() => onUpdateItem(item.id, { storage_location: item.storage_location === value ? null : value, fridge_zone: value !== "fridge" ? null : item.fridge_zone })}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.storage_location === value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.storage_location === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
                     >{label}</button>
                   ))}
                 </div>
@@ -461,12 +461,12 @@ export default function PantryItem({
 
               {/* Category */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Category</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Category</p>
                 <div className="flex flex-wrap gap-1.5">
                   {FOOD_CATEGORIES.map(({ value, label }) => (
                     <button key={value} type="button"
                       onClick={() => onUpdateItem(item.id, { food_category: item.food_category === value ? null : value })}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.food_category === value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.food_category === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
                     >{label}</button>
                   ))}
                 </div>
@@ -475,7 +475,7 @@ export default function PantryItem({
               {/* Assigned to */}
               {members.length > 1 && (
                 <div className="flex flex-col gap-2">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned to</p>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Assigned to</p>
                   <div className="flex gap-2 flex-wrap">
                     {/* "Everyone" chip */}
                     <button
@@ -483,8 +483,8 @@ export default function PantryItem({
                       onClick={() => onUpdateItem(item.id, { assigned_to: null })}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                         !item.assigned_to || item.assigned_to.length === 0
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                          : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                       }`}
                     >
                       Everyone
@@ -562,7 +562,7 @@ export default function PantryItem({
             : { duration: 0.18, ease: "easeOut" }
         }
         style={{ gridColumn: "span 1" }}
-        className={`bg-white rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border border-gray-100 ${item.running_low ? "border-l-[3px] border-l-amber-400" : ""}`}
+        className={`bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border border-gray-100 dark:border-zinc-800 ${item.running_low ? "border-l-[3px] border-l-amber-400" : ""}`}
         onClick={handleCardClick}
         onPointerDown={handleLongPressStart}
         onPointerUp={handleLongPressEnd}
@@ -571,7 +571,7 @@ export default function PantryItem({
       >
         <div className="p-3 flex flex-col gap-2 min-h-[76px]">
           <div className="flex items-start gap-1.5">
-            <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2 flex-1">{item.name}</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-50 leading-snug line-clamp-2 flex-1">{item.name}</p>
             {assignedMembers.length > 0 && (
               <div className="flex -space-x-1 flex-shrink-0 mt-[1px]">
                 {assignedMembers.map((m) => {
@@ -626,15 +626,15 @@ export default function PantryItem({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.92 }}
                 transition={{ type: "spring", stiffness: 420, damping: 36 }}
-                className="fixed z-[61] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-48px)] max-w-sm bg-white rounded-3xl shadow-2xl p-5 flex flex-col gap-3"
+                className="fixed z-[61] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-48px)] max-w-sm bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-5 flex flex-col gap-3"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <p className="text-base font-semibold text-gray-900">Remove item?</p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-gray-50">Remove item?</p>
                   <button
                     type="button"
                     onClick={() => setConfirmDelete(false)}
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors active:scale-90"
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-90"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -642,13 +642,13 @@ export default function PantryItem({
                   </button>
                 </div>
 
-                <p className="text-sm text-gray-400 -mt-1">What would you like to do with <span className="font-medium text-gray-600">{item.name}</span>?</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 -mt-1">What would you like to do with <span className="font-medium text-gray-600 dark:text-gray-300">{item.name}</span>?</p>
 
                 <div className="flex flex-col gap-2 mt-1">
                   <button
                     type="button"
                     onClick={() => { setConfirmDelete(false); onUpdateQuantity(item.id, Math.max(1, item.quantity - 1)); }}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
                   >
                     Just reduce the quantity
                   </button>
@@ -656,7 +656,7 @@ export default function PantryItem({
                     <button
                       type="button"
                       onClick={handleAddToListAndRemove}
-                      className="w-full px-4 py-3 bg-gray-900 text-white text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
+                      className="w-full px-4 py-3 bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-2xl active:scale-[0.97] transition-all text-left"
                     >
                       Add to shopping list &amp; remove
                     </button>

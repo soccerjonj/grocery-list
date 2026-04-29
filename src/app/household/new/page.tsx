@@ -63,7 +63,7 @@ export default function NewHouseholdPage() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50 dark:bg-zinc-950">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -73,7 +73,7 @@ export default function NewHouseholdPage() {
         <div className="mb-6">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors active:opacity-60"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 transition-colors active:opacity-60"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -83,13 +83,13 @@ export default function NewHouseholdPage() {
         </div>
 
         <div className="mb-7">
-          <h1 className="text-2xl font-semibold text-gray-900">New household</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">New household</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Create a space to share with your household
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               id="household-name"

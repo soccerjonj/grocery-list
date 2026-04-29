@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 
 interface BottomNavProps {
@@ -52,15 +53,17 @@ const tabs = [
 
 export default function BottomNav({ householdId }: BottomNavProps) {
   const pathname = usePathname();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-30 pb-safe"
       style={{
-        background: "rgba(255,255,255,0.88)",
+        background: isDark ? "rgba(9,9,11,0.88)" : "rgba(255,255,255,0.88)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        borderTop: "1px solid rgba(0,0,0,0.07)",
+        borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.07)",
       }}
     >
       <div className="max-w-lg mx-auto flex">
@@ -75,7 +78,7 @@ export default function BottomNav({ householdId }: BottomNavProps) {
               style={{ touchAction: "manipulation" }}
               className={cn(
                 "relative flex-1 flex flex-col items-center gap-1 pt-2.5 pb-3 min-h-[56px] transition-colors duration-150 active:opacity-70",
-                active ? "text-gray-900" : "text-gray-400"
+                active ? "text-gray-900 dark:text-gray-50" : "text-gray-400 dark:text-gray-500"
               )}
             >
               {/* Sliding pill background */}
@@ -83,7 +86,7 @@ export default function BottomNav({ householdId }: BottomNavProps) {
                 <motion.div
                   layoutId="nav-pill"
                   className="absolute inset-x-5 inset-y-1.5 rounded-2xl"
-                  style={{ backgroundColor: "rgba(0,0,0,0.05)" }}
+                  style={{ backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }}
                   transition={{ type: "spring", stiffness: 500, damping: 42 }}
                 />
               )}

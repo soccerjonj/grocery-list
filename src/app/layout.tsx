@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ui/ThemeProvider";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -33,9 +34,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geist.variable} h-full`}>
-      <body className="min-h-full bg-gray-50 text-gray-900 antialiased font-sans">
-        {children}
+    <html lang="en" className={`${geist.variable} h-full`} suppressHydrationWarning>
+      <body className="min-h-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-50 antialiased font-sans">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

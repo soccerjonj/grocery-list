@@ -84,14 +84,14 @@ function ToastPortal({
             onClick={() => onDismiss(t.id)}
             className={`pointer-events-auto max-w-sm w-full flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium text-left ${
               t.type === "success"
-                ? "bg-gray-900 text-white"
+                ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
                 : t.type === "error"
                 ? "bg-red-600 text-white"
-                : "bg-white text-gray-900 border border-gray-100 shadow-md"
+                : "bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-50 border border-gray-100 dark:border-zinc-700 shadow-md"
             }`}
           >
             {t.type === "success" && (
-              <svg className="w-4 h-4 flex-shrink-0 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-4 h-4 flex-shrink-0 text-green-400 dark:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             )}

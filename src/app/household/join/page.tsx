@@ -128,7 +128,7 @@ function JoinForm() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50 dark:bg-zinc-950">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -139,7 +139,7 @@ function JoinForm() {
           <button
             type="button"
             onClick={() => step === "color" ? setStep("code") : router.push("/dashboard")}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors active:opacity-60"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 transition-colors active:opacity-60"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -158,14 +158,14 @@ function JoinForm() {
               transition={{ duration: 0.2 }}
             >
               <div className="mb-7">
-                <h1 className="text-2xl font-semibold text-gray-900">Join a household</h1>
-                <p className="text-sm text-gray-500 mt-1">Enter the invite code shared with you</p>
+                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Join a household</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter the invite code shared with you</p>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm p-6">
                 <form onSubmit={handleCodeSubmit} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="code" className="text-sm font-medium text-gray-700">Invite code</label>
+                    <label htmlFor="code" className="text-sm font-medium text-gray-700 dark:text-gray-300">Invite code</label>
                     <input
                       id="code"
                       type="text"
@@ -176,7 +176,7 @@ function JoinForm() {
                       autoFocus
                       autoCapitalize="none"
                       autoCorrect="off"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 bg-white focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none font-mono tracking-widest text-center text-lg uppercase"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-gray-900 dark:focus:ring-zinc-400 focus:border-transparent outline-none font-mono tracking-widest text-center text-lg uppercase"
                     />
                   </div>
 
@@ -199,13 +199,13 @@ function JoinForm() {
               transition={{ duration: 0.2 }}
             >
               <div className="mb-7">
-                <h1 className="text-2xl font-semibold text-gray-900">Pick your color</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Joining <span className="font-medium text-gray-900">{household?.name}</span> — choose a color that&apos;s yours
+                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Pick your color</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Joining <span className="font-medium text-gray-900 dark:text-gray-50">{household?.name}</span> — choose a color that&apos;s yours
                 </p>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-5">
+              <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm p-6 flex flex-col gap-5">
                 <ColorPicker
                   value={selectedColor}
                   onChange={setSelectedColor}
@@ -213,7 +213,7 @@ function JoinForm() {
                 />
 
                 {takenColors.length > 0 && (
-                  <p className="text-xs text-gray-400 text-center">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
                     Locked colors are already taken by someone in this household
                   </p>
                 )}

@@ -46,7 +46,7 @@ export default function ShoppingListDetailPage() {
         <div className="flex items-center justify-between mb-2">
           <Link
             href={`/household/${householdId}/shopping`}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -59,19 +59,19 @@ export default function ShoppingListDetailPage() {
               <button
                 onClick={handleArchive}
                 disabled={archiving}
-                className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
               >
                 {archiving ? "Archiving…" : "Archive list"}
               </button>
             )}
             {isArchived && (
               <>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1.5 rounded-lg">
+                <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg">
                   Archived
                 </span>
                 <Link
                   href={`/household/${householdId}/pantry?import=${listId}`}
-                  className="text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                  className="text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
                 >
                   Add to pantry
                 </Link>
@@ -79,7 +79,7 @@ export default function ShoppingListDetailPage() {
             )}
             <Link
               href={`/household/${householdId}/settings`}
-              className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
               aria-label="Settings"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -91,19 +91,19 @@ export default function ShoppingListDetailPage() {
 
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs text-gray-400 font-medium tracking-wide mb-0.5">
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium tracking-wide mb-0.5">
               {householdName}
             </p>
             {loading ? (
-              <div className="h-8 w-40 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-8 w-40 bg-gray-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
             ) : (
-              <h1 className="text-2xl font-semibold text-gray-900">
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
                 {list?.name ?? "Shopping list"}
               </h1>
             )}
           </div>
           {activeItems.length > 0 && (
-            <span className="text-sm text-gray-400 mb-0.5">
+            <span className="text-sm text-gray-400 dark:text-gray-500 mb-0.5">
               {activeItems.length} item{activeItems.length !== 1 ? "s" : ""}
             </span>
           )}

@@ -40,17 +40,17 @@ export default function InviteModal({
   return (
     <Modal open={open} onClose={onClose} title="Invite someone">
       <div className="flex flex-col gap-5">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Share this code or link to invite someone to{" "}
-          <span className="font-medium text-gray-900">{householdName}</span>.
+          <span className="font-medium text-gray-900 dark:text-gray-50">{householdName}</span>.
         </p>
 
         <div className="flex flex-col items-center gap-2">
-          <p className="text-xs text-gray-400 uppercase tracking-widest font-medium">
+          <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-widest font-medium">
             Invite code
           </p>
-          <div className="bg-gray-50 border border-gray-200 rounded-xl px-6 py-3">
-            <span className="font-mono text-3xl tracking-[0.25em] font-semibold text-gray-900 select-all">
+          <div className="bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-6 py-3">
+            <span className="font-mono text-3xl tracking-[0.25em] font-semibold text-gray-900 dark:text-gray-50 select-all">
               {inviteCode.toUpperCase()}
             </span>
           </div>

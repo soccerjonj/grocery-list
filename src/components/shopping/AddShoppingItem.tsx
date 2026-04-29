@@ -99,7 +99,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
     <div ref={containerRef} className="relative">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-2xl border border-gray-100 shadow-sm"
+        className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm"
       >
         {/* ── Name row ─────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-4 py-3.5">
@@ -117,7 +117,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
               setExpanded(true);
               setShowSuggestions(true);
             }}
-            className="flex-1 text-sm text-gray-900 placeholder:text-gray-400 outline-none bg-transparent"
+            className="flex-1 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
           />
 
           {/* Close button — visible while expanded */}
@@ -131,7 +131,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.12 }}
                 whileTap={{ scale: 0.88 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 text-xs font-medium"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors flex-shrink-0 text-xs font-medium"
                 aria-label="Close"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -195,7 +195,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="overflow-hidden border-t border-gray-50"
+              className="overflow-hidden border-t border-gray-50 dark:border-zinc-800"
             >
               {suggestions.map((s) => (
                 <button
@@ -203,14 +203,14 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                   type="button"
                   onMouseDown={(e) => { e.preventDefault(); applySuggestion(s); }}
                   onTouchEnd={(e) => { e.preventDefault(); applySuggestion(s); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-zinc-800 active:bg-gray-100 dark:active:bg-zinc-700 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-gray-700 flex-1 truncate">{s.name}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">{s.name}</span>
                   {s.store && (
-                    <span className="text-xs text-gray-400 flex-shrink-0 truncate max-w-[100px]">{s.store}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 truncate max-w-[100px]">{s.store}</span>
                   )}
                 </button>
               ))}
@@ -229,7 +229,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="overflow-hidden"
             >
-              <div className="flex flex-col gap-2 px-4 pb-4 pt-3 border-t border-gray-100">
+              <div className="flex flex-col gap-2 px-4 pb-4 pt-3 border-t border-gray-100 dark:border-zinc-800">
                 {duplicate && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
                     <p className="text-xs font-semibold text-amber-700">Already on the list (×{duplicate.quantity})</p>
@@ -254,14 +254,14 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     placeholder="Qty"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    className="w-16 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-center"
+                    className="w-16 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 outline-none text-center"
                   />
                   <input
                     type="text"
                     placeholder="Unit (optional)"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
+                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 outline-none"
                   />
                 </div>
                 {/* Store picker */}
@@ -272,7 +272,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                       type="button"
                       onClick={() => { if (!managingStores) { setStore(store === s ? "" : s); setCustomStoreMode(false); } }}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        store === s && !managingStores ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        store === s && !managingStores ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                       }`}
                     >
                       {s}
@@ -289,7 +289,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     type="button"
                     onClick={() => { setCustomStoreMode((v) => !v); setManagingStores(false); if (customStoreMode) setStore(""); }}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                      customStoreMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      customStoreMode ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                     }`}
                   >{knownStores.length === 0 ? "Add store" : "+ New"}</button>
                   {knownStores.length > 0 && (
@@ -297,7 +297,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                       type="button"
                       onClick={() => { setManagingStores((v) => !v); setCustomStoreMode(false); }}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        managingStores ? "bg-red-50 text-red-400" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                        managingStores ? "bg-red-50 dark:bg-red-900/30 text-red-400" : "bg-gray-100 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-zinc-700"
                       }`}
                     >{managingStores ? "Done" : "Edit"}</button>
                   )}
@@ -310,27 +310,27 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                       value={store}
                       onChange={(e) => setStore(e.target.value)}
                       autoFocus
-                      className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none"
+                      className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 outline-none"
                     />
                     {store.trim() && (
                       <button
                         type="button"
                         onClick={() => { saveStore(store.trim()); setCustomStoreMode(false); }}
-                        className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium active:scale-[0.94]"
+                        className="px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium active:scale-[0.94]"
                       >Save</button>
                     )}
                   </div>
                 )}
                 {members.length > 1 && (
                   <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                    <span className="text-xs text-gray-400 font-medium mr-0.5">For:</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-0.5">For:</span>
                     <button
                       type="button"
                       onClick={() => setAssignedTo(null)}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                         !assignedTo || assignedTo.length === 0
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                          : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                       }`}
                     >
                       Everyone

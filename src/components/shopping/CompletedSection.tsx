@@ -48,9 +48,9 @@ export default function CompletedSection({
               <path d="M2 6l3 3 5-5" />
             </svg>
           </span>
-          <span className="text-sm font-medium text-gray-500">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
             Checked off
-            <span className="ml-1.5 text-xs font-medium text-gray-400 tabular-nums">({items.length})</span>
+            <span className="ml-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 tabular-nums">({items.length})</span>
           </span>
           <motion.svg
             animate={{ rotate: open ? 90 : 0 }}
@@ -65,7 +65,7 @@ export default function CompletedSection({
         {onClearAll && (
           <button
             onClick={onClearAll}
-            className="text-xs font-medium text-gray-400 hover:text-red-400 transition-colors py-1 px-1.5 rounded-lg hover:bg-red-50 active:opacity-60"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-red-400 transition-colors py-1 px-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 active:opacity-60"
           >
             Clear all
           </button>
@@ -83,7 +83,7 @@ export default function CompletedSection({
             transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="overflow-hidden"
           >
-            <div className="bg-white rounded-2xl border border-gray-100 px-4 py-1">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 px-4 py-1">
               <AnimatePresence>
                 {items.map((item) => (
                   <motion.div
@@ -94,7 +94,7 @@ export default function CompletedSection({
                     transition={{ duration: 0.18 }}
                     className="overflow-hidden"
                   >
-                    <div className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-3 py-3 border-b border-gray-50 dark:border-zinc-800 last:border-0">
                       {/* Un-check button */}
                       <button
                         onClick={() => onToggle(item.id)}
@@ -106,7 +106,7 @@ export default function CompletedSection({
                         </svg>
                       </button>
 
-                      <p className="flex-1 text-sm text-gray-400 line-through truncate">
+                      <p className="flex-1 text-sm text-gray-400 dark:text-gray-500 line-through truncate">
                         {item.name}
                         {item.quantity && item.quantity !== 1 && (
                           <span className="ml-1.5 text-gray-300">
@@ -117,7 +117,7 @@ export default function CompletedSection({
                       </p>
 
                       {item.store && (
-                        <span className="text-xs text-gray-300 flex-shrink-0 truncate max-w-[80px]">{item.store}</span>
+                        <span className="text-xs text-gray-300 dark:text-gray-600 flex-shrink-0 truncate max-w-[80px]">{item.store}</span>
                       )}
 
                       {item.completed_by && (() => {
@@ -137,7 +137,7 @@ export default function CompletedSection({
 
                       <button
                         onClick={() => onDelete(item.id)}
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-200 hover:text-red-400 hover:bg-red-50 transition-colors active:scale-90"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-200 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors active:scale-90"
                         aria-label="Remove"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

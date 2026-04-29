@@ -135,7 +135,7 @@ export default function AddPantryItem({
     <div ref={containerRef} className="relative">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-2xl border border-gray-100 shadow-sm"
+        className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm"
       >
         {/* ── Name row ─────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-4 py-3.5">
@@ -152,7 +152,7 @@ export default function AddPantryItem({
               setExpanded(true);
               setShowSuggestions(true);
             }}
-            className="flex-1 text-sm text-gray-900 placeholder:text-gray-400 outline-none bg-transparent"
+            className="flex-1 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
           />
 
           {/* Close button — visible while expanded */}
@@ -166,7 +166,7 @@ export default function AddPantryItem({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.12 }}
                 whileTap={{ scale: 0.88 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 text-xs font-medium"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors flex-shrink-0 text-xs font-medium"
                 aria-label="Close"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -230,7 +230,7 @@ export default function AddPantryItem({
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="overflow-hidden border-t border-gray-50"
+              className="overflow-hidden border-t border-gray-50 dark:border-zinc-800"
             >
               {suggestions.map((s) => (
                 <button
@@ -239,19 +239,19 @@ export default function AddPantryItem({
                   // onMouseDown prevents the input from blurring before click fires
                   onMouseDown={(e) => { e.preventDefault(); applySuggestion(s); }}
                   onTouchEnd={(e) => { e.preventDefault(); applySuggestion(s); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-zinc-800 active:bg-gray-100 dark:active:bg-zinc-700 transition-colors"
                 >
-                  <svg className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-gray-700 flex-1 truncate">{s.name}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">{s.name}</span>
                   {s.storage_location && (
-                    <span className="text-xs text-gray-400 flex-shrink-0">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
                       {STORAGE_LOCATIONS.find((l) => l.value === s.storage_location)?.label}
                     </span>
                   )}
                   {s.food_category && !s.storage_location && (
-                    <span className="text-xs text-gray-400 flex-shrink-0">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
                       {FOOD_CATEGORIES.find((c) => c.value === s.food_category)?.label}
                     </span>
                   )}
@@ -271,17 +271,17 @@ export default function AddPantryItem({
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <div className="mx-4 mb-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
-                <p className="text-xs font-semibold text-amber-700">Already in pantry (×{duplicate.quantity})</p>
+              <div className="mx-4 mb-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 flex flex-col gap-2">
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Already in pantry (×{duplicate.quantity})</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={handleMergeQty}
                     className="flex-1 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg active:scale-[0.97]"
                   >Add to existing</button>
                   <button type="button" onClick={doAdd}
-                    className="flex-1 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg active:scale-[0.97]"
+                    className="flex-1 py-1.5 bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-xs font-medium rounded-lg active:scale-[0.97]"
                   >Add as new entry</button>
                   <button type="button" onClick={() => setDuplicate(null)}
-                    className="px-3 text-gray-400 text-xs active:opacity-60"
+                    className="px-3 text-gray-400 dark:text-gray-500 text-xs active:opacity-60"
                   >Cancel</button>
                 </div>
               </div>
@@ -300,14 +300,14 @@ export default function AddPantryItem({
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="overflow-hidden"
             >
-              <div className="border-t border-gray-100 px-4 pb-4 pt-3 flex flex-col gap-4">
+              <div className="border-t border-gray-100 dark:border-zinc-800 px-4 pb-4 pt-3 flex flex-col gap-4">
 
                 {/* Quantity */}
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setQuantity(String(Math.max(0.5, (parseFloat(quantity) || 1) - 1)))}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg leading-none active:scale-90"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-lg leading-none active:scale-90"
                   >
                     −
                   </button>
@@ -317,12 +317,12 @@ export default function AddPantryItem({
                     step="any"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    className="w-12 text-center text-sm font-semibold text-gray-900 outline-none border border-gray-200 rounded-lg py-1 bg-transparent"
+                    className="w-12 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-lg py-1 bg-transparent dark:bg-zinc-800"
                   />
                   <button
                     type="button"
                     onClick={() => setQuantity(String((parseFloat(quantity) || 1) + 1))}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg leading-none active:scale-90"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-lg leading-none active:scale-90"
                   >
                     +
                   </button>
@@ -330,7 +330,7 @@ export default function AddPantryItem({
 
                 {/* Storage location */}
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-medium text-gray-400">Storage</p>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Storage</p>
                   <div className="flex flex-wrap gap-1.5">
                     {STORAGE_LOCATIONS.map(({ value, label }) => (
                       <button
@@ -342,8 +342,8 @@ export default function AddPantryItem({
                         }}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                           storageLocation === value
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                            : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                         }`}
                       >
                         {label}
@@ -362,7 +362,7 @@ export default function AddPantryItem({
                       transition={{ duration: 0.18 }}
                       className="overflow-hidden flex flex-col gap-1.5"
                     >
-                      <p className="text-xs font-medium text-gray-400">Fridge zone</p>
+                      <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Fridge zone</p>
                       <div className="flex gap-1.5">
                         {FRIDGE_ZONES.map(({ value, label }) => (
                           <button
@@ -372,7 +372,7 @@ export default function AddPantryItem({
                             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                               fridgeZone === value
                                 ? "bg-blue-600 text-white"
-                                : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                                : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
                             }`}
                           >
                             {label}
@@ -385,7 +385,7 @@ export default function AddPantryItem({
 
                 {/* Food category */}
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-medium text-gray-400">Category</p>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Category</p>
                   <div className="flex flex-wrap gap-1.5">
                     {FOOD_CATEGORIES.map(({ value, label }) => (
                       <button
@@ -394,8 +394,8 @@ export default function AddPantryItem({
                         onClick={() => setFoodCategory(foodCategory === value ? "" : value)}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                           foodCategory === value
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                            : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                         }`}
                       >
                         {label}
@@ -406,7 +406,7 @@ export default function AddPantryItem({
 
                 {/* Expiry date */}
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-medium text-gray-400">Expires</p>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Expires</p>
                   {expiresAt ? (
                     <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-xl px-3 py-1.5 self-start">
                       <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -423,7 +423,7 @@ export default function AddPantryItem({
                       </button>
                     </div>
                   ) : (
-                    <label className="inline-flex items-center gap-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors self-start cursor-pointer relative">
+                    <label className="inline-flex items-center gap-1.5 bg-gray-50 dark:bg-zinc-800 border border-dashed border-gray-300 dark:border-zinc-600 rounded-xl px-3 py-1.5 text-xs text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-zinc-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors self-start cursor-pointer relative">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -436,15 +436,15 @@ export default function AddPantryItem({
                 {/* Owned by */}
                 {showMemberPicker && (
                   <div className="flex flex-col gap-1.5">
-                    <p className="text-xs font-medium text-gray-400">For</p>
+                    <p className="text-xs font-medium text-gray-400 dark:text-gray-500">For</p>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
                         onClick={() => setAssignedTo([])}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                           assignedTo.length === 0
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                            : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                         }`}
                       >
                         Everyone
@@ -459,8 +459,8 @@ export default function AddPantryItem({
                             onClick={() => toggleMember(m.user_id)}
                             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                               selected
-                                ? "bg-gray-900 text-white"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                                : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                             }`}
                           >
                             {isMe ? "Me" : m.short_name}

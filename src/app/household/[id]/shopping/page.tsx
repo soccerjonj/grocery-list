@@ -27,8 +27,8 @@ function PastTripRow({ list, householdId }: { list: ShoppingListType; householdI
       className="flex items-center justify-between py-2.5 active:opacity-60 transition-opacity"
     >
       <div>
-        <p className="text-sm text-gray-700">{list.name}</p>
-        <p className="text-xs text-gray-400">{formatDate(list.archived_at!)}</p>
+        <p className="text-sm text-gray-700 dark:text-gray-300">{list.name}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(list.archived_at!)}</p>
       </div>
       <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -178,16 +178,16 @@ export default function ShoppingPage() {
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-gray-400 font-medium tracking-wide mb-0.5">
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium tracking-wide mb-0.5">
               {householdName}
             </p>
-            <h1 className="text-2xl font-semibold text-gray-900">Shopping</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Shopping</h1>
           </div>
           <div className="flex items-center gap-2">
             <ActivityBellButton householdId={householdId} />
             <Link
               href={`/household/${householdId}/settings`}
-              className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors active:opacity-60"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:opacity-60"
               aria-label="Settings"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -230,7 +230,7 @@ export default function ShoppingPage() {
                   transition={{ duration: 0.2 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setConfirmFinish(true)}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gray-900 text-white rounded-2xl text-sm font-medium shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl text-sm font-medium shadow-sm"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -249,17 +249,17 @@ export default function ShoppingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ duration: 0.18 }}
-                  className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col gap-2"
+                  className="bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-4 flex flex-col gap-2"
                 >
-                  <p className="text-sm font-semibold text-gray-800 text-center">Finish this trip?</p>
-                  <p className="text-xs text-gray-400 text-center mb-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 text-center">Finish this trip?</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center mb-1">
                     Checked items are saved to history.
                     {activeItems.length > 0 && ` ${activeItems.length} unchecked item${activeItems.length !== 1 ? "s" : ""} will carry over.`}
                   </p>
                   <button
                     onClick={handleFinishTrip}
                     disabled={finishing}
-                    className="w-full py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl active:scale-[0.97] transition-all disabled:opacity-50"
+                    className="w-full py-2.5 bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-xl active:scale-[0.97] transition-all disabled:opacity-50"
                   >
                     {finishing ? "Saving…" : "Yes, finish trip"}
                   </button>
@@ -282,7 +282,7 @@ export default function ShoppingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ duration: 0.22 }}
-                  className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
+                  className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -291,8 +291,8 @@ export default function ShoppingPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Trip saved!</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">Trip saved!</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                         Want to add your {lastTripCount} item{lastTripCount !== 1 ? "s" : ""} to the pantry?
                       </p>
                     </div>
@@ -300,7 +300,7 @@ export default function ShoppingPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => router.push(`/household/${householdId}/pantry?import=${lastTripId}`)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl active:scale-[0.97] transition-all"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-xl active:scale-[0.97] transition-all"
                     >
                       Add to pantry
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -320,10 +320,10 @@ export default function ShoppingPage() {
 
             {/* ── Past trips ─────────────────────────────────── */}
             {pastLists.length > 0 && (
-              <div className="border-t border-gray-100 pt-3 mt-1">
+              <div className="border-t border-gray-100 dark:border-zinc-800 pt-3 mt-1">
                 <button
                   onClick={() => setShowPast((v) => !v)}
-                  className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors py-1 w-full active:opacity-60"
+                  className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-1 w-full active:opacity-60"
                 >
                   <motion.svg
                     animate={{ rotate: showPast ? 90 : 0 }}
@@ -348,7 +348,7 @@ export default function ShoppingPage() {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      <div className="divide-y divide-gray-50 pl-1">
+                      <div className="divide-y divide-gray-50 dark:divide-zinc-800 pl-1">
                         {pastLists.map((list) => (
                           <PastTripRow key={list.id} list={list} householdId={householdId} />
                         ))}

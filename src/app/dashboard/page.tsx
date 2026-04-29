@@ -53,8 +53,7 @@ export default async function DashboardPage() {
 
   return (
     <div
-      className="min-h-dvh flex flex-col items-center justify-center px-6"
-      style={{ background: "linear-gradient(160deg, #f8fafc 0%, #f1f5f9 60%, #e2e8f0 100%)" }}
+      className="min-h-dvh flex flex-col items-center justify-center px-6 bg-gray-50 dark:bg-zinc-950"
     >
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
@@ -73,10 +72,10 @@ export default async function DashboardPage() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
             Hi, {firstName} 👋
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {hasHouseholds
               ? "Pick a household to continue"
               : "You're not in a household yet"}
@@ -89,7 +88,7 @@ export default async function DashboardPage() {
               <Link
                 key={hh.id}
                 href={`/household/${hh.id}/pantry`}
-                className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-4 hover:border-gray-300 transition-colors active:scale-[0.97] active:bg-gray-50 shadow-sm"
+                className="flex items-center justify-between bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 px-4 py-4 hover:border-gray-300 dark:hover:border-zinc-600 transition-colors active:scale-[0.97] active:bg-gray-50 dark:active:bg-zinc-800 shadow-sm"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0">
@@ -97,7 +96,7 @@ export default async function DashboardPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
                   </div>
-                  <span className="font-medium text-gray-900">{hh.name}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-50">{hh.name}</span>
                 </div>
                 <svg
                   className="w-4 h-4 text-gray-400"
@@ -117,33 +116,33 @@ export default async function DashboardPage() {
           </div>
         ) : (
           /* Empty state — guide the user */
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm p-5 mb-6">
             <div className="flex flex-col gap-3.5">
               <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-sm">1</span>
+                <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-sm dark:text-gray-300">1</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Create a household</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Give your home a name to get started</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Create a household</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Give your home a name to get started</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-sm">2</span>
+                <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-sm dark:text-gray-300">2</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Invite your household</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Share your invite code so everyone can join</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Invite your household</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Share your invite code so everyone can join</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-sm">3</span>
+                <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-sm dark:text-gray-300">3</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Shop together</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Lists and pantry sync in real time</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Shop together</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Lists and pantry sync in real time</p>
                 </div>
               </div>
             </div>
@@ -172,7 +171,7 @@ export default async function DashboardPage() {
           </Link>
           <Link
             href="/household/join"
-            className="flex flex-col items-center gap-2 bg-white text-gray-900 border border-gray-200 rounded-2xl px-4 py-5 hover:border-gray-400 transition-colors text-center active:scale-[0.97] active:bg-gray-50 shadow-sm"
+            className="flex flex-col items-center gap-2 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-50 border border-gray-200 dark:border-zinc-700 rounded-2xl px-4 py-5 hover:border-gray-400 dark:hover:border-zinc-500 transition-colors text-center active:scale-[0.97] active:bg-gray-50 dark:active:bg-zinc-800 shadow-sm"
           >
             <svg
               className="w-6 h-6"
@@ -194,7 +193,7 @@ export default async function DashboardPage() {
         <form action={signOut} className="mt-8 text-center">
           <button
             type="submit"
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             Sign out
           </button>

@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #111111;
+  --row-bg: 255 255 255;
+}
+
+.dark {
+  --row-bg: 31 31 35;
 }
 
 @theme inline {
@@ -14,6 +21,10 @@
 body {
   background: #f9fafb;
   color: var(--foreground);
+}
+
+.dark body {
+  background: #09090b;
 }
 
 /* Safe area support for iOS PWA */

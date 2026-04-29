@@ -44,7 +44,7 @@ export default async function HouseholdLayout({
   return (
     <ToastProvider>
       <HouseholdProvider householdId={household.id} householdName={household.name}>
-        <div className="min-h-dvh pb-20">
+        <div className="min-h-dvh pb-20 bg-gray-50 dark:bg-zinc-950">
           <PageTransition>{children}</PageTransition>
         </div>
         <BottomNav householdId={household.id} />

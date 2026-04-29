@@ -80,16 +80,16 @@ function PantryPageInner() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <p className="text-xs text-gray-400 font-medium tracking-wide mb-0.5">
+          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium tracking-wide mb-0.5">
             {householdName}
           </p>
-          <h1 className="text-2xl font-semibold text-gray-900">Pantry</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Pantry</h1>
         </div>
         <div className="flex items-center gap-2">
           <ActivityBellButton householdId={householdId} />
           <Link
             href={`/household/${householdId}/settings`}
-            className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors active:opacity-60"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:opacity-60"
             aria-label="Settings"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

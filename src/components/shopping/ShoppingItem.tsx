@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { useTheme } from "next-themes";
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
@@ -119,9 +120,16 @@ export default function ShoppingItem({
   const assignedMembers = getAssignedMembers(item.assigned_to, members);
 
   // ── Swipe-to-delete ──────────────────────────────────────────────
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [-72, -24], [1, 0]);
-  const rowBg = useTransform(x, [-72, -20, 0], ["rgb(254,226,226)", "rgb(255,241,242)", "rgb(255,255,255)"]);
+  const rowBg = useTransform(
+    x, [-72, -20, 0],
+    isDark
+      ? ["rgb(69,10,10)", "rgb(40,15,15)", "rgb(31,31,35)"]
+      : ["rgb(254,226,226)", "rgb(255,241,242)", "rgb(255,255,255)"]
+  );
 
   // ── Edit sheet ───────────────────────────────────────────────────
   const sheet = (
@@ -139,21 +147,21 @@ export default function ShoppingItem({
             key="sheet"
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 380, damping: 40 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[88vh] flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl max-h-[88vh] flex flex-col"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {/* Handle */}
             <div className="flex justify-center pt-3.5 pb-1 flex-shrink-0">
-              <div className="w-10 h-[5px] bg-gray-200 rounded-full" />
+              <div className="w-10 h-[5px] bg-gray-200 dark:bg-zinc-700 rounded-full" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 pt-3 pb-3 flex-shrink-0 border-b border-gray-100">
-              <h2 className="text-base font-semibold text-gray-900 flex-1">Edit item</h2>
+            <div className="flex items-center gap-3 px-5 pt-3 pb-3 flex-shrink-0 border-b border-gray-100 dark:border-zinc-800">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50 flex-1">Edit item</h2>
               <button
                 type="button"
                 onClick={closeSheet}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors active:scale-90"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-90"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -166,20 +174,20 @@ export default function ShoppingItem({
 
               {/* Name */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-medium text-gray-400">Item</p>
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Item</p>
                 <input
                   ref={nameInputRef}
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                  className="w-full text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
+                  className="w-full text-sm text-gray-900 dark:text-gray-50 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* Qty + unit */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-medium text-gray-400">Quantity &amp; unit</p>
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Quantity &amp; unit</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -188,21 +196,21 @@ export default function ShoppingItem({
                     placeholder="Qty"
                     value={editQty}
                     onChange={(e) => setEditQty(e.target.value)}
-                    className="w-20 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 text-center transition-colors"
+                    className="w-20 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 text-center transition-colors"
                   />
                   <input
                     type="text"
                     placeholder="Unit (optional)"
                     value={editUnit}
                     onChange={(e) => setEditUnit(e.target.value)}
-                    className="flex-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
+                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
                   />
                 </div>
               </div>
 
               {/* Store */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-medium text-gray-400">Store</p>
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Store</p>
                 <div className="flex flex-wrap gap-1.5">
                   {knownStores.map((s) => (
                     <button
@@ -210,7 +218,7 @@ export default function ShoppingItem({
                       type="button"
                       onClick={() => { setEditStore(editStore === s ? "" : s); setCustomStoreMode(false); }}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        editStore === s ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        editStore === s ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                       }`}
                     >{s}</button>
                   ))}
@@ -218,7 +226,7 @@ export default function ShoppingItem({
                     type="button"
                     onClick={() => { setCustomStoreMode((v) => !v); if (customStoreMode) setEditStore(""); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                      customStoreMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      customStoreMode ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                     }`}
                   >{knownStores.length === 0 ? "Add store" : "+ New"}</button>
                 </div>
@@ -229,7 +237,7 @@ export default function ShoppingItem({
                     value={editStore}
                     onChange={(e) => setEditStore(e.target.value)}
                     autoFocus
-                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
+                    className="w-full text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
                   />
                 )}
               </div>
@@ -237,13 +245,13 @@ export default function ShoppingItem({
               {/* Assigned to */}
               {members.length > 1 && (
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-medium text-gray-400">For</p>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">For</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setEditAssigned(null)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        !editAssigned || editAssigned.length === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        !editAssigned || editAssigned.length === 0 ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                       }`}
                     >
                       Everyone
@@ -278,7 +286,7 @@ export default function ShoppingItem({
                 type="button"
                 onClick={handleSave}
                 disabled={!editName.trim()}
-                className="w-full py-3 bg-gray-900 text-white text-sm font-medium rounded-2xl disabled:opacity-30 active:scale-[0.98] transition-all mt-1"
+                className="w-full py-3 bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-2xl disabled:opacity-30 active:scale-[0.98] transition-all mt-1"
               >
                 Save changes
               </button>
@@ -287,7 +295,7 @@ export default function ShoppingItem({
               <button
                 type="button"
                 onClick={() => { onDelete(item.id); closeSheet(); }}
-                className="text-sm text-gray-400 hover:text-red-500 transition-colors py-1 self-center active:opacity-60"
+                className="text-sm text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors py-1 self-center active:opacity-60"
               >
                 Remove from list
               </button>
@@ -363,8 +371,8 @@ export default function ShoppingItem({
               borderColor: "#16a34a",
               scale: checking ? [1, 1.24, 0.9, 1] : 1,
             } : {
-              backgroundColor: "#ffffff",
-              borderColor: "#d1d5db",
+              backgroundColor: isDark ? "#27272a" : "#ffffff",
+              borderColor: isDark ? "#52525b" : "#d1d5db",
               scale: 1,
             }}
             transition={{
@@ -414,7 +422,7 @@ export default function ShoppingItem({
           <motion.p
             animate={{ opacity: isChecked ? 0.38 : 1 }}
             transition={{ duration: 0.2, delay: isChecked ? 0.12 : 0 }}
-            className="text-sm font-medium text-gray-900 truncate"
+            className="text-sm font-medium text-gray-900 dark:text-gray-50 truncate"
           >
             {item.name}
             {item.quantity && item.quantity !== 1 && (
@@ -426,7 +434,7 @@ export default function ShoppingItem({
           </motion.p>
 
           {!isChecked && item.store && (
-            <p className="text-xs text-gray-400 truncate mt-0.5">{item.store}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{item.store}</p>
           )}
 
           {/* Strikethrough */}
@@ -473,7 +481,7 @@ export default function ShoppingItem({
           animate={{ opacity: isChecked ? 0 : 1 }}
           transition={{ duration: 0.15 }}
           onClick={() => onDelete(item.id)}
-          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
           aria-label="Remove item"
           tabIndex={isChecked ? -1 : 0}
         >

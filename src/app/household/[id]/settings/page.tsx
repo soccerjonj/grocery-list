@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "next-themes";
 import { useHouseholdContext } from "@/context/HouseholdContext";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import { createClient } from "@/lib/supabase/client";
@@ -64,6 +65,7 @@ export default function SettingsPage() {
   const { householdId, householdName } = useHouseholdContext();
   const { members, currentUserId, currentUserRole, loading, removeMember } =
     useHouseholdMembers(householdId);
+  const { theme, setTheme } = useTheme();
 
   // ── Profile state ─────────────────────────────────────────────────
   const [displayName, setDisplayName] = useState("");
@@ -159,7 +161,7 @@ export default function SettingsPage() {
       <div className="flex items-center gap-3 mb-7">
         <Link
           href={`/household/${householdId}/pantry`}
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors active:opacity-60 flex-shrink-0"
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:opacity-60 flex-shrink-0"
           aria-label="Back"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -167,24 +169,49 @@ export default function SettingsPage() {
           </svg>
         </Link>
         <div>
-          <p className="text-xs text-gray-400 font-medium">{householdName}</p>
-          <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{householdName}</p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Settings</h1>
         </div>
       </div>
 
       {loading ? (
         <div className="flex flex-col gap-4">
           {[120, 200, 160].map((h, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 animate-pulse" style={{ height: h }} />
+            <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 animate-pulse" style={{ height: h }} />
           ))}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
 
+          {/* ── Appearance card ───────────────────────────────────── */}
+          <section>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Appearance</p>
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3.5">
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Theme</p>
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-xl p-1">
+                  {(["system", "light", "dark"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTheme(t)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all capitalize ${
+                        theme === t
+                          ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
+                          : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* ── Profile card ──────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="px-5 pt-5 pb-1">
-              <p className="text-xs font-medium text-gray-400 mb-4">Your profile</p>
+              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-4">Your profile</p>
 
               {/* Avatar + name */}
               <div className="flex items-center gap-4 mb-4">
@@ -203,13 +230,13 @@ export default function SettingsPage() {
                     onChange={(e) => setDisplayName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
                     placeholder="Your name"
-                    className="w-full text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
+                    className="w-full text-sm text-gray-900 dark:text-gray-50 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
                   />
                 </div>
               </div>
 
               {/* Color picker */}
-              <div className={`mb-4 rounded-xl p-3 transition-colors ${needsColor ? "bg-amber-50 border border-amber-200" : "bg-gray-50"}`}>
+              <div className={`mb-4 rounded-xl p-3 transition-colors ${needsColor ? "bg-amber-50 border border-amber-200" : "bg-gray-50 dark:bg-zinc-800"}`}>
                 {needsColor && (
                   <div className="flex items-center gap-1.5 mb-2.5">
                     <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -218,7 +245,7 @@ export default function SettingsPage() {
                     <p className="text-xs font-medium text-amber-700">Choose a color so your household can identify you</p>
                   </div>
                 )}
-                {!needsColor && <p className="text-xs font-medium text-gray-400 mb-2.5">Your color</p>}
+                {!needsColor && <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-2.5">Your color</p>}
                 <div className="flex gap-2.5 flex-wrap">
                   {MEMBER_COLORS.map((c) => (
                     <ColorSwatch
@@ -264,14 +291,14 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Household card ─────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm overflow-hidden">
 
             {/* Invite section */}
-            <div className="px-5 pt-5 pb-4 border-b border-gray-50">
-              <p className="text-xs font-medium text-gray-400 mb-3">Invite someone</p>
+            <div className="px-5 pt-5 pb-4 border-b border-gray-50 dark:border-zinc-800">
+              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-3">Invite someone</p>
               {inviteCode && (
-                <div className="flex items-center justify-center bg-gray-50 rounded-xl py-3 mb-3">
-                  <span className="font-mono text-2xl tracking-[0.3em] font-bold text-gray-900 select-all">
+                <div className="flex items-center justify-center bg-gray-50 dark:bg-zinc-800 rounded-xl py-3 mb-3">
+                  <span className="font-mono text-2xl tracking-[0.3em] font-bold text-gray-900 dark:text-gray-50 select-all">
                     {inviteCode.toUpperCase()}
                   </span>
                 </div>
@@ -308,7 +335,7 @@ export default function SettingsPage() {
 
             {/* Member list */}
             <div>
-              <p className="text-xs font-medium text-gray-400 px-5 pt-4 pb-2">Members</p>
+              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-5 pt-4 pb-2">Members</p>
               <AnimatePresence initial={false}>
                 {members.map((member, index) => {
                   const isMe = member.user_id === currentUserId;
@@ -323,7 +350,7 @@ export default function SettingsPage() {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.2 }}
-                      className={`flex items-center gap-3 px-5 py-3 ${index > 0 ? "border-t border-gray-50" : ""}`}
+                      className={`flex items-center gap-3 px-5 py-3 ${index > 0 ? "border-t border-gray-50 dark:border-zinc-800" : ""}`}
                     >
                       <motion.div
                         animate={{ backgroundColor: hexAlpha(displayColor, 0.15) }}
@@ -336,10 +363,10 @@ export default function SettingsPage() {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-50 truncate">
                             {isMe && displayName.trim() ? displayName.trim() : member.display_name}
                           </p>
-                          {isMe && <span className="text-[10px] text-gray-400 font-medium flex-shrink-0">(you)</span>}
+                          {isMe && <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium flex-shrink-0">(you)</span>}
                         </div>
                         <p className={`text-xs font-medium mt-0.5 ${member.role === "owner" ? "text-violet-500" : "text-gray-400"}`}>
                           {member.role === "owner" ? "Owner" : "Member"}
@@ -350,7 +377,7 @@ export default function SettingsPage() {
                         <button
                           onClick={() => handleRemove(member.user_id)}
                           disabled={removing === member.user_id}
-                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors active:scale-90 disabled:opacity-40"
+                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-300 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors active:scale-90 disabled:opacity-40"
                           aria-label={`Remove ${member.display_name}`}
                         >
                           {removing === member.user_id ? (
@@ -374,10 +401,10 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Account card ──────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm overflow-hidden">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-5 py-4 text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors active:opacity-60 text-left"
+              className="w-full flex items-center gap-3 px-5 py-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors active:opacity-60 text-left"
             >
               <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -387,7 +414,7 @@ export default function SettingsPage() {
             {canLeave && (
               <button
                 onClick={() => setConfirmLeave(true)}
-                className="w-full flex items-center gap-3 px-5 py-4 text-sm text-red-400 hover:text-red-600 hover:bg-red-50 border-t border-gray-50 transition-colors active:opacity-60 text-left"
+                className="w-full flex items-center gap-3 px-5 py-4 text-sm text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-t border-gray-50 dark:border-zinc-800 transition-colors active:opacity-60 text-left"
               >
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
