@@ -169,6 +169,7 @@ export interface Database {
           quantity: number | null;
           unit: string | null;
           store: string | null;
+          notes: string | null;
           completed: boolean;
           completed_by: string | null;
           completed_at: string | null;
@@ -185,6 +186,7 @@ export interface Database {
           quantity?: number | null;
           unit?: string | null;
           store?: string | null;
+          notes?: string | null;
           completed?: boolean;
           completed_by?: string | null;
           completed_at?: string | null;
@@ -201,6 +203,7 @@ export interface Database {
           quantity?: number | null;
           unit?: string | null;
           store?: string | null;
+          notes?: string | null;
           completed?: boolean;
           completed_by?: string | null;
           completed_at?: string | null;

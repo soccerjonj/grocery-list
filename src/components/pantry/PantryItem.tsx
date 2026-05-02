@@ -525,6 +525,22 @@ export default function PantryItem({
                 </div>
               )}
 
+              {/* Notes */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Note</p>
+                <textarea
+                  placeholder="Brand, location, anything useful…"
+                  defaultValue={item.notes ?? ""}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim().slice(0, 150) || null;
+                    if (val !== (item.notes ?? null)) onUpdateItem(item.id, { notes: val });
+                  }}
+                  onChange={(e) => { if (e.target.value.length > 150) e.target.value = e.target.value.slice(0, 150); }}
+                  rows={2}
+                  className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
+                />
+              </div>
+
               {/* Delete confirmation */}
               {/* Remove button */}
               <button type="button"
@@ -597,6 +613,7 @@ export default function PantryItem({
                 : <span className="text-xs text-gray-300">—</span>
               }
               {item.opened && <span className="w-1 h-1 rounded-full bg-orange-300 flex-shrink-0" />}
+              {item.notes && <span className="w-1 h-1 rounded-full bg-blue-300 flex-shrink-0" title={item.notes} />}
             </div>
             <span className={`text-xs font-semibold tabular-nums ${item.running_low ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
           </div>

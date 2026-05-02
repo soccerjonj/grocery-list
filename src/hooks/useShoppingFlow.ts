@@ -114,7 +114,8 @@ export function useShoppingFlow(householdId: string) {
     quantity?: number,
     unit?: string,
     store?: string,
-    assignedTo?: string[] | null
+    assignedTo?: string[] | null,
+    notes?: string
   ) {
     if (!activeListId) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -127,6 +128,7 @@ export function useShoppingFlow(householdId: string) {
       quantity: quantity ?? null,
       unit: unit ?? null,
       store: store ?? null,
+      notes: notes ?? null,
       completed: false,
       completed_by: null,
       completed_at: null,
@@ -147,6 +149,7 @@ export function useShoppingFlow(householdId: string) {
         quantity: quantity ?? null,
         unit: unit ?? null,
         store: store ?? null,
+        notes: notes ?? null,
         added_by: user?.id ?? null,
         assigned_to: assignedTo ?? null,
       })
@@ -168,7 +171,7 @@ export function useShoppingFlow(householdId: string) {
 
   async function updateItem(
     id: string,
-    fields: Partial<Pick<ShoppingItem, "name" | "quantity" | "unit" | "store" | "assigned_to">>
+    fields: Partial<Pick<ShoppingItem, "name" | "quantity" | "unit" | "store" | "notes" | "assigned_to">>
   ) {
     const prev = items.find((i) => i.id === id);
     setItems((all) => all.map((i) => (i.id === id ? { ...i, ...fields } : i)));

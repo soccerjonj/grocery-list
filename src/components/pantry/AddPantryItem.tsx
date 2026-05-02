@@ -44,6 +44,7 @@ export default function AddPantryItem({
   const [foodCategory, setFoodCategory] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
 
   const [submitted, setSubmitted] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -99,6 +100,7 @@ export default function AddPantryItem({
       foodCategory: foodCategory || null,
       expiresAt: expiresAt || null,
       assignedTo: assignedTo.length > 0 ? assignedTo : null,
+      notes: notes.trim() || null,
     });
     clearFields();
   }
@@ -113,6 +115,7 @@ export default function AddPantryItem({
     setName("");
     setQuantity("1");
     setUnit("");
+    setNotes("");
     setStorageLocation("");
     setFridgeZone("");
     setFoodCategory("");
@@ -444,6 +447,21 @@ export default function AddPantryItem({
                       Add expiry date
                       <input type="date" value={expiresAt} min={today} onChange={(e) => setExpiresAt(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
                     </label>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Note <span className="font-normal">(optional)</span></p>
+                  <textarea
+                    placeholder="Brand, location, anything useful…"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value.slice(0, 150))}
+                    rows={2}
+                    className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
+                  />
+                  {notes.length >= 100 && (
+                    <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">{150 - notes.length} left</p>
                   )}
                 </div>
 

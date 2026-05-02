@@ -6,6 +6,7 @@ import type { PantryItem } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
 
 export interface AddPantryOptions {
+  notes?: string | null;
   expiresAt?: string | null;
   storageLocation?: string | null;
   fridgeZone?: string | null;
@@ -102,7 +103,7 @@ export function usePantry(householdId: string) {
       name,
       quantity,
       unit: unit ?? null,
-      notes: null,
+      notes: options?.notes ?? null,
       added_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -125,6 +126,7 @@ export function usePantry(householdId: string) {
         name,
         quantity,
         unit: unit ?? null,
+        notes: options?.notes ?? null,
         added_by: user?.id ?? null,
         expires_at: options?.expiresAt ?? null,
         storage_location: options?.storageLocation ?? null,

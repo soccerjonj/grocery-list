@@ -97,6 +97,7 @@ export function useShoppingList(householdId: string, listId: string) {
       quantity: quantity ?? null,
       unit: unit ?? null,
       store: store ?? null,
+      notes: null,
       completed: false,
       completed_by: null,
       completed_at: null,

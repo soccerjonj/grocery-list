@@ -8,7 +8,7 @@ import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 
 interface AddShoppingItemProps {
-  onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null) => void;
+  onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null, notes?: string) => void;
   householdId: string;
   members?: MemberProfile[];
   currentUserId?: string | null;
@@ -22,6 +22,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   const [unit, setUnit] = useState("");
   const [store, setStore] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
+  const [notes, setNotes] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -81,8 +82,8 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   }
 
   function doAdd() {
-    onAdd(name.trim(), quantity ? parseFloat(quantity) : undefined, unit || undefined, store.trim() || undefined, assignedTo);
-    setName(""); setQuantity(""); setUnit(""); setStore(""); setAssignedTo(null);
+    onAdd(name.trim(), quantity ? parseFloat(quantity) : undefined, unit || undefined, store.trim() || undefined, assignedTo, notes.trim() || undefined);
+    setName(""); setQuantity(""); setUnit(""); setStore(""); setAssignedTo(null); setNotes("");
     if (customStoreMode && store.trim()) saveStore(store.trim());
     setShowSuggestions(false); setCustomStoreMode(false); setManagingStores(false); setDuplicate(null);
     setSubmitted(true);
@@ -289,6 +290,21 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     ))}
                   </div>
                 </div>
+                {/* Note */}
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Note <span className="font-normal">(optional)</span></p>
+                  <textarea
+                    placeholder="Brand, where to find it…"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value.slice(0, 150))}
+                    rows={2}
+                    className="w-full text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 resize-none transition-colors placeholder:text-gray-300 dark:placeholder:text-zinc-600"
+                  />
+                  {notes.length >= 100 && (
+                    <p className="text-[10px] text-gray-300 dark:text-zinc-600 text-right">{150 - notes.length} left</p>
+                  )}
+                </div>
+
                 {/* Store picker */}
                 <div className="flex flex-wrap gap-1.5">
                   {knownStores.map((s) => (

@@ -13,7 +13,7 @@ interface ShoppingItemProps {
   item: ShoppingItemType;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onUpdate?: (id: string, fields: Partial<Pick<ShoppingItemType, "name" | "quantity" | "unit" | "store" | "assigned_to">>) => void;
+  onUpdate?: (id: string, fields: Partial<Pick<ShoppingItemType, "name" | "quantity" | "unit" | "store" | "notes" | "assigned_to">>) => void;
   members?: MemberProfile[];
   currentUserId?: string | null;
 }
@@ -47,6 +47,7 @@ export default function ShoppingItem({
   const [editUnit, setEditUnit] = useState(item.unit ?? "");
   const [editStore, setEditStore] = useState(item.store ?? "");
   const [editAssigned, setEditAssigned] = useState<string[] | null>(item.assigned_to ?? null);
+  const [editNotes, setEditNotes] = useState(item.notes ?? "");
 
   const { getStores } = useItemSuggestions(item.household_id);
   const knownStores = getStores();
@@ -65,6 +66,7 @@ export default function ShoppingItem({
       setEditUnit(item.unit ?? "");
       setEditStore(item.store ?? "");
       setEditAssigned(item.assigned_to ?? null);
+      setEditNotes(item.notes ?? "");
     }
   }, [item, sheetOpen]);
 
@@ -93,6 +95,7 @@ export default function ShoppingItem({
       quantity: editQty ? parseFloat(editQty) : null,
       unit: editUnit.trim() || null,
       store: editStore.trim() || null,
+      notes: editNotes.trim() || null,
       assigned_to: editAssigned,
     });
     closeSheet();
@@ -239,6 +242,21 @@ export default function ShoppingItem({
                     autoFocus
                     className="w-full text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
                   />
+                )}
+              </div>
+
+              {/* Notes */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Note <span className="font-normal">(optional)</span></p>
+                <textarea
+                  placeholder="Brand, where to find it…"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value.slice(0, 150))}
+                  rows={2}
+                  className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
+                />
+                {editNotes.length >= 100 && (
+                  <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">{150 - editNotes.length} left</p>
                 )}
               </div>
 
@@ -437,6 +455,9 @@ export default function ShoppingItem({
 
           {!isChecked && item.store && (
             <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{item.store}</p>
+          )}
+          {!isChecked && item.notes && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5 italic">{item.notes}</p>
           )}
 
           {/* Strikethrough */}
