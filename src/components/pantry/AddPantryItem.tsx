@@ -25,6 +25,8 @@ function formatDateDisplay(iso: string): string {
   });
 }
 
+const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
+
 export default function AddPantryItem({
   onAdd,
   members,
@@ -36,6 +38,7 @@ export default function AddPantryItem({
   const [quantity, setQuantity] = useState("1");
   const [expanded, setExpanded] = useState(false);
 
+  const [unit, setUnit] = useState<string>("");
   const [storageLocation, setStorageLocation] = useState<string>("");
   const [fridgeZone, setFridgeZone] = useState<string>("");
   const [foodCategory, setFoodCategory] = useState<string>("");
@@ -72,6 +75,7 @@ export default function AddPantryItem({
 
   function applySuggestion(s: ItemSuggestion) {
     setName(s.name);
+    if (s.unit) setUnit(s.unit);
     if (s.storage_location) setStorageLocation(s.storage_location);
     if (s.fridge_zone) setFridgeZone(s.fridge_zone);
     if (s.food_category) setFoodCategory(s.food_category);
@@ -89,7 +93,7 @@ export default function AddPantryItem({
   }
 
   function doAdd() {
-    onAdd(name.trim(), parseFloat(quantity) || 1, undefined, {
+    onAdd(name.trim(), parseFloat(quantity) || 1, unit || undefined, {
       storageLocation: storageLocation || null,
       fridgeZone: storageLocation === "fridge" ? (fridgeZone || null) : null,
       foodCategory: foodCategory || null,
@@ -108,6 +112,7 @@ export default function AddPantryItem({
   function clearFields() {
     setName("");
     setQuantity("1");
+    setUnit("");
     setStorageLocation("");
     setFridgeZone("");
     setFoodCategory("");
@@ -302,30 +307,39 @@ export default function AddPantryItem({
             >
               <div className="border-t border-gray-100 dark:border-zinc-800 px-4 pb-4 pt-3 flex flex-col gap-4">
 
-                {/* Quantity */}
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(String(Math.max(0.5, (parseFloat(quantity) || 1) - 1)))}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-lg leading-none active:scale-90"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="w-12 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-lg py-1 bg-transparent dark:bg-zinc-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(String((parseFloat(quantity) || 1) + 1))}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-lg leading-none active:scale-90"
-                  >
-                    +
-                  </button>
+                {/* Quantity + unit */}
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Amount</p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(String(Math.max(0.5, (parseFloat(quantity) || 1) - 1)))}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-lg leading-none active:scale-90"
+                    >−</button>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      className="w-12 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-lg py-1 bg-transparent dark:bg-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(String((parseFloat(quantity) || 1) + 1))}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-lg leading-none active:scale-90"
+                    >+</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COMMON_UNITS.map((u) => (
+                      <button key={u} type="button" onClick={() => setUnit(unit === u ? "" : u)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                          unit === u
+                            ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                            : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                        }`}>{u}</button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Storage location */}

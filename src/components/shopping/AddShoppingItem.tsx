@@ -14,6 +14,8 @@ interface AddShoppingItemProps {
   currentUserId?: string | null;
 }
 
+const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
+
 export default function AddShoppingItem({ onAdd, householdId, members = [], currentUserId }: AddShoppingItemProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -119,6 +121,21 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
             }}
             className="flex-1 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
           />
+
+          {/* Amount preview chip — visible when collapsed and amount is set */}
+          <AnimatePresence initial={false}>
+            {!expanded && (quantity || unit) && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.12 }}
+                className="flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs font-medium text-gray-600 dark:text-gray-300 flex-shrink-0"
+              >
+                {[quantity, unit].filter(Boolean).join(" ")}
+                <button type="button" onClick={(e) => { e.stopPropagation(); setQuantity(""); setUnit(""); }}
+                  className="w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-gray-400">×</button>
+              </motion.span>
+            )}
+          </AnimatePresence>
 
           {/* Close button — visible while expanded */}
           <AnimatePresence initial={false}>
@@ -246,23 +263,31 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    placeholder="Qty"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="w-16 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 outline-none text-center"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Unit (optional)"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 outline-none"
-                  />
+                {/* Amount: stepper + unit chips */}
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Amount</p>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button"
+                      onClick={() => { const n = (parseFloat(quantity) || 1) - 1; setQuantity(n <= 0 ? "" : String(n)); }}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-lg leading-none active:scale-90 transition-transform">−</button>
+                    <input type="number" min="1" step="any" placeholder="—"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      className="w-12 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-lg py-1 bg-transparent dark:bg-zinc-800 placeholder:text-gray-300 dark:placeholder:text-zinc-600" />
+                    <button type="button"
+                      onClick={() => setQuantity(String((parseFloat(quantity) || 0) + 1))}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-lg leading-none active:scale-90 transition-transform">+</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COMMON_UNITS.map((u) => (
+                      <button key={u} type="button" onClick={() => setUnit(unit === u ? "" : u)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                          unit === u
+                            ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                            : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                        }`}>{u}</button>
+                    ))}
+                  </div>
                 </div>
                 {/* Store picker */}
                 <div className="flex flex-wrap gap-1.5">
