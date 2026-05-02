@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { useTheme } from "next-themes";
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
@@ -340,6 +340,8 @@ export default function ShoppingItem({
             if (info.offset.x < -60) {
               if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(10);
               onDelete(item.id);
+            } else {
+              animate(x, 0, { type: "spring", stiffness: 500, damping: 36 });
             }
           }}
           style={{ x, backgroundColor: rowBg }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
@@ -273,7 +273,9 @@ export default function ImportToPantrySheet({
   const [loadingItems, setLoadingItems] = useState(true);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
-  const supabase = createClient();
+  // Stable client ref — avoids re-running the fetch effect on every render
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -283,11 +285,15 @@ export default function ImportToPantrySheet({
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Fetch completed items from the archived list, then check for pantry duplicates
+  // Fetch completed items from the archived list, then check for pantry duplicates.
+  // Retries once after 900 ms if the first attempt returns nothing — guards against
+  // a brief race between finishTrip() writing to the DB and this sheet opening.
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setLoadingItems(true);
+
+    async function load(attempt = 0) {
+      if (attempt === 0) setLoadingItems(true);
+
       const { data } = await supabase
         .from("shopping_items")
         .select("id, name, quantity, unit")
@@ -309,7 +315,13 @@ export default function ImportToPantrySheet({
         expiresAt: null,
       }));
 
-      // Check for existing pantry items
+      // If the list came back empty on the first try, give the DB one more chance
+      if (raw.length === 0 && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 900));
+        if (!cancelled) load(1);
+        return;
+      }
+
       const conflicts = await getPantryDuplicates(householdId, raw.map((r) => r.name));
 
       if (!cancelled) {
@@ -324,9 +336,11 @@ export default function ImportToPantrySheet({
         setLoadingItems(false);
       }
     }
+
     load();
     return () => { cancelled = true; };
-  }, [listId, householdId, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listId, householdId]);
 
   function updateDraft(key: string, patch: Partial<DraftItem>) {
     setDrafts((prev) =>
