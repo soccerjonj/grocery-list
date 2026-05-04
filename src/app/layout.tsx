@@ -14,13 +14,16 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Our Pantry",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f9fafb" },
+    { media: "(prefers-color-scheme: dark)",  color: "#09090b" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -35,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geist.variable} h-full`} suppressHydrationWarning>
-      <body className="min-h-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-50 antialiased font-sans">
+      <body className="min-h-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-50 antialiased font-sans pt-safe">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
