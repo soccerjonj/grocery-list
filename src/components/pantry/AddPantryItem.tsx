@@ -7,6 +7,7 @@ import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
 import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/database";
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
+import { getPantryHint, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
 
 interface AddPantryItemProps {
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
@@ -49,9 +50,11 @@ export default function AddPantryItem({
   const [submitted, setSubmitted] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [duplicate, setDuplicate] = useState<{ id: string; quantity: number } | null>(null);
+  const [autoDetected, setAutoDetected] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoDetectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { getSuggestions } = useItemSuggestions(householdId);
   const suggestions = getSuggestions(name, 5);
@@ -123,6 +126,7 @@ export default function AddPantryItem({
     setAssignedTo([]);
     setShowSuggestions(false);
     setDuplicate(null);
+    setAutoDetected(false);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
@@ -153,8 +157,22 @@ export default function AddPantryItem({
             placeholder="Add an item…"
             value={name}
             onChange={(e) => {
-              setName(e.target.value);
+              const val = e.target.value;
+              setName(val);
               setShowSuggestions(true);
+              // Debounced auto-detect: fill storage + category if still empty
+              if (autoDetectTimer.current) clearTimeout(autoDetectTimer.current);
+              autoDetectTimer.current = setTimeout(() => {
+                const hint = getPantryHint(val);
+                if (hint) {
+                  setStorageLocation((prev) => prev || hint.storage_location);
+                  setFoodCategory((prev) => prev || hint.food_category);
+                  if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
+                  setAutoDetected(true);
+                } else {
+                  setAutoDetected(false);
+                }
+              }, 350);
             }}
             onFocus={() => {
               setExpanded(true);
@@ -310,6 +328,32 @@ export default function AddPantryItem({
             >
               <div className="border-t border-gray-100 dark:border-zinc-800 px-4 pb-4 pt-3 flex flex-col gap-4">
 
+                {/* Auto-detect indicator */}
+                <AnimatePresence>
+                  {autoDetected && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex items-center gap-1.5 text-[11px] text-violet-500 dark:text-violet-400 -mt-1">
+                        <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                        </svg>
+                        <span>Storage &amp; category auto-detected</span>
+                        <button
+                          type="button"
+                          onClick={() => setAutoDetected(false)}
+                          className="ml-auto opacity-50 hover:opacity-100 transition-opacity leading-none"
+                          aria-label="Dismiss"
+                        >×</button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Quantity + unit */}
                 <div className="flex flex-col gap-2">
                   <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Amount</p>
@@ -356,6 +400,7 @@ export default function AddPantryItem({
                         onClick={() => {
                           setStorageLocation(storageLocation === value ? "" : value);
                           if (value !== "fridge") setFridgeZone("");
+                          setAutoDetected(false);
                         }}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                           storageLocation === value
@@ -408,7 +453,7 @@ export default function AddPantryItem({
                       <button
                         key={value}
                         type="button"
-                        onClick={() => setFoodCategory(foodCategory === value ? "" : value)}
+                        onClick={() => { setFoodCategory(foodCategory === value ? "" : value); setAutoDetected(false); }}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
                           foodCategory === value
                             ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
@@ -424,6 +469,32 @@ export default function AddPantryItem({
                 {/* Expiry date */}
                 <div className="flex flex-col gap-1.5">
                   <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Expires</p>
+                  {(() => {
+                    const sugDays = getSuggestedExpiryDays(storageLocation, foodCategory);
+                    return !expiresAt && sugDays !== null ? (
+                      <AnimatePresence>
+                        <motion.button
+                          key={`${storageLocation}-${foodCategory}`}
+                          type="button"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + sugDays);
+                            setExpiresAt(d.toISOString().split("T")[0]);
+                          }}
+                          className="self-start inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors active:scale-[0.96]"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                          </svg>
+                          Suggest: {formatSuggestedDays(sugDays)}
+                        </motion.button>
+                      </AnimatePresence>
+                    ) : null;
+                  })()}
                   {expiresAt ? (
                     <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-xl px-3 py-1.5 self-start">
                       <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
