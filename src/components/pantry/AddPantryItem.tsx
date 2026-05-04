@@ -84,8 +84,8 @@ export default function AddPantryItem({
     if (s.fridge_zone) setFridgeZone(s.fridge_zone);
     if (s.food_category) setFoodCategory(s.food_category);
     setShowSuggestions(false);
-    // Focus back so user can continue editing or submit
-    setTimeout(() => nameRef.current?.focus(), 50);
+    // Do NOT refocus — programmatic focus triggers onFocus which re-shows
+    // suggestions, causing the form to collapse if the user taps to dismiss them
   }
 
   async function handleSubmit(e: React.FormEvent) {
