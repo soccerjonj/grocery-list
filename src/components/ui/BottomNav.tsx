@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 
 interface BottomNavProps {
@@ -53,18 +52,16 @@ const tabs = [
 
 export default function BottomNav({ householdId }: BottomNavProps) {
   const pathname = usePathname();
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 pb-safe"
-      style={{
-        background: isDark ? "rgba(9,9,11,0.88)" : "rgba(255,255,255,0.88)",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.07)",
-      }}
+      className={cn(
+        "fixed bottom-0 left-0 right-0 z-30 pb-safe",
+        "bg-white/[0.88] dark:bg-zinc-950/[0.88]",
+        "border-t border-black/[0.07] dark:border-white/[0.08]",
+        "[backdrop-filter:blur(20px)_saturate(180%)]",
+        "[-webkit-backdrop-filter:blur(20px)_saturate(180%)]",
+      )}
     >
       <div className="max-w-lg mx-auto flex">
         {tabs.map((tab) => {
@@ -85,8 +82,7 @@ export default function BottomNav({ householdId }: BottomNavProps) {
               {active && (
                 <motion.div
                   layoutId="nav-pill"
-                  className="absolute inset-x-5 inset-y-1.5 rounded-2xl"
-                  style={{ backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }}
+                  className="absolute inset-x-5 inset-y-1.5 rounded-2xl bg-black/[0.05] dark:bg-white/[0.08]"
                   transition={{ type: "spring", stiffness: 500, damping: 42 }}
                 />
               )}
