@@ -157,6 +157,7 @@ export function useShoppingFlow(householdId: string) {
       .single();
 
     if (error) {
+      console.error("shopping addItem failed:", error.message, error.details);
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
     } else if (data) {
       selfInsertedIds.current.add(data.id);
