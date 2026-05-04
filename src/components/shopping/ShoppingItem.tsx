@@ -130,7 +130,7 @@ export default function ShoppingItem({
   const rowBg = useTransform(
     x, [-72, -20, 0],
     isDark
-      ? ["rgb(69,10,10)", "rgb(40,15,15)", "rgb(31,31,35)"]
+      ? ["rgb(69,10,10)", "rgb(40,15,15)", "rgb(24,24,27)"]
       : ["rgb(254,226,226)", "rgb(255,241,242)", "rgb(255,255,255)"]
   );
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTheme } from "next-themes";
 import PantryItem from "./PantryItem";
 import AddPantryItem from "./AddPantryItem";
 import type { PantryItem as PantryItemType } from "@/types/database";
@@ -95,6 +96,7 @@ function RunningLowRow({
   members,
   currentUserId,
   isFlashing,
+  isDark,
   onIgnore,
   onAddedToList,
   onAddToList,
@@ -105,6 +107,7 @@ function RunningLowRow({
   members: MemberProfile[];
   currentUserId: string | null;
   isFlashing: boolean;
+  isDark: boolean;
   onIgnore: () => void;
   onAddedToList: () => void;
   onAddToList?: (qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) => Promise<boolean>;
@@ -121,25 +124,29 @@ function RunningLowRow({
     <>
       <motion.div
         animate={{
-          backgroundColor: isFlashing ? "#f0fdf4" : "#fffbeb",
-          borderColor: isFlashing ? "#bbf7d0" : "#fde68a",
+          backgroundColor: isDark
+            ? isFlashing ? "rgb(5,36,17)"   : "rgb(28,16,3)"
+            : isFlashing ? "#f0fdf4"         : "#fffbeb",
+          borderColor: isDark
+            ? isFlashing ? "rgb(22,101,52)"  : "rgb(120,53,15)"
+            : isFlashing ? "#bbf7d0"         : "#fde68a",
         }}
         transition={{ duration: 0.25 }}
-        className="flex items-center gap-2 border border-l-[3px] border-l-amber-400 rounded-xl px-3 py-2"
+        className="flex items-center gap-2 border border-l-[3px] border-l-amber-500 dark:border-l-amber-600 rounded-xl px-3 py-2"
       >
         <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-          <p className={`text-xs font-semibold truncate transition-colors duration-250 ${isFlashing ? "text-green-700" : "text-gray-800"}`}>
+          <p className={`text-xs font-semibold truncate transition-colors duration-250 ${isFlashing ? "text-green-600 dark:text-green-400" : "text-gray-800 dark:text-gray-200"}`}>
             {item.name}
           </p>
           {locationLabel && (
-            <p className={`text-[10px] flex-shrink-0 transition-colors duration-250 ${isFlashing ? "text-green-400" : "text-gray-400"}`}>
+            <p className={`text-[10px] flex-shrink-0 transition-colors duration-250 ${isFlashing ? "text-green-500 dark:text-green-600" : "text-gray-400 dark:text-gray-500"}`}>
               {locationLabel}
             </p>
           )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {isFlashing ? (
-            <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-green-100 text-green-600 flex items-center gap-1">
+            <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
               </svg>
@@ -151,7 +158,7 @@ function RunningLowRow({
                 <button
                   type="button"
                   onClick={() => setModalOpen(true)}
-                  className="text-[11px] font-medium px-2 py-1 rounded-lg bg-white border border-gray-200 text-gray-500 hover:border-gray-400 transition-all active:scale-95"
+                  className="text-[11px] font-medium px-2 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-400 transition-all active:scale-95"
                 >
                   + List
                 </button>
@@ -159,7 +166,7 @@ function RunningLowRow({
               <button
                 type="button"
                 onClick={onIgnore}
-                className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors active:scale-90"
+                className="w-5 h-5 flex items-center justify-center rounded-md text-gray-300 dark:text-zinc-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:scale-90"
                 aria-label="Dismiss"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -323,6 +330,8 @@ export default function PantryList({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   function dismissItem(id: string, reason: "dismiss" | "added") {
     setExitReasons((prev) => ({ ...prev, [id]: reason }));
@@ -542,6 +551,7 @@ export default function PantryList({
                           item={item}
                           locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
                           isFlashing={flashingIds.has(item.id)}
+                          isDark={isDark}
                           onIgnore={() => dismissItem(item.id, "dismiss")}
                           onAddedToList={() => handleAddedToList(item.id)}
                           members={members}
