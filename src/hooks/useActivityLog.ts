@@ -15,7 +15,11 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
 
   const computeUnread = useCallback((items: ActivityLog[]) => {
     if (typeof window === "undefined") return;
-    const others = items.filter((a) => !currentUserId || a.user_id !== currentUserId);
+    // Only count other users' activities. If currentUserId isn't resolved yet,
+    // treat everyone as the current user so we never badge own actions.
+    const others = currentUserId
+      ? items.filter((a) => a.user_id !== currentUserId)
+      : [];
     const raw = localStorage.getItem(LAST_SEEN_KEY(householdId));
     if (!raw) { setUnreadCount(others.length); return; }
     const lastSeen = new Date(raw).getTime();
