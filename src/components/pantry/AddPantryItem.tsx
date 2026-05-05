@@ -17,14 +17,6 @@ interface AddPantryItemProps {
   existingNames: string[];
 }
 
-function formatDateDisplay(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
 
@@ -482,60 +474,57 @@ export default function AddPantryItem({
                 {/* Expiry date */}
                 <div className="flex flex-col gap-1.5">
                   <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Expires</p>
-                  {expiresAt ? (
-                    <div className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 rounded-xl px-3 py-1.5 self-start">
-                      <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <label className="relative text-xs font-medium text-green-700 dark:text-green-400 cursor-pointer">
-                        {formatDateDisplay(expiresAt)}
-                        <input type="date" value={expiresAt} min={today} onChange={(e) => setExpiresAt(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
-                      </label>
-                      <button type="button" onClick={() => setExpiresAt("")} className="text-green-500 hover:text-green-700 transition-colors ml-0.5" aria-label="Clear date">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    /* Date picker + suggestion on the same row so they never overlap */
-                    <div className="flex items-center gap-2">
-                      <label className="inline-flex items-center gap-1.5 bg-gray-50 dark:bg-zinc-800 border border-dashed border-gray-300 dark:border-zinc-600 rounded-xl px-3 py-1.5 text-xs text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-zinc-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors cursor-pointer relative">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Pick a date
-                        <input type="date" value={expiresAt} min={today} onChange={(e) => setExpiresAt(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
-                      </label>
-                      {(() => {
+                  {/* Single persistent input — never unmounts so the native picker
+                      can't get killed by a React conditional re-render mid-session */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={expiresAt}
+                      min={today}
+                      onChange={(e) => setExpiresAt(e.target.value)}
+                      className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
+                    />
+                    <AnimatePresence mode="wait">
+                      {expiresAt ? (
+                        <motion.button
+                          key="clear"
+                          type="button"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.12 }}
+                          onClick={() => setExpiresAt("")}
+                          className="flex-shrink-0 px-3 py-2 text-xs font-medium text-red-400 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-xl active:scale-[0.96] transition-colors"
+                        >
+                          Clear
+                        </motion.button>
+                      ) : (() => {
                         const sugDays = getSuggestedExpiryDays(storageLocation, foodCategory);
                         if (sugDays === null) return null;
                         return (
-                          <AnimatePresence>
-                            <motion.button
-                              key={`${storageLocation}-${foodCategory}`}
-                              type="button"
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ duration: 0.15 }}
-                              onClick={() => {
-                                const d = new Date();
-                                d.setDate(d.getDate() + sugDays);
-                                setExpiresAt(d.toISOString().split("T")[0]);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors active:scale-[0.96]"
-                            >
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                              </svg>
-                              {formatSuggestedDays(sugDays)}
-                            </motion.button>
-                          </AnimatePresence>
+                          <motion.button
+                            key={`suggest-${storageLocation}-${foodCategory}`}
+                            type="button"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ duration: 0.12 }}
+                            onClick={() => {
+                              const d = new Date();
+                              d.setDate(d.getDate() + sugDays);
+                              setExpiresAt(d.toISOString().split("T")[0]);
+                            }}
+                            className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 active:scale-[0.96] transition-colors"
+                          >
+                            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                            </svg>
+                            {formatSuggestedDays(sugDays)}
+                          </motion.button>
                         );
                       })()}
-                    </div>
-                  )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* Notes */}
