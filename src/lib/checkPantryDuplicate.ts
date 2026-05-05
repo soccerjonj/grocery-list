@@ -36,10 +36,24 @@ export async function getPantryDuplicates(
   return map;
 }
 
-export async function increasePantryQty(id: string, currentQty: number, addAmt: number) {
+export async function increasePantryQty(
+  id: string,
+  currentQty: number,
+  addAmt: number,
+  meta?: {
+    storageLocation?: string | null;
+    fridgeZone?: string | null;
+    foodCategory?: string | null;
+  }
+) {
   const supabase = createClient();
-  await supabase
-    .from("pantry_items")
-    .update({ quantity: currentQty + addAmt, updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const patch: Record<string, unknown> = {
+    quantity: currentQty + addAmt,
+    updated_at: new Date().toISOString(),
+  };
+  // Only overwrite metadata fields that the user explicitly selected
+  if (meta?.storageLocation != null) patch.storage_location = meta.storageLocation;
+  if (meta?.fridgeZone != null)      patch.fridge_zone      = meta.fridgeZone;
+  if (meta?.foodCategory != null)    patch.food_category    = meta.foodCategory;
+  await supabase.from("pantry_items").update(patch).eq("id", id);
 }

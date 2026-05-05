@@ -80,9 +80,22 @@ export default function AddPantryItem({
   function applySuggestion(s: ItemSuggestion) {
     setName(s.name);
     if (s.unit) setUnit(s.unit);
-    if (s.storage_location) setStorageLocation(s.storage_location);
-    if (s.fridge_zone) setFridgeZone(s.fridge_zone);
-    if (s.food_category) setFoodCategory(s.food_category);
+    if (s.storage_location) {
+      setStorageLocation(s.storage_location);
+      if (s.fridge_zone) setFridgeZone(s.fridge_zone);
+      if (s.food_category) setFoodCategory(s.food_category);
+    } else {
+      // Suggestion has no pantry metadata (e.g. sourced from shopping history) —
+      // fall back to keyword-based auto-detect so storage/category/fridge-zone
+      // are still populated.
+      const hint = getPantryHint(s.name);
+      if (hint) {
+        setStorageLocation(hint.storage_location);
+        setFoodCategory(hint.food_category);
+        if (hint.fridge_zone) setFridgeZone(hint.fridge_zone);
+        setAutoDetected(true);
+      }
+    }
     setShowSuggestions(false);
     // Do NOT refocus — programmatic focus triggers onFocus which re-shows
     // suggestions, causing the form to collapse if the user taps to dismiss them

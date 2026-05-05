@@ -9,6 +9,7 @@ import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { getPantryDuplicates, increasePantryQty } from "@/lib/checkPantryDuplicate";
+import { getPantryHint } from "@/lib/pantryHints";
 
 interface DraftItem {
   key: string;
@@ -303,17 +304,20 @@ export default function ImportToPantrySheet({
 
       if (cancelled) return;
 
-      const raw = (data ?? []).map((item) => ({
-        key: item.id,
-        name: item.name,
-        quantity: item.quantity ?? 1,
-        unit: item.unit ?? "",
-        storageLocation: null,
-        fridgeZone: null,
-        foodCategory: null,
-        assignedTo: null,
-        expiresAt: null,
-      }));
+      const raw = (data ?? []).map((item) => {
+        const hint = getPantryHint(item.name);
+        return {
+          key: item.id,
+          name: item.name,
+          quantity: item.quantity ?? 1,
+          unit: item.unit ?? "",
+          storageLocation: hint?.storage_location ?? null,
+          fridgeZone: hint?.fridge_zone ?? null,
+          foodCategory: hint?.food_category ?? null,
+          assignedTo: null,
+          expiresAt: null,
+        };
+      });
 
       // If the list came back empty on the first try, give the DB one more chance
       if (raw.length === 0 && attempt === 0) {
@@ -357,7 +361,16 @@ export default function ImportToPantrySheet({
     setSaving(true);
     for (const draft of drafts) {
       if (draft.conflict && (draft.conflictAction ?? "merge") === "merge") {
-        await increasePantryQty(draft.conflict.existingId, draft.conflict.existingQty, draft.quantity);
+        await increasePantryQty(
+          draft.conflict.existingId,
+          draft.conflict.existingQty,
+          draft.quantity,
+          {
+            storageLocation: draft.storageLocation,
+            fridgeZone: draft.fridgeZone,
+            foodCategory: draft.foodCategory,
+          }
+        );
       } else {
         await onAddItem(
           draft.name,
