@@ -44,7 +44,7 @@ export default async function HouseholdLayout({
   return (
     <ToastProvider>
       <HouseholdProvider householdId={household.id} householdName={household.name}>
-        <div className="min-h-dvh pb-20 bg-gray-50 dark:bg-zinc-950">
+        <div className="min-h-dvh bg-gray-50 dark:bg-zinc-950" style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}>
           <PageTransition>{children}</PageTransition>
         </div>
         <BottomNav householdId={household.id} />
