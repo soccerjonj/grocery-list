@@ -482,38 +482,12 @@ export default function AddPantryItem({
                 {/* Expiry date */}
                 <div className="flex flex-col gap-1.5">
                   <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Expires</p>
-                  {(() => {
-                    const sugDays = getSuggestedExpiryDays(storageLocation, foodCategory);
-                    return !expiresAt && sugDays !== null ? (
-                      <AnimatePresence>
-                        <motion.button
-                          key={`${storageLocation}-${foodCategory}`}
-                          type="button"
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ duration: 0.15 }}
-                          onClick={() => {
-                            const d = new Date();
-                            d.setDate(d.getDate() + sugDays);
-                            setExpiresAt(d.toISOString().split("T")[0]);
-                          }}
-                          className="self-start inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors active:scale-[0.96]"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                          </svg>
-                          Suggest: {formatSuggestedDays(sugDays)}
-                        </motion.button>
-                      </AnimatePresence>
-                    ) : null;
-                  })()}
                   {expiresAt ? (
-                    <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-xl px-3 py-1.5 self-start">
-                      <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <div className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 rounded-xl px-3 py-1.5 self-start">
+                      <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <label className="relative text-xs font-medium text-green-700 cursor-pointer">
+                      <label className="relative text-xs font-medium text-green-700 dark:text-green-400 cursor-pointer">
                         {formatDateDisplay(expiresAt)}
                         <input type="date" value={expiresAt} min={today} onChange={(e) => setExpiresAt(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
                       </label>
@@ -524,13 +498,43 @@ export default function AddPantryItem({
                       </button>
                     </div>
                   ) : (
-                    <label className="inline-flex items-center gap-1.5 bg-gray-50 dark:bg-zinc-800 border border-dashed border-gray-300 dark:border-zinc-600 rounded-xl px-3 py-1.5 text-xs text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-zinc-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors self-start cursor-pointer relative">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Add expiry date
-                      <input type="date" value={expiresAt} min={today} onChange={(e) => setExpiresAt(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
-                    </label>
+                    /* Date picker + suggestion on the same row so they never overlap */
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 bg-gray-50 dark:bg-zinc-800 border border-dashed border-gray-300 dark:border-zinc-600 rounded-xl px-3 py-1.5 text-xs text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-zinc-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors cursor-pointer relative">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Pick a date
+                        <input type="date" value={expiresAt} min={today} onChange={(e) => setExpiresAt(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
+                      </label>
+                      {(() => {
+                        const sugDays = getSuggestedExpiryDays(storageLocation, foodCategory);
+                        if (sugDays === null) return null;
+                        return (
+                          <AnimatePresence>
+                            <motion.button
+                              key={`${storageLocation}-${foodCategory}`}
+                              type="button"
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ duration: 0.15 }}
+                              onClick={() => {
+                                const d = new Date();
+                                d.setDate(d.getDate() + sugDays);
+                                setExpiresAt(d.toISOString().split("T")[0]);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors active:scale-[0.96]"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                              </svg>
+                              {formatSuggestedDays(sugDays)}
+                            </motion.button>
+                          </AnimatePresence>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
 
