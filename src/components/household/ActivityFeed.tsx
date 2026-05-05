@@ -55,6 +55,32 @@ interface ActivityGroup {
 const STANDALONE_ACTIONS = new Set(["trip_finished", "member_join"]);
 const GROUP_WINDOW_MS = 12 * 60 * 60 * 1000; // 12 hours
 
+/**
+ * Collapses add → delete → add sequences within a group.
+ * If the final action is pantry_add and a pantry_delete exists earlier,
+ * the user deleted and re-added (e.g. to fix metadata after a bug).
+ * Strip everything up to and including the last delete — only the net
+ * result (the final add, plus any non-add/delete events) is kept.
+ */
+function deduplicateEntries(entries: ActivityLog[]): ActivityLog[] {
+  const last = entries[entries.length - 1];
+  if (last?.action !== "pantry_add") return entries;
+
+  const lastDeleteIdx = entries.map((e) => e.action).lastIndexOf("pantry_delete");
+  if (lastDeleteIdx === -1) return entries;
+
+  const kept = [
+    // non-add/delete events that predate the last delete (e.g. running_low)
+    ...entries.slice(0, lastDeleteIdx).filter(
+      (e) => e.action !== "pantry_add" && e.action !== "pantry_delete"
+    ),
+    // everything after the last delete (the final re-add and anything else)
+    ...entries.slice(lastDeleteIdx + 1),
+  ];
+  // Always keep at least the final add
+  return kept.length > 0 ? kept : [last];
+}
+
 function groupActivities(activities: ActivityLog[]): ActivityGroup[] {
   // activities arrives newest-first; process oldest-first for natural accumulation
   const chronological = [...activities].reverse();
@@ -81,6 +107,15 @@ function groupActivities(activities: ActivityLog[]): ActivityGroup[] {
       existing.latest_at = a.created_at;
     } else {
       groups.push({ key: a.id, item_name: a.item_name, entries: [a], latest_at: a.created_at });
+    }
+  }
+
+  // Collapse add→delete→add noise within each group
+  for (const g of groups) {
+    if (g.entries.length > 1) {
+      g.entries = deduplicateEntries(g.entries);
+      // Update latest_at to reflect the deduplicated tail
+      g.latest_at = g.entries[g.entries.length - 1].created_at;
     }
   }
 
