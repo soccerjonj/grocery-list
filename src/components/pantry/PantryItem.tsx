@@ -443,9 +443,9 @@ export default function PantryItem({
               </div>
 
               {/* Fridge zone */}
-              <AnimatePresence>
+              <AnimatePresence initial={false}>
                 {item.storage_location === "fridge" && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-1.5">
+                  <motion.div key="fridge-zone" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-1.5">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fridge zone</p>
                     <div className="flex gap-1.5">
                       {FRIDGE_ZONES.map(({ value, label }) => (
