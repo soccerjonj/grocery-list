@@ -6,8 +6,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import PantryItem from "./PantryItem";
 import AddPantryItem from "./AddPantryItem";
-import type { PantryItem as PantryItemType } from "@/types/database";
-import { FOOD_CATEGORIES } from "@/types/database";
+import type { PantryItem as PantryItemType, Kind } from "@/types/database";
+import { FOOD_CATEGORIES, SUPPLIES_CATEGORIES, SUPPLIES_LOCATIONS } from "@/types/database";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
@@ -23,14 +23,21 @@ interface PantryListProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
-  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null) => Promise<boolean>;
+  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null, kind?: string | null) => Promise<boolean>;
 }
 
 type SortKey = "freshness" | "expiry" | "name" | "category" | "added";
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+const FOOD_SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "freshness", label: "Freshness" },
   { key: "expiry",    label: "Expiry" },
+  { key: "name",      label: "Name" },
+  { key: "category",  label: "Category" },
+  { key: "added",     label: "Recent" },
+];
+
+// Supplies don't expire / don't have freshness logic — fewer options
+const SUPPLIES_SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "name",      label: "Name" },
   { key: "category",  label: "Category" },
   { key: "added",     label: "Recent" },
@@ -200,11 +207,13 @@ interface SectionProps {
   householdId: string;
   sort: SortKey;
   expandedId: string | null;
+  /** When true, this section subdivides fridge items by `fridge_zone`. Food only. */
+  showFridgeZones?: boolean;
   onToggleExpand: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
-  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null) => Promise<boolean>;
+  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null, kind?: string | null) => Promise<boolean>;
 }
 
 function StorageSection({
@@ -215,6 +224,7 @@ function StorageSection({
   householdId,
   sort,
   expandedId,
+  showFridgeZones = false,
   onToggleExpand,
   onUpdateQuantity,
   onUpdateItem,
@@ -224,7 +234,7 @@ function StorageSection({
   const [open, setOpen] = useState(true);
   if (items.length === 0) return null;
 
-  const isFridge = label === "Fridge";
+  const isFridge = showFridgeZones && label === "Fridge";
   const quickUse = isFridge ? items.filter((i) => i.fridge_zone === "quick_use") : [];
   const longTerm  = isFridge ? items.filter((i) => i.fridge_zone === "long_term") : [];
   const unzoned   = isFridge ? items.filter((i) => !i.fridge_zone) : items;
@@ -324,14 +334,44 @@ export default function PantryList({
   onDelete,
   onAddToShoppingList,
 }: PantryListProps) {
+  // Tab persistence: remember Food vs Supplies per household
+  const tabStorageKey = `pantry_kind_${householdId}`;
+  const [kind, setKind] = useState<Kind>(() => {
+    if (typeof window === "undefined") return "food";
+    const saved = window.localStorage.getItem(tabStorageKey);
+    return saved === "supplies" ? "supplies" : "food";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(tabStorageKey, kind);
+    }
+  }, [kind, tabStorageKey]);
+
   const [sort, setSort] = useState<SortKey>("freshness");
+  // When switching to Supplies, ensure we're on a sort key that's still valid
+  useEffect(() => {
+    if (kind === "supplies" && (sort === "freshness" || sort === "expiry")) {
+      setSort("name");
+    }
+  }, [kind, sort]);
+
   const [filterCategory, setFilterCategory] = useState<string>("");
+  // Reset category filter when switching tabs (categories differ between kinds)
+  useEffect(() => { setFilterCategory(""); }, [kind]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+
+  const sortOptions = kind === "supplies" ? SUPPLIES_SORT_OPTIONS : FOOD_SORT_OPTIONS;
+  const categoryOptions = kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
+  const totalCounts = {
+    food: items.filter((i) => (i.kind ?? "food") === "food").length,
+    supplies: items.filter((i) => i.kind === "supplies").length,
+  };
 
   function dismissItem(id: string, reason: "dismiss" | "added") {
     setExitReasons((prev) => ({ ...prev, [id]: reason }));
@@ -363,33 +403,86 @@ export default function PantryList({
     );
   }
 
+  // Partition by kind first — items without a kind default to 'food' for safety
+  const kindFiltered = items.filter((i) => (i.kind ?? "food") === kind);
+
   const searched = searchQuery.trim()
-    ? items.filter((i) => i.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-    : items;
+    ? kindFiltered.filter((i) => i.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : kindFiltered;
 
   const filtered = filterCategory
     ? searched.filter((i) => i.food_category === filterCategory)
     : searched;
 
-  const runningLowItems = items.filter((i) => i.running_low && !i.running_low_dismissed);
+  // Running-low scoped to active tab so users only see what's relevant
+  const runningLowItems = kindFiltered.filter((i) => i.running_low && !i.running_low_dismissed);
 
+  // Food sections (only used when kind === 'food')
   const fridgeItems   = filtered.filter((i) => i.storage_location === "fridge");
   const freezerItems  = filtered.filter((i) => i.storage_location === "freezer");
   const pantryItems   = filtered.filter((i) => i.storage_location === "pantry");
   const roomTempItems = filtered.filter((i) => i.storage_location === "room_temp");
-  const unsortedItems = filtered.filter((i) => !i.storage_location);
+
+  // Supplies section bins, keyed by SUPPLIES_LOCATIONS values.
+  // Items with null/unknown storage_location land in the "other" bin so they
+  // never get hidden from the user.
+  const supplyKnown = new Set(SUPPLIES_LOCATIONS.map((l) => l.value as string));
+  const suppliesByLocation = SUPPLIES_LOCATIONS.map((loc) => ({
+    value: loc.value,
+    label: loc.label,
+    items: filtered.filter((i) => {
+      if (loc.value === "other") {
+        return !i.storage_location || !supplyKnown.has(i.storage_location);
+      }
+      return i.storage_location === loc.value;
+    }),
+  }));
+  // Food sections use a fixed list above; "unsorted" food = no storage_location set
+  const foodKnown = new Set(["fridge", "freezer", "pantry", "room_temp"]);
+  const unsortedItems = filtered.filter(
+    (i) => !i.storage_location || !foodKnown.has(i.storage_location)
+  );
 
   const hasItems = filtered.length > 0;
 
   const LOCATION_LABEL: Record<string, string> = {
     fridge: "Fridge", freezer: "Freezer", pantry: "Pantry", room_temp: "Counter",
+    bathroom: "Bathroom", laundry: "Laundry", kitchen: "Kitchen", garage: "Garage", other: "Other",
   };
 
   const sectionProps = { members, currentUserId, householdId, sort, expandedId, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
 
   return (
     <div className="flex flex-col gap-4">
-      <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} />
+      {/* ── Food / Supplies tab ───────────────────────────── */}
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800">
+        {(["food", "supplies"] as const).map((k) => {
+          const active = kind === k;
+          const label = k === "food" ? "Food" : "Supplies";
+          const count = totalCounts[k];
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              className={`relative py-2 rounded-xl text-sm font-medium transition-colors active:scale-[0.98] ${
+                active
+                  ? "bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-50 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              }`}
+            >
+              {label}
+              {count > 0 && (
+                <span className={`ml-1.5 text-xs tabular-nums ${active ? "text-gray-400 dark:text-gray-500" : "text-gray-300 dark:text-gray-600"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} kind={kind} />
 
       {items.length > 0 && (
         /* Search bar */
@@ -424,11 +517,11 @@ export default function PantryList({
         </div>
       )}
 
-      {items.length > 0 && (
+      {kindFiltered.length > 0 && (
         /* Sort + category filter bar — sticky */
         <div className="sticky top-0 z-10 -mx-4 px-4 py-1.5 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-sm">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-          {SORT_OPTIONS.map(({ key, label }) => (
+          {sortOptions.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setSort(key)}
@@ -452,7 +545,7 @@ export default function PantryList({
           >
             All
           </button>
-          {FOOD_CATEGORIES.map(({ value, label }) => (
+          {categoryOptions.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => setFilterCategory(filterCategory === value ? "" : value)}
@@ -469,16 +562,28 @@ export default function PantryList({
         </div>
       )}
 
-      {!hasItems && items.length === 0 ? (
+      {!hasItems && kindFiltered.length === 0 ? (
         <div className="flex flex-col items-center py-14 gap-3">
           <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-zinc-800 flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 2h6M8 6h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2zM10 11h4M10 15h4" />
-            </svg>
+            {kind === "supplies" ? (
+              <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 10V7a2 2 0 012-2h10a2 2 0 012 2v3M6 10v9a2 2 0 002 2h8a2 2 0 002-2v-9" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 2h6M8 6h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2zM10 11h4M10 15h4" />
+              </svg>
+            )}
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Your pantry is empty</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Add items to track what you have</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {kind === "supplies" ? "No supplies tracked yet" : "Your pantry is empty"}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              {kind === "supplies"
+                ? "Add things like toothpaste, paper towels, or pet food"
+                : "Add items to track what you have"}
+            </p>
           </div>
         </div>
       ) : !hasItems ? (
@@ -557,7 +662,7 @@ export default function PantryList({
                           members={members}
                           currentUserId={currentUserId}
                           householdId={householdId}
-                          onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo) : undefined}
+                          onAddToList={onAddToShoppingList ? (qty, unit, store, assignedTo) => onAddToShoppingList(item.name, qty, unit, store, assignedTo, item.kind ?? "food") : undefined}
                         />
                       </motion.div>
                     ))}
@@ -567,12 +672,22 @@ export default function PantryList({
             )}
           </AnimatePresence>
 
-          <StorageSection label="Fridge"  items={fridgeItems}   {...sectionProps} />
-          <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} />
-          <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} />
-          <StorageSection label="Counter" items={roomTempItems} {...sectionProps} />
-          {unsortedItems.length > 0 && (
-            <StorageSection label="Other" items={unsortedItems} {...sectionProps} />
+          {kind === "food" ? (
+            <>
+              <StorageSection label="Fridge"  items={fridgeItems}   showFridgeZones {...sectionProps} />
+              <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} />
+              <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} />
+              <StorageSection label="Counter" items={roomTempItems} {...sectionProps} />
+              {unsortedItems.length > 0 && (
+                <StorageSection label="Other" items={unsortedItems} {...sectionProps} />
+              )}
+            </>
+          ) : (
+            <>
+              {suppliesByLocation.map((bin) => (
+                <StorageSection key={bin.value} label={bin.label} items={bin.items} {...sectionProps} />
+              ))}
+            </>
           )}
         </div>
       )}

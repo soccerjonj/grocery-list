@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PantryItem as PantryItemType } from "@/types/database";
-import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES } from "@/types/database";
+import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES, SUPPLIES_CATEGORIES, SUPPLIES_LOCATIONS } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
@@ -16,7 +16,7 @@ interface PantryItemProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
-  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null) => Promise<boolean>;
+  onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null, kind?: string | null) => Promise<boolean>;
   members: MemberProfile[];
   householdId: string;
   currentUserId: string | null;
@@ -132,7 +132,7 @@ export default function PantryItem({
   }
 
   async function handleAddModalConfirm(qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) {
-    if (onAddToShoppingList) await onAddToShoppingList(item.name, qty, unit, store, assignedTo);
+    if (onAddToShoppingList) await onAddToShoppingList(item.name, qty, unit, store, assignedTo, item.kind ?? "food");
     setShowAddModal(false);
     if (addModalIsDelete) {
       triggerExit("consume");
@@ -168,10 +168,13 @@ export default function PantryItem({
     };
   }, [expanded]);
 
-  const expiry = getExpiryBadge(item.expires_at);
+  const isSupplies = (item.kind ?? "food") === "supplies";
+  const expiry = isSupplies ? null : getExpiryBadge(item.expires_at);
   const ownerInfo = getOwnerInfo(item.assigned_to, members, currentUserId);
   const assignedMembers = getAssignedMembers(item.assigned_to, members);
   const qtyDisplay = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(1);
+  const locationOptions = isSupplies ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS;
+  const categoryOptions = isSupplies ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
 
   function increment() { onUpdateQuantity(item.id, item.quantity + 1); }
 
@@ -399,41 +402,45 @@ export default function PantryItem({
                 )}
               </div>
 
-              {/* Expiry */}
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Expires</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={item.expires_at ?? ""}
-                    onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
-                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
-                  />
-                  {item.expires_at ? (
-                    <button
-                      type="button"
-                      onClick={() => onUpdateItem(item.id, { expires_at: null })}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 transition-colors active:scale-[0.96]"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Clear
-                    </button>
-                  ) : (
-                    expiry == null && null
+              {/* Expiry — food only (supplies don't expire in any meaningful way) */}
+              {!isSupplies && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Expires</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={item.expires_at ?? ""}
+                      onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
+                      className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
+                    />
+                    {item.expires_at ? (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateItem(item.id, { expires_at: null })}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 transition-colors active:scale-[0.96]"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Clear
+                      </button>
+                    ) : (
+                      expiry == null && null
+                    )}
+                  </div>
+                  {item.expires_at && expiry && (
+                    <p className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</p>
                   )}
                 </div>
-                {item.expires_at && expiry && (
-                  <p className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</p>
-                )}
-              </div>
+              )}
 
-              {/* Storage */}
+              {/* Storage / Location */}
               <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Storage</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                  {isSupplies ? "Location" : "Storage"}
+                </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {STORAGE_LOCATIONS.map(({ value, label }) => (
+                  {locationOptions.map(({ value, label }) => (
                     <button key={value} type="button"
                       onClick={() => onUpdateItem(item.id, { storage_location: item.storage_location === value ? null : value, fridge_zone: value !== "fridge" ? null : item.fridge_zone })}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.storage_location === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
@@ -442,28 +449,30 @@ export default function PantryItem({
                 </div>
               </div>
 
-              {/* Fridge zone */}
-              <AnimatePresence initial={false}>
-                {item.storage_location === "fridge" && (
-                  <motion.div key="fridge-zone" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-1.5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fridge zone</p>
-                    <div className="flex gap-1.5">
-                      {FRIDGE_ZONES.map(({ value, label }) => (
-                        <button key={value} type="button"
-                          onClick={() => onUpdateItem(item.id, { fridge_zone: item.fridge_zone === value ? null : value })}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.fridge_zone === value ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
-                        >{label}</button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Fridge zone — food only, only when fridge is selected */}
+              {!isSupplies && (
+                <AnimatePresence initial={false}>
+                  {item.storage_location === "fridge" && (
+                    <motion.div key="fridge-zone" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-1.5">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fridge zone</p>
+                      <div className="flex gap-1.5">
+                        {FRIDGE_ZONES.map(({ value, label }) => (
+                          <button key={value} type="button"
+                            onClick={() => onUpdateItem(item.id, { fridge_zone: item.fridge_zone === value ? null : value })}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.fridge_zone === value ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
 
               {/* Category */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Category</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {FOOD_CATEGORIES.map(({ value, label }) => (
+                  {categoryOptions.map(({ value, label }) => (
                     <button key={value} type="button"
                       onClick={() => onUpdateItem(item.id, { food_category: item.food_category === value ? null : value })}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.food_category === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem } from "@/types/database";
+import { getPantryHint } from "@/lib/pantryHints";
 
 export function useShoppingList(householdId: string, listId: string) {
   const [items, setItems] = useState<ShoppingItem[]>([]);
@@ -83,11 +84,13 @@ export function useShoppingList(householdId: string, listId: string) {
     quantity?: number,
     unit?: string,
     store?: string,
-    assignedTo?: string[] | null
+    assignedTo?: string[] | null,
+    kind?: string
   ) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    const resolvedKind = kind ?? getPantryHint(name)?.kind ?? "food";
 
     const optimistic: ShoppingItem = {
       id: `temp-${Date.now()}`,
@@ -105,6 +108,7 @@ export function useShoppingList(householdId: string, listId: string) {
       added_by: user?.id ?? null,
       created_at: new Date().toISOString(),
       assigned_to: assignedTo ?? null,
+      kind: resolvedKind,
     };
 
     setItems((prev) => [...prev, optimistic]);
@@ -120,6 +124,7 @@ export function useShoppingList(householdId: string, listId: string) {
         store: store ?? null,
         added_by: user?.id ?? null,
         assigned_to: assignedTo ?? null,
+        kind: resolvedKind,
       })
       .select()
       .single();

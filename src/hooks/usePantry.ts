@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/logActivity";
 export interface AddPantryOptions {
   notes?: string | null;
   expiresAt?: string | null;
+  kind?: string | null;
   storageLocation?: string | null;
   fridgeZone?: string | null;
   foodCategory?: string | null;
@@ -108,6 +109,7 @@ export function usePantry(householdId: string) {
       updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       expires_at: options?.expiresAt ?? null,
+      kind: options?.kind ?? "food",
       storage_location: options?.storageLocation ?? null,
       fridge_zone: options?.fridgeZone ?? null,
       food_category: options?.foodCategory ?? null,
@@ -129,6 +131,7 @@ export function usePantry(householdId: string) {
         notes: options?.notes ?? null,
         added_by: user?.id ?? null,
         expires_at: options?.expiresAt ?? null,
+        kind: options?.kind ?? "food",
         storage_location: options?.storageLocation ?? null,
         fridge_zone: options?.fridgeZone ?? null,
         food_category: options?.foodCategory ?? null,

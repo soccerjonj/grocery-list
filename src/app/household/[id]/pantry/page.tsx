@@ -11,6 +11,7 @@ import InviteModal from "@/components/household/InviteModal";
 import ImportToPantrySheet from "@/components/pantry/ImportToPantrySheet";
 import ActivityBellButton from "@/components/household/ActivityBellFloat";
 import { createClient } from "@/lib/supabase/client";
+import { getPantryHint } from "@/lib/pantryHints";
 
 function PantryPageInner() {
   const { householdId, householdName } = useHouseholdContext();
@@ -54,10 +55,12 @@ function PantryPageInner() {
     unit?: string | null,
     store?: string | null,
     assignedTo?: string[] | null,
+    kind?: string | null,
   ): Promise<boolean> {
     if (!activeShoppingListId) return false;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
+    const resolvedKind = kind ?? getPantryHint(name)?.kind ?? "food";
     const { error } = await supabase.from("shopping_items").insert({
       household_id: householdId,
       list_id: activeShoppingListId,
@@ -67,6 +70,7 @@ function PantryPageInner() {
       store: store ?? null,
       assigned_to: assignedTo ?? null,
       added_by: user?.id ?? null,
+      kind: resolvedKind,
     });
     return !error;
   }

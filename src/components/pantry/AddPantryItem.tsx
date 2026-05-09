@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
-import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/database";
+import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES, SUPPLIES_LOCATIONS, SUPPLIES_CATEGORIES, type Kind } from "@/types/database";
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
 import { getPantryHint, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
 
@@ -16,6 +16,8 @@ interface AddPantryItemProps {
   currentUserId: string | null;
   householdId: string;
   existingNames: string[];
+  /** Active pantry tab — drives default kind and chip vocabularies. */
+  kind: Kind;
 }
 
 const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
@@ -25,6 +27,7 @@ export default function AddPantryItem({
   members,
   currentUserId,
   householdId,
+  kind: tabKind,
 }: AddPantryItemProps) {
   // ── Inline name input
   const [name, setName] = useState("");
@@ -45,6 +48,20 @@ export default function AddPantryItem({
   const [notes, setNotes] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [autoDetected, setAutoDetected] = useState(false);
+  // Resolved kind for this draft. Defaults to the active tab; pantryHints can
+  // override (e.g. user is on Food but types "toothpaste"). When kind flips
+  // due to detection, we set kindAutoDetected so we can show a small chip the
+  // user can tap to revert.
+  const [kind, setKind] = useState<Kind>(tabKind);
+  const [kindAutoDetected, setKindAutoDetected] = useState(false);
+  // Keep kind in sync if the parent tab changes while the sheet is closed
+  useEffect(() => {
+    if (!sheetOpen) {
+      setKind(tabKind);
+      setKindAutoDetected(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabKind]);
 
   // ── Duplicate
   const [duplicate, setDuplicate] = useState<{ id: string; quantity: number } | null>(null);
@@ -74,9 +91,20 @@ export default function AddPantryItem({
     autoDetectTimer.current = setTimeout(() => {
       const hint = getPantryHint(val);
       if (hint) {
-        setStorageLocation((prev) => prev || hint.storage_location);
-        setFoodCategory((prev) => prev || hint.food_category);
-        if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
+        // If the hint's kind disagrees with the active tab, switch — this is
+        // the "user typed 'toothpaste' on Food tab" case.
+        if (hint.kind !== kind) {
+          setKind(hint.kind);
+          setKindAutoDetected(true);
+          // Clear any stale storage/category chosen for the wrong kind
+          setStorageLocation(hint.storage_location);
+          setFoodCategory(hint.food_category);
+          setFridgeZone(hint.fridge_zone ?? "");
+        } else {
+          setStorageLocation((prev) => prev || hint.storage_location);
+          setFoodCategory((prev) => prev || hint.food_category);
+          if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
+        }
         setAutoDetected(true);
       } else {
         setAutoDetected(false);
@@ -96,9 +124,17 @@ export default function AddPantryItem({
     }
     const hint = getPantryHint(n);
     if (hint) {
-      setStorageLocation((prev) => prev || hint.storage_location);
-      setFoodCategory((prev) => prev || hint.food_category);
-      if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
+      if (hint.kind !== kind) {
+        setKind(hint.kind);
+        setKindAutoDetected(true);
+        setStorageLocation(hint.storage_location);
+        setFoodCategory(hint.food_category);
+        setFridgeZone(hint.fridge_zone ?? "");
+      } else {
+        setStorageLocation((prev) => prev || hint.storage_location);
+        setFoodCategory((prev) => prev || hint.food_category);
+        if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
+      }
       setAutoDetected(true);
     }
 
@@ -115,18 +151,22 @@ export default function AddPantryItem({
     let sl = s.storage_location || "";
     let fz = s.fridge_zone || "";
     let fc = s.food_category || "";
-    if (!sl || !fc) {
-      const hint = getPantryHint(s.name);
-      if (hint) {
-        if (!sl) sl = hint.storage_location;
-        if (!fc) fc = hint.food_category;
-        if (hint.fridge_zone && !fz) fz = hint.fridge_zone;
+    let resolvedKind: Kind = kind;
+    const hint = !sl || !fc ? getPantryHint(s.name) : null;
+    if (hint) {
+      if (!sl) sl = hint.storage_location;
+      if (!fc) fc = hint.food_category;
+      if (hint.fridge_zone && !fz) fz = hint.fridge_zone;
+      if (hint.kind !== kind) {
+        resolvedKind = hint.kind;
+        setKind(hint.kind);
+        setKindAutoDetected(true);
       }
     }
     setName(s.name);
     if (s.unit) setUnit(s.unit);
     setStorageLocation(sl);
-    setFridgeZone(fz);
+    setFridgeZone(resolvedKind === "supplies" ? "" : fz);
     setFoodCategory(fc);
     if (sl || fc) setAutoDetected(true);
     setShowSuggestions(false);
@@ -162,27 +202,33 @@ export default function AddPantryItem({
     setAssignedTo([]);
     setAutoDetected(false);
     setDuplicate(null);
+    setKind(tabKind);
+    setKindAutoDetected(false);
   }
 
   async function handleAdd() {
     if (!name.trim()) return;
+    const isSupplies = kind === "supplies";
     if (duplicate && conflictAction === "merge") {
       await increasePantryQty(
         duplicate.id,
         duplicate.quantity,
         parseFloat(quantity) || 1,
         {
+          kind,
           storageLocation: storageLocation || null,
-          fridgeZone: storageLocation === "fridge" ? (fridgeZone || null) : null,
+          fridgeZone: !isSupplies && storageLocation === "fridge" ? (fridgeZone || null) : null,
           foodCategory: foodCategory || null,
         }
       );
     } else {
       onAdd(name.trim(), parseFloat(quantity) || 1, unit || undefined, {
+        kind,
         storageLocation: storageLocation || null,
-        fridgeZone: storageLocation === "fridge" ? (fridgeZone || null) : null,
+        fridgeZone: !isSupplies && storageLocation === "fridge" ? (fridgeZone || null) : null,
         foodCategory: foodCategory || null,
-        expiresAt: expiresAt || null,
+        // Supplies don't expire — drop any value the user might have set
+        expiresAt: isSupplies ? null : (expiresAt || null),
         assignedTo: assignedTo.length > 0 ? assignedTo : null,
         notes: notes.trim() || null,
       });
@@ -245,8 +291,30 @@ export default function AddPantryItem({
                           Auto-detected
                         </span>
                       )}
+                      {kindAutoDetected && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // User taps to revert kind back to the active tab
+                            setKind(tabKind);
+                            setKindAutoDetected(false);
+                            setStorageLocation("");
+                            setFridgeZone("");
+                            setFoodCategory("");
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 text-[10px] font-medium text-amber-600 dark:text-amber-400 flex-shrink-0 active:scale-95 transition-transform"
+                          title="Tap to switch back"
+                        >
+                          {kind === "supplies" ? "Detected supplies" : "Detected food"}
+                          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Review details, then add to pantry</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      Review details, then add to {kind === "supplies" ? "supplies" : "pantry"}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -312,11 +380,13 @@ export default function AddPantryItem({
                     </div>
                   </div>
 
-                  {/* Storage */}
+                  {/* Storage / Location */}
                   <div className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Storage</p>
+                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                      {kind === "supplies" ? "Location" : "Storage"}
+                    </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {STORAGE_LOCATIONS.map(({ value, label }) => (
+                      {(kind === "supplies" ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS).map(({ value, label }) => (
                         <button key={value} type="button"
                           onClick={() => {
                             setStorageLocation(storageLocation === value ? "" : value);
@@ -327,34 +397,36 @@ export default function AddPantryItem({
                         >{label}</button>
                       ))}
                     </div>
-                    <AnimatePresence initial={false}>
-                      {storageLocation === "fridge" && (
-                        <motion.div
-                          key="fridge-zone"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.18 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="flex gap-1.5 pt-1">
-                            {FRIDGE_ZONES.map(({ value, label }) => (
-                              <button key={value} type="button"
-                                onClick={() => setFridgeZone(fridgeZone === value ? "" : value)}
-                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${fridgeZone === value ? "bg-blue-600 text-white" : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"}`}
-                              >{label}</button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {kind === "food" && (
+                      <AnimatePresence initial={false}>
+                        {storageLocation === "fridge" && (
+                          <motion.div
+                            key="fridge-zone"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.18 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="flex gap-1.5 pt-1">
+                              {FRIDGE_ZONES.map(({ value, label }) => (
+                                <button key={value} type="button"
+                                  onClick={() => setFridgeZone(fridgeZone === value ? "" : value)}
+                                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${fridgeZone === value ? "bg-blue-600 text-white" : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"}`}
+                                >{label}</button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    )}
                   </div>
 
                   {/* Category */}
                   <div className="flex flex-col gap-2">
                     <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Category</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {FOOD_CATEGORIES.map(({ value, label }) => (
+                      {(kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES).map(({ value, label }) => (
                         <button key={value} type="button"
                           onClick={() => { setFoodCategory(foodCategory === value ? "" : value); setAutoDetected(false); }}
                           className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${foodCategory === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
@@ -363,7 +435,8 @@ export default function AddPantryItem({
                     </div>
                   </div>
 
-                  {/* Expiry */}
+                  {/* Expiry — food only */}
+                  {kind === "food" && (
                   <div className="flex flex-col gap-2">
                     <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Expires</p>
                     <div className="flex items-center gap-2">
@@ -406,6 +479,7 @@ export default function AddPantryItem({
                       </AnimatePresence>
                     </div>
                   </div>
+                  )}
 
                   {/* Notes */}
                   <div className="flex flex-col gap-2">
@@ -455,7 +529,9 @@ export default function AddPantryItem({
                     onClick={handleAdd}
                     className="w-full py-3.5 bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl text-sm font-semibold active:scale-[0.98] transition-transform"
                   >
-                    {duplicate && conflictAction === "merge" ? "Add to existing item" : "Add to pantry"}
+                    {duplicate && conflictAction === "merge"
+                      ? "Add to existing item"
+                      : kind === "supplies" ? "Add to supplies" : "Add to pantry"}
                   </button>
                 </div>
               </motion.div>
@@ -477,7 +553,7 @@ export default function AddPantryItem({
           <input
             ref={nameRef}
             type="text"
-            placeholder="Add an item…"
+            placeholder={tabKind === "supplies" ? "Add a supply…" : "Add an item…"}
             value={name}
             onChange={handleNameChange}
             onFocus={() => setShowSuggestions(true)}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES } from "@/types/database";
+import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES, SUPPLIES_LOCATIONS, SUPPLIES_CATEGORIES, type Kind } from "@/types/database";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
@@ -16,6 +16,7 @@ interface DraftItem {
   name: string;
   quantity: number;
   unit: string;
+  kind: Kind;
   storageLocation: string | null;
   fridgeZone: string | null;
   foodCategory: string | null;
@@ -166,9 +167,36 @@ function DraftCard({
         />
       </div>
 
-      {/* Row 3: storage chips */}
+      {/* Row 2.5: Food / Supplies toggle */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-zinc-800 self-start">
+        {(["food", "supplies"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => {
+              if (item.kind === k) return;
+              // Switching kind clears chip selections from the other vocabulary
+              onChange({
+                kind: k,
+                storageLocation: null,
+                fridgeZone: null,
+                foodCategory: null,
+              });
+            }}
+            className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-colors active:scale-[0.94] ${
+              item.kind === k
+                ? "bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-50 shadow-sm"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            {k === "food" ? "Food" : "Supplies"}
+          </button>
+        ))}
+      </div>
+
+      {/* Row 3: storage / location chips */}
       <div className="flex flex-wrap gap-1.5">
-        {STORAGE_LOCATIONS.map(({ value, label }) => (
+        {(item.kind === "supplies" ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS).map(({ value, label }) => (
           <button
             key={value}
             type="button"
@@ -186,8 +214,8 @@ function DraftCard({
         ))}
       </div>
 
-      {/* Fridge zone */}
-      {item.storageLocation === "fridge" && (
+      {/* Fridge zone — food only */}
+      {item.kind === "food" && item.storageLocation === "fridge" && (
         <div className="flex flex-wrap gap-1.5">
           {FRIDGE_ZONES.map(({ value, label }) => (
             <button key={value} type="button"
@@ -198,9 +226,9 @@ function DraftCard({
         </div>
       )}
 
-      {/* Food category */}
+      {/* Category */}
       <div className="flex flex-wrap gap-1.5">
-        {FOOD_CATEGORIES.map(({ value, label }) => (
+        {(item.kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES).map(({ value, label }) => (
           <button key={value} type="button"
             onClick={() => onChange({ foodCategory: item.foodCategory === value ? null : value })}
             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.foodCategory === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
@@ -238,24 +266,26 @@ function DraftCard({
         </div>
       )}
 
-      {/* Row 4: expiry date */}
-      <div className="flex items-center gap-2">
-        <input
-          type="date"
-          value={item.expiresAt ?? ""}
-          onChange={(e) => onChange({ expiresAt: e.target.value || null })}
-          className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
-        />
-        {item.expiresAt && (
-          <button
-            type="button"
-            onClick={() => onChange({ expiresAt: null })}
-            className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors active:opacity-60"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {/* Row 4: expiry date — food only */}
+      {item.kind === "food" && (
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={item.expiresAt ?? ""}
+            onChange={(e) => onChange({ expiresAt: e.target.value || null })}
+            className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
+          />
+          {item.expiresAt && (
+            <button
+              type="button"
+              onClick={() => onChange({ expiresAt: null })}
+              className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors active:opacity-60"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -297,20 +327,28 @@ export default function ImportToPantrySheet({
 
       const { data } = await supabase
         .from("shopping_items")
-        .select("id, name, quantity, unit")
+        .select("id, name, quantity, unit, kind")
         .eq("list_id", listId)
         .eq("completed", true)
         .order("completed_at", { ascending: true });
 
       if (cancelled) return;
 
-      const raw = (data ?? []).map((item) => {
+      const raw: DraftItem[] = (data ?? []).map((item) => {
         const hint = getPantryHint(item.name);
+        // Prefer the shopping item's own kind (if it was set when added) over
+        // the hint, so users who explicitly tagged something keep their choice.
+        const rowKind = (item as { kind?: string }).kind;
+        const resolvedKind: Kind =
+          rowKind === "supplies" || rowKind === "food"
+            ? rowKind
+            : (hint?.kind ?? "food");
         return {
           key: item.id,
           name: item.name,
           quantity: item.quantity ?? 1,
           unit: item.unit ?? "",
+          kind: resolvedKind,
           storageLocation: hint?.storage_location ?? null,
           fridgeZone: hint?.fridge_zone ?? null,
           foodCategory: hint?.food_category ?? null,
@@ -366,8 +404,9 @@ export default function ImportToPantrySheet({
           draft.conflict.existingQty,
           draft.quantity,
           {
+            kind: draft.kind,
             storageLocation: draft.storageLocation,
-            fridgeZone: draft.fridgeZone,
+            fridgeZone: draft.kind === "food" ? draft.fridgeZone : null,
             foodCategory: draft.foodCategory,
           }
         );
@@ -377,11 +416,12 @@ export default function ImportToPantrySheet({
           draft.quantity,
           draft.unit || undefined,
           {
+            kind: draft.kind,
             storageLocation: draft.storageLocation,
-            fridgeZone: draft.fridgeZone,
+            fridgeZone: draft.kind === "food" ? draft.fridgeZone : null,
             foodCategory: draft.foodCategory,
             assignedTo: draft.assignedTo,
-            expiresAt: draft.expiresAt,
+            expiresAt: draft.kind === "food" ? draft.expiresAt : null,
           }
         );
       }

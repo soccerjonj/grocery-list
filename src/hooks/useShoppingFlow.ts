@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem, ShoppingList } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
+import { getPantryHint } from "@/lib/pantryHints";
 
 function tripName() {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -115,10 +116,15 @@ export function useShoppingFlow(householdId: string) {
     unit?: string,
     store?: string,
     assignedTo?: string[] | null,
-    notes?: string
+    notes?: string,
+    kind?: string
   ) {
     if (!activeListId) return;
     const { data: { user } } = await supabase.auth.getUser();
+    // Caller can override kind explicitly (e.g. running-low → shopping carries
+    // the pantry item's kind through). Otherwise fall back to a name-based hint
+    // so toilet paper / cat food / toothpaste auto-route to Supplies on import.
+    const resolvedKind = kind ?? getPantryHint(name)?.kind ?? "food";
 
     const optimistic: ShoppingItem = {
       id: `temp-${Date.now()}`,
@@ -136,6 +142,7 @@ export function useShoppingFlow(householdId: string) {
       added_by: user?.id ?? null,
       created_at: new Date().toISOString(),
       assigned_to: assignedTo ?? null,
+      kind: resolvedKind,
     };
 
     setItems((prev) => [...prev, optimistic]);
@@ -152,6 +159,7 @@ export function useShoppingFlow(householdId: string) {
         notes: notes ?? null,
         added_by: user?.id ?? null,
         assigned_to: assignedTo ?? null,
+        kind: resolvedKind,
       })
       .select()
       .single();

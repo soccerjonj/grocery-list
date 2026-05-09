@@ -41,6 +41,7 @@ export async function increasePantryQty(
   currentQty: number,
   addAmt: number,
   meta?: {
+    kind?: string | null;
     storageLocation?: string | null;
     fridgeZone?: string | null;
     foodCategory?: string | null;
@@ -52,6 +53,7 @@ export async function increasePantryQty(
     updated_at: new Date().toISOString(),
   };
   // Only overwrite metadata fields that the user explicitly selected
+  if (meta?.kind != null)            patch.kind             = meta.kind;
   if (meta?.storageLocation != null) patch.storage_location = meta.storageLocation;
   if (meta?.fridgeZone != null)      patch.fridge_zone      = meta.fridgeZone;
   if (meta?.foodCategory != null)    patch.food_category    = meta.foodCategory;

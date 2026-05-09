@@ -1,11 +1,13 @@
 export interface PantryHint {
-  storage_location: "fridge" | "freezer" | "pantry" | "room_temp";
-  food_category: "produce" | "meat" | "dairy" | "drinks" | "condiments" | "grains" | "snacks" | "prepared" | "other";
+  kind: "food" | "supplies";
+  storage_location: string;
+  food_category: string;
   fridge_zone?: "quick_use" | "long_term";
 }
 
+// ── Food keywords ─────────────────────────────────────────────────────
 // Ordered most-specific first — first match wins
-const LOOKUP: Array<{ kw: string[]; hint: PantryHint }> = [
+const FOOD_LOOKUP: Array<{ kw: string[]; hint: Omit<PantryHint, "kind"> }> = [
   // ── Frozen ────────────────────────────────────────────────────────────
   {
     kw: ["frozen", "ice cream", "gelato", "sorbet", "popsicle", "ice pop", "ice pack"],
@@ -157,16 +159,107 @@ const LOOKUP: Array<{ kw: string[]; hint: PantryHint }> = [
   },
 ];
 
+// ── Supplies keywords ─────────────────────────────────────────────────
+// Non-food household items. Storage locations come from SUPPLIES_LOCATIONS:
+// 'bathroom' | 'laundry' | 'kitchen' | 'garage' | 'other'.
+// Categories come from SUPPLIES_CATEGORIES: 'cleaning' | 'personal_care'
+// | 'paper_goods' | 'pet' | 'other'.
+//
+// Order matters within this array — most specific first. e.g. "paper towel"
+// must come before generic "tissue" / "kleenex" so kitchen wins over bathroom.
+const SUPPLIES_LOOKUP: Array<{ kw: string[]; hint: Omit<PantryHint, "kind"> }> = [
+  // ── Pet ─────────────────────────────────────────────────────────────
+  {
+    kw: [
+      "cat food", "dog food", "kitty food", "puppy food",
+      "cat litter", "kitty litter", "litter box",
+      "pet treat", "dog treat", "cat treat",
+      "kibble", "pet food", "pet shampoo",
+    ],
+    hint: { storage_location: "kitchen", food_category: "pet" },
+  },
+
+  // ── Paper goods – kitchen (more specific than generic tissue) ───────
+  {
+    kw: ["paper towel", "kitchen roll"],
+    hint: { storage_location: "kitchen", food_category: "paper_goods" },
+  },
+
+  // ── Paper goods – bathroom ──────────────────────────────────────────
+  {
+    kw: ["toilet paper", "tp roll", "tissue", "kleenex", "facial tissue", "napkin"],
+    hint: { storage_location: "bathroom", food_category: "paper_goods" },
+  },
+
+  // ── Personal care – bathroom ────────────────────────────────────────
+  {
+    kw: [
+      "toothpaste", "toothbrush", "floss", "mouthwash",
+      "deodorant", "antiperspirant",
+      "shampoo", "conditioner", "body wash", "soap bar", "bar soap",
+      "hand soap", "lotion", "moisturizer",
+      "razor", "razor blade", "shaving cream", "shaving gel",
+      "sunscreen", "sunblock",
+      "hairspray", "hair gel", "hair oil",
+      "cotton swab", "cotton ball", "q-tip", "qtip",
+      "tampon", "pad", "menstrual",
+      "band-aid", "bandage", "gauze", "antiseptic",
+      "ibuprofen", "acetaminophen", "aspirin", "tylenol", "advil", "vitamin",
+      "contact lens", "contact solution",
+    ],
+    hint: { storage_location: "bathroom", food_category: "personal_care" },
+  },
+
+  // ── Cleaning – laundry room ─────────────────────────────────────────
+  {
+    kw: [
+      "laundry detergent", "fabric softener", "dryer sheet",
+      "stain remover", "bleach", "oxiclean", "tide", "downy",
+    ],
+    hint: { storage_location: "laundry", food_category: "cleaning" },
+  },
+
+  // ── Cleaning – kitchen ──────────────────────────────────────────────
+  {
+    kw: [
+      "dish soap", "dish detergent", "dishwasher pod", "dishwasher tablet",
+      "sponge", "scrubber", "scour pad",
+      "trash bag", "garbage bag", "kitchen bag",
+      "ziploc", "ziplock", "freezer bag", "sandwich bag",
+      "foil", "aluminum foil", "plastic wrap", "cling film",
+      "parchment paper", "wax paper",
+      "all-purpose cleaner", "windex", "glass cleaner",
+      "disinfectant", "lysol", "clorox", "disinfecting wipe",
+      "dish gloves", "rubber gloves",
+    ],
+    hint: { storage_location: "kitchen", food_category: "cleaning" },
+  },
+
+  // ── Cleaning – generic / other ──────────────────────────────────────
+  {
+    kw: [
+      "broom", "mop", "dustpan", "vacuum bag",
+      "air freshener", "candle", "matches", "lighter",
+      "light bulb", "lightbulb", "battery", "batteries",
+    ],
+    hint: { storage_location: "other", food_category: "other" },
+  },
+];
+
 export function getPantryHint(name: string): PantryHint | null {
   if (!name || name.length < 3) return null;
   const lower = name.toLowerCase().trim();
-  for (const { kw, hint } of LOOKUP) {
-    if (kw.some((k) => lower.includes(k))) return hint;
+  // Try food first — its keyword set is broader and more diverse.
+  for (const { kw, hint } of FOOD_LOOKUP) {
+    if (kw.some((k) => lower.includes(k))) return { kind: "food", ...hint };
+  }
+  for (const { kw, hint } of SUPPLIES_LOOKUP) {
+    if (kw.some((k) => lower.includes(k))) return { kind: "supplies", ...hint };
   }
   return null;
 }
 
-/** Suggested days to expiry based on where/what the item is. */
+/** Suggested days to expiry based on where/what the item is. Food only. */
 export function getSuggestedExpiryDays(storage: string, category: string): number | null {
   if (!storage) return null;
   if (storage === "freezer") return 90;
