@@ -431,8 +431,15 @@ export default function PantryList({
     value: loc.value,
     label: loc.label,
     items: filtered.filter((i) => {
+      // The "other" bin catches three cases: items explicitly placed there,
+      // items with no location set, and items with a location we don't know
+      // about (e.g. legacy food locations on a row that flipped to supplies).
       if (loc.value === "other") {
-        return !i.storage_location || !supplyKnown.has(i.storage_location);
+        return (
+          i.storage_location === "other" ||
+          !i.storage_location ||
+          !supplyKnown.has(i.storage_location)
+        );
       }
       return i.storage_location === loc.value;
     }),
