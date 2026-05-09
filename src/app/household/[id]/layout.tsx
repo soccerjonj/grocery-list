@@ -4,6 +4,7 @@ import { HouseholdProvider } from "@/context/HouseholdContext";
 import { ToastProvider } from "@/context/ToastContext";
 import BottomNav from "@/components/ui/BottomNav";
 import PageTransition from "@/components/ui/PageTransition";
+import PullToRefresh from "@/components/ui/PullToRefresh";
 
 export default async function HouseholdLayout({
   children,
@@ -44,9 +45,11 @@ export default async function HouseholdLayout({
   return (
     <ToastProvider>
       <HouseholdProvider householdId={household.id} householdName={household.name}>
-        <div className="min-h-dvh bg-gray-50 dark:bg-zinc-950" style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}>
-          <PageTransition>{children}</PageTransition>
-        </div>
+        <PullToRefresh>
+          <div className="min-h-dvh bg-gray-50 dark:bg-zinc-950" style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}>
+            <PageTransition>{children}</PageTransition>
+          </div>
+        </PullToRefresh>
         <BottomNav householdId={household.id} />
       </HouseholdProvider>
     </ToastProvider>
