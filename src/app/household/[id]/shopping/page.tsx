@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useHouseholdContext } from "@/context/HouseholdContext";
-import { useShoppingFlow } from "@/hooks/useShoppingFlow";
-import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import Spinner from "@/components/ui/Spinner";
 import ActivityBellButton from "@/components/household/ActivityBellFloat";
@@ -125,7 +124,9 @@ function TripCelebration({ count, onDone }: { count: number; onDone: () => void 
 
 export default function ShoppingPage() {
   const { householdId, householdName } = useHouseholdContext();
-  const { members, currentUserId } = useHouseholdMembers(householdId);
+  // Hooks live in HouseholdDataProvider so tab switches don't refetch.
+  const { shopping, members: membersData } = useHouseholdData();
+  const { members, currentUserId } = membersData;
   const {
     activeItems,
     completedItems,
@@ -137,7 +138,7 @@ export default function ShoppingPage() {
     toggleComplete,
     deleteItem,
     finishTrip,
-  } = useShoppingFlow(householdId);
+  } = shopping;
 
   const router = useRouter();
   const [showPast, setShowPast] = useState(false);

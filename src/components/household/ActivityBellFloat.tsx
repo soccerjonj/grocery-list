@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useActivityLog } from "@/hooks/useActivityLog";
-import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 import { ActivityFeedSheet } from "@/components/household/ActivityFeed";
 
 /** Inline bell button — drop directly inside a header button group. */
 export default function ActivityBellButton({ householdId }: { householdId: string }) {
   const [open, setOpen] = useState(false);
-  const { currentUserId } = useHouseholdMembers(householdId);
+  // Read shared members hook from context — avoids a duplicate fetch + sub.
+  const { members: { currentUserId } } = useHouseholdData();
   const { activities, loading, unreadCount, markAllRead, clearAll } = useActivityLog(householdId, currentUserId);
 
   return (

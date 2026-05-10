@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import type { ActivityLog } from "@/types/database";
 
@@ -144,7 +144,8 @@ export function ActivityFeedSheet({
   onMarkAllRead: () => void;
   onClearAll: () => void;
 }) {
-  const { members } = useHouseholdMembers(householdId);
+  // Read shared members from context — avoids a duplicate fetch + sub.
+  const { members: { members } } = useHouseholdData();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);

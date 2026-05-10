@@ -5,8 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useHouseholdContext } from "@/context/HouseholdContext";
-import { usePantry } from "@/hooks/usePantry";
-import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 import PantryList from "@/components/pantry/PantryList";
 import InviteModal from "@/components/household/InviteModal";
 import ImportToPantrySheet from "@/components/pantry/ImportToPantrySheet";
@@ -17,8 +16,10 @@ import type { Kind } from "@/types/database";
 
 function PantryPageInner() {
   const { householdId, householdName } = useHouseholdContext();
-  const { items, loading, addItem, updateQuantity, updateItem, deleteItem } = usePantry(householdId);
-  const { members, currentUserId } = useHouseholdMembers(householdId);
+  // Hooks live in HouseholdDataProvider so tab switches don't refetch.
+  const { pantry, members: membersData } = useHouseholdData();
+  const { items, loading, addItem, updateQuantity, updateItem, deleteItem } = pantry;
+  const { members, currentUserId } = membersData;
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [activeShoppingListId, setActiveShoppingListId] = useState<string | null>(null);
