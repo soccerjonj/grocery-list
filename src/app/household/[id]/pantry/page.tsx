@@ -245,6 +245,7 @@ function PantryPageInner() {
         currentUserId={currentUserId}
         householdId={householdId}
         kind={kind}
+        onKindChange={setKind}
         searchQuery={searchQuery}
         onClearSearch={() => { setSearchQuery(""); setSearchOpen(false); }}
         onAdd={addItem}

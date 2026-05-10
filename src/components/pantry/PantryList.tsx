@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
@@ -21,6 +21,8 @@ interface PantryListProps {
   householdId: string;
   /** Active tab — owned by the parent so the page header can show kind tabs. */
   kind: Kind;
+  /** Lets a horizontal swipe within the list switch tabs. */
+  onKindChange?: (k: Kind) => void;
   /** Search text — owned by the parent (header has the input). Empty = no filter. */
   searchQuery: string;
   /** Called by the empty-state "Show all" affordance to clear parent search. */
@@ -335,6 +337,7 @@ export default function PantryList({
   currentUserId,
   householdId,
   kind,
+  onKindChange,
   searchQuery,
   onClearSearch,
   onAdd,
@@ -379,6 +382,90 @@ export default function PantryList({
 
   function handleToggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  // ── Horizontal swipe between Food / Supplies tabs ────────────────────
+  // Tracks a single-finger gesture and only commits a tab change when:
+  //  – the touch is single-finger,
+  //  – the start target is not inside a horizontal scroll container
+  //    (e.g. the sort/filter chip bar — those need to scroll freely),
+  //  – no sheet/modal is open (we read body.overflow as the signal),
+  //  – horizontal motion clearly exceeds vertical,
+  //  – distance ≥ SWIPE_DISTANCE OR a fast flick (velocity ≥ SWIPE_VELOCITY).
+  const SWIPE_DISTANCE = 60;        // px
+  const SWIPE_VELOCITY = 0.4;        // px/ms — flick threshold for a quick gesture
+  const AXIS_LOCK_DISTANCE = 8;      // px — distance before we lock to an axis
+  const AXIS_HORIZONTAL_RATIO = 1.3; // |dx| must exceed |dy| × this to be horizontal
+  const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  const swipeAxis = useRef<"none" | "horizontal" | "vertical">("none");
+
+  function startsInHorizontalScroller(target: EventTarget | null): boolean {
+    let el = target as HTMLElement | null;
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el);
+      if (
+        (style.overflowX === "auto" || style.overflowX === "scroll") &&
+        el.scrollWidth > el.clientWidth + 1
+      ) {
+        return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  function handleSwipeStart(e: React.TouchEvent) {
+    if (!onKindChange) return;
+    if (e.touches.length !== 1) return;
+    if (document.body.style.overflow === "hidden") return;
+    if (startsInHorizontalScroller(e.target)) return;
+    const t = e.touches[0];
+    swipeStart.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+    swipeAxis.current = "none";
+  }
+
+  function handleSwipeMove(e: React.TouchEvent) {
+    if (!swipeStart.current) return;
+    const t = e.touches[0];
+    const ax = Math.abs(t.clientX - swipeStart.current.x);
+    const ay = Math.abs(t.clientY - swipeStart.current.y);
+    if (swipeAxis.current === "none") {
+      if (ax < AXIS_LOCK_DISTANCE && ay < AXIS_LOCK_DISTANCE) return;
+      swipeAxis.current = ax > ay * AXIS_HORIZONTAL_RATIO ? "horizontal" : "vertical";
+      if (swipeAxis.current === "vertical") {
+        // Disengage so vertical scroll feels native and we don't fire on touchend
+        swipeStart.current = null;
+      }
+    }
+  }
+
+  function handleSwipeEnd(e: React.TouchEvent) {
+    if (!swipeStart.current || swipeAxis.current !== "horizontal") {
+      swipeStart.current = null;
+      swipeAxis.current = "none";
+      return;
+    }
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipeStart.current.x;
+    const dt = Math.max(1, Date.now() - swipeStart.current.t);
+    const velocity = Math.abs(dx) / dt;
+    swipeStart.current = null;
+    swipeAxis.current = "none";
+
+    if (Math.abs(dx) < SWIPE_DISTANCE && velocity < SWIPE_VELOCITY) return;
+
+    // dx < 0 means finger moved left — advance from Food → Supplies
+    if (dx < 0 && kind === "food") {
+      onKindChange?.("supplies");
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate(6); } catch { /* ignore */ }
+      }
+    } else if (dx > 0 && kind === "supplies") {
+      onKindChange?.("food");
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate(6); } catch { /* ignore */ }
+      }
+    }
   }
 
   if (loading) {
@@ -453,6 +540,16 @@ export default function PantryList({
   return (
     <div className="flex flex-col gap-3">
       <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} kind={kind} />
+
+      {/* Swipeable region — covers sort/filter row + sections + empty state.
+          Excludes AddPantryItem above so input taps & drags work normally. */}
+      <div
+        onTouchStart={handleSwipeStart}
+        onTouchMove={handleSwipeMove}
+        onTouchEnd={handleSwipeEnd}
+        onTouchCancel={handleSwipeEnd}
+        className="flex flex-col gap-4"
+      >
 
       {kindFiltered.length > 0 && (
         /* Sort + category filter bar — sticky */
@@ -628,6 +725,7 @@ export default function PantryList({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
