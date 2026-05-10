@@ -4,8 +4,8 @@
   "description": "Shared grocery and pantry tracking for your household",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#111111",
-  "theme_color": "#111111",
+  "background_color": "#f9fafb",
+  "theme_color": "#f9fafb",
   "orientation": "portrait-primary",
   "icons": [
     {

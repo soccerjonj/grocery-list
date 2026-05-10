@@ -21,26 +21,25 @@ export default async function HouseholdLayout({
 
   if (!user) redirect("/auth/login");
 
-  // Verify membership
-  const { data: membership } = await supabase
+  // Single round-trip: verify membership AND pull the household name via
+  // a PostgREST embedded select. Saves one network hop on every navigation
+  // into a household route, which was a measurable chunk of cold-start time.
+  const { data: membershipRaw } = await supabase
     .from("household_members")
-    .select("role")
+    .select("role, households:household_id(id, name)")
     .eq("household_id", id)
     .eq("user_id", user.id)
     .single();
 
-  if (!membership) redirect("/dashboard");
+  // Supabase types the embed as an array; the FK is many-to-one so the
+  // runtime value is a single object. Coerce defensively for both shapes.
+  type MembershipShape = { role: string; households: { id: string; name: string } | { id: string; name: string }[] | null };
+  const membership = membershipRaw as MembershipShape | null;
+  const household = membership
+    ? (Array.isArray(membership.households) ? membership.households[0] : membership.households)
+    : null;
 
-  // Fetch household details separately
-  const { data: householdData } = await supabase
-    .from("households")
-    .select("id, name")
-    .eq("id", id)
-    .single();
-
-  if (!householdData) redirect("/dashboard");
-
-  const household = householdData as { id: string; name: string };
+  if (!membership || !household) redirect("/dashboard");
 
   return (
     <ToastProvider>

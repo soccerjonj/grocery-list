@@ -10,24 +10,20 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/auth/login");
 
-  // Fetch household IDs this user belongs to
+  // Fetch household memberships in a single round-trip via PostgREST embed.
+  // This used to be two separate awaits (household_members → households),
+  // doubling the cold-start latency on the dashboard.
   const { data: memberRows } = await supabase
     .from("household_members")
-    .select("household_id")
+    .select("household_id, households:household_id(id, name)")
     .eq("user_id", user.id);
 
-  const householdIds: string[] = (memberRows ?? []).map(
-    (m: { household_id: string }) => m.household_id
-  );
-
-  let households: Array<{ id: string; name: string }> = [];
-  if (householdIds.length > 0) {
-    const { data } = await supabase
-      .from("households")
-      .select("id, name")
-      .in("id", householdIds);
-    households = (data ?? []) as Array<{ id: string; name: string }>;
-  }
+  // Supabase typegen infers the embed as an array; the FK is many-to-one
+  // so it's actually a single object (or null).
+  type Row = { households: { id: string; name: string } | { id: string; name: string }[] | null };
+  const households: Array<{ id: string; name: string }> = (memberRows as unknown as Row[] ?? [])
+    .map((m) => (Array.isArray(m.households) ? m.households[0] : m.households))
+    .filter((h): h is { id: string; name: string } => !!h);
 
   // If exactly one household, jump straight in
   if (households.length === 1) {
