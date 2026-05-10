@@ -150,6 +150,7 @@ export function useShoppingList(householdId: string, listId: string) {
 
     const now = new Date().toISOString();
     const completed = !item.completed;
+    const snapshot = item;
 
     setItems((prev) =>
       prev.map((i) =>
@@ -164,7 +165,7 @@ export function useShoppingList(householdId: string, listId: string) {
       )
     );
 
-    await supabase
+    const { error } = await supabase
       .from("shopping_items")
       .update({
         completed,
@@ -172,19 +173,38 @@ export function useShoppingList(householdId: string, listId: string) {
         completed_at: completed ? now : null,
       })
       .eq("id", id);
+
+    if (error) {
+      console.error("shopping toggleComplete failed:", error.message);
+      setItems((prev) => prev.map((i) => (i.id === id ? snapshot : i)));
+    }
   }
 
   async function clearCompleted() {
     const now = new Date().toISOString();
-    const completedIds = items.filter((i) => i.completed).map((i) => i.id);
-    if (!completedIds.length) return;
+    const completedItems = items.filter((i) => i.completed);
+    if (!completedItems.length) return;
+    const completedIds = completedItems.map((i) => i.id);
 
     setItems((prev) => prev.filter((i) => !i.completed));
 
-    await supabase
+    const { error } = await supabase
       .from("shopping_items")
       .update({ cleared_at: now })
       .in("id", completedIds);
+
+    if (error) {
+      // Restore the completed items we optimistically removed. We can't
+      // perfectly preserve order without an index snapshot, but adding
+      // them back at the original positions of the unaffected items is
+      // close enough since clearCompleted only removes completed items.
+      console.error("clearCompleted failed:", error.message);
+      setItems((prev) => {
+        const present = new Set(prev.map((i) => i.id));
+        const restored = completedItems.filter((i) => !present.has(i.id));
+        return [...prev, ...restored];
+      });
+    }
   }
 
   async function updateItem(
@@ -201,8 +221,20 @@ export function useShoppingList(householdId: string, listId: string) {
   }
 
   async function deleteItem(id: string) {
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return;
+    const snapshot = items[idx];
     setItems((prev) => prev.filter((i) => i.id !== id));
-    await supabase.from("shopping_items").delete().eq("id", id);
+    const { error } = await supabase.from("shopping_items").delete().eq("id", id);
+    if (error) {
+      console.error("shopping deleteItem failed:", error.message);
+      setItems((prev) => {
+        if (prev.some((i) => i.id === id)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(idx, next.length), 0, snapshot);
+        return next;
+      });
+    }
   }
 
   const activeItems = items.filter((i) => !i.completed);

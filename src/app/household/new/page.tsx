@@ -28,7 +28,8 @@ export default function NewHouseholdPage() {
       if (!user) throw new Error("Not authenticated");
 
       // Ensure a profile row exists for this user (in case the trigger
-      // didn't fire — e.g. the migration was applied after sign-up).
+      // didn't fire — e.g. the migration was applied after sign-up). We
+      // also upsert the display_name here in case it was missed.
       const fullName =
         user.user_metadata?.display_name ||
         [user.user_metadata?.first_name, user.user_metadata?.last_name].filter(Boolean).join(" ") ||
@@ -39,21 +40,13 @@ export default function NewHouseholdPage() {
         { onConflict: "id", ignoreDuplicates: true }
       );
 
-      // Generate the ID client-side so we don't need .select() after insert.
-      // (The SELECT policy requires membership, which doesn't exist yet at
-      // insert time — using a pre-known ID sidesteps the timing issue.)
-      const householdId = crypto.randomUUID();
-
-      const { error: hhError } = await supabase
-        .from("households")
-        .insert({ id: householdId, name: name.trim(), created_by: user.id });
-      if (hhError) throw hhError;
-
-      // Add creator as owner
-      const { error: memberError } = await supabase
-        .from("household_members")
-        .insert({ household_id: householdId, user_id: user.id, role: "owner" });
-      if (memberError) throw memberError;
+      // Atomic create: household + owner-membership in one transaction
+      // via migration 018's RPC. Previously these were two separate
+      // round-trips, so a partial failure left an orphaned household
+      // with no members — invisible via RLS and never deletable.
+      const { data: householdId, error: rpcErr } = await supabase
+        .rpc("create_household_with_owner", { p_name: name.trim() });
+      if (rpcErr || !householdId) throw rpcErr ?? new Error("Failed to create household");
 
       router.push(`/household/${householdId}/pantry`);
     } catch (err: unknown) {

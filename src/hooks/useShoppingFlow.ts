@@ -201,6 +201,8 @@ export function useShoppingFlow(householdId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     const now = new Date().toISOString();
     const completed = !item.completed;
+    // Snapshot for rollback in case the DB write fails.
+    const snapshot = item;
 
     setItems((prev) =>
       prev.map((i) =>
@@ -210,18 +212,41 @@ export function useShoppingFlow(householdId: string) {
       )
     );
 
-    await supabase.from("shopping_items").update({
+    const { error } = await supabase.from("shopping_items").update({
       completed,
       completed_by: completed ? user?.id : null,
       completed_at: completed ? now : null,
     }).eq("id", id);
 
+    if (error) {
+      // Rollback so the user sees the actual DB state, not a phantom toggle.
+      console.error("shopping toggleComplete failed:", error.message);
+      setItems((prev) => prev.map((i) => (i.id === id ? snapshot : i)));
+      return;
+    }
+
     if (completed) logActivity(householdId, "shopping_check", item.name);
   }
 
   async function deleteItem(id: string) {
+    // Snapshot for rollback. We capture both the item and its index so the
+    // restored order matches what the user saw before they tapped delete.
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return;
+    const snapshot = items[idx];
+
     setItems((prev) => prev.filter((i) => i.id !== id));
-    await supabase.from("shopping_items").delete().eq("id", id);
+    const { error } = await supabase.from("shopping_items").delete().eq("id", id);
+    if (error) {
+      console.error("shopping deleteItem failed:", error.message);
+      setItems((prev) => {
+        // Skip if it's somehow already back (realtime echo, retry race)
+        if (prev.some((i) => i.id === id)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(idx, next.length), 0, snapshot);
+        return next;
+      });
+    }
   }
 
   // ── Finish trip ───────────────────────────────────────────────
@@ -236,31 +261,18 @@ export function useShoppingFlow(householdId: string) {
     const now = new Date().toISOString();
     const unchecked = items.filter((i) => !i.completed);
 
-    // Name and archive the current list
-    await supabase
-      .from("shopping_lists")
-      .update({ archived_at: now, name: tripName() })
-      .eq("id", activeListId);
-
-    // Get-or-create the next active list via the race-safe RPC. The
-    // partial unique index from migration 017 means a direct insert here
-    // would fail with unique_violation if another client raced us; the
-    // RPC handles that case and returns whichever list won.
+    // Atomic finish: archive current list, create new list, move unchecked
+    // items — all in one transaction via migration 018's RPC. Previously
+    // these were three separate round-trips; a partial failure could
+    // orphan items split across two lists with one of them already
+    // archived (invisible). Now it's all-or-nothing at the DB level.
     const { data: newListId, error: rpcErr } = await supabase
-      .rpc("get_or_create_active_shopping_list", { p_household_id: householdId });
+      .rpc("finish_shopping_trip", { p_list_id: activeListId, p_trip_name: tripName() });
 
     if (rpcErr || !newListId) {
-      console.error("Failed to get-or-create new shopping list:", rpcErr?.message);
+      console.error("Failed to finish trip:", rpcErr?.message);
       setFinishing(false);
       return null;
-    }
-
-    // Move unchecked items to the new list
-    if (unchecked.length > 0) {
-      await supabase
-        .from("shopping_items")
-        .update({ list_id: newListId, completed: false, completed_by: null, completed_at: null })
-        .in("id", unchecked.map((i) => i.id));
     }
 
     // Update local state

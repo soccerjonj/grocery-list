@@ -130,17 +130,19 @@ function JoinForm() {
         user.email?.split("@")[0] ||
         "";
 
-      // Save chosen color to profile
-      await supabase.from("profiles").upsert(
-        { id: user.id, display_name: fullName, color: selectedColor },
-        { onConflict: "id" }
-      );
-
-      // Join the household
+      // Insert membership FIRST. If this fails (RLS, dup, etc.) we don't
+      // want to have already overwritten the user's profile color — which
+      // is shared across all their households.
       const { error: joinError } = await supabase
         .from("household_members")
         .insert({ household_id: household.id, user_id: user.id, role: "member" });
       if (joinError) throw joinError;
+
+      // Now safe to update the profile with the chosen color + name.
+      await supabase.from("profiles").upsert(
+        { id: user.id, display_name: fullName, color: selectedColor },
+        { onConflict: "id" }
+      );
 
       router.push(`/household/${household.id}/pantry`);
     } catch (err: unknown) {

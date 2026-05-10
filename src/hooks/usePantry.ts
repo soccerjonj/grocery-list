@@ -154,15 +154,22 @@ export function usePantry(householdId: string) {
   }
 
   async function updateQuantity(id: string, quantity: number) {
+    const snapshot = items.find((i) => i.id === id);
+    if (!snapshot) return;
+    const now = new Date().toISOString();
     setItems((prev) =>
       prev.map((i) =>
-        i.id === id ? { ...i, quantity, updated_at: new Date().toISOString() } : i
+        i.id === id ? { ...i, quantity, updated_at: now } : i
       )
     );
-    await supabase
+    const { error } = await supabase
       .from("pantry_items")
-      .update({ quantity, updated_at: new Date().toISOString() })
+      .update({ quantity, updated_at: now })
       .eq("id", id);
+    if (error) {
+      console.error("pantry updateQuantity failed:", error.message);
+      setItems((prev) => prev.map((i) => (i.id === id ? snapshot : i)));
+    }
   }
 
   async function updateItem(
@@ -200,10 +207,22 @@ export function usePantry(householdId: string) {
   }
 
   async function deleteItem(id: string) {
-    const item = items.find((i) => i.id === id);
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return;
+    const snapshot = items[idx];
     setItems((prev) => prev.filter((i) => i.id !== id));
-    await supabase.from("pantry_items").delete().eq("id", id);
-    if (item) logActivity(householdId, "pantry_delete", item.name);
+    const { error } = await supabase.from("pantry_items").delete().eq("id", id);
+    if (error) {
+      console.error("pantry deleteItem failed:", error.message);
+      setItems((prev) => {
+        if (prev.some((i) => i.id === id)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(idx, next.length), 0, snapshot);
+        return next;
+      });
+      return;
+    }
+    logActivity(householdId, "pantry_delete", snapshot.name);
   }
 
   return { items, loading, error, addItem, updateQuantity, updateItem, deleteItem };
