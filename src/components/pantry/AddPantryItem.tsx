@@ -549,7 +549,7 @@ export default function AddPantryItem({
         onSubmit={handleNameSubmit}
         className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm"
       >
-        <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-4 py-2.5">
           <input
             ref={nameRef}
             type="text"

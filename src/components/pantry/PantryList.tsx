@@ -19,6 +19,12 @@ interface PantryListProps {
   members: MemberProfile[];
   currentUserId: string | null;
   householdId: string;
+  /** Active tab — owned by the parent so the page header can show kind tabs. */
+  kind: Kind;
+  /** Search text — owned by the parent (header has the input). Empty = no filter. */
+  searchQuery: string;
+  /** Called by the empty-state "Show all" affordance to clear parent search. */
+  onClearSearch?: () => void;
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
@@ -328,25 +334,15 @@ export default function PantryList({
   members,
   currentUserId,
   householdId,
+  kind,
+  searchQuery,
+  onClearSearch,
   onAdd,
   onUpdateQuantity,
   onUpdateItem,
   onDelete,
   onAddToShoppingList,
 }: PantryListProps) {
-  // Tab persistence: remember Food vs Supplies per household
-  const tabStorageKey = `pantry_kind_${householdId}`;
-  const [kind, setKind] = useState<Kind>(() => {
-    if (typeof window === "undefined") return "food";
-    const saved = window.localStorage.getItem(tabStorageKey);
-    return saved === "supplies" ? "supplies" : "food";
-  });
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(tabStorageKey, kind);
-    }
-  }, [kind, tabStorageKey]);
-
   const [sort, setSort] = useState<SortKey>("freshness");
   // When switching to Supplies, ensure we're on a sort key that's still valid
   useEffect(() => {
@@ -359,7 +355,6 @@ export default function PantryList({
   // Reset category filter when switching tabs (categories differ between kinds)
   useEffect(() => { setFilterCategory(""); }, [kind]);
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
@@ -368,10 +363,6 @@ export default function PantryList({
 
   const sortOptions = kind === "supplies" ? SUPPLIES_SORT_OPTIONS : FOOD_SORT_OPTIONS;
   const categoryOptions = kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
-  const totalCounts = {
-    food: items.filter((i) => (i.kind ?? "food") === "food").length,
-    supplies: items.filter((i) => i.kind === "supplies").length,
-  };
 
   function dismissItem(id: string, reason: "dismiss" | "added") {
     setExitReasons((prev) => ({ ...prev, [id]: reason }));
@@ -460,69 +451,8 @@ export default function PantryList({
   const sectionProps = { members, currentUserId, householdId, sort, expandedId, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* ── Food / Supplies tab ───────────────────────────── */}
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800">
-        {(["food", "supplies"] as const).map((k) => {
-          const active = kind === k;
-          const label = k === "food" ? "Food" : "Supplies";
-          const count = totalCounts[k];
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKind(k)}
-              className={`relative py-2 rounded-xl text-sm font-medium transition-colors active:scale-[0.98] ${
-                active
-                  ? "bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-50 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              }`}
-            >
-              {label}
-              {count > 0 && (
-                <span className={`ml-1.5 text-xs tabular-nums ${active ? "text-gray-400 dark:text-gray-500" : "text-gray-300 dark:text-gray-600"}`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
+    <div className="flex flex-col gap-3">
       <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} kind={kind} />
-
-      {items.length > 0 && (
-        /* Search bar */
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
-          </svg>
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setSearchQuery("")}
-            placeholder="Search pantry…"
-            className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-      )}
 
       {kindFiltered.length > 0 && (
         /* Sort + category filter bar — sticky */
@@ -599,7 +529,7 @@ export default function PantryList({
             {searchQuery ? `No results for "${searchQuery}"` : "Nothing in this category"}
           </p>
           <button
-            onClick={() => { setSearchQuery(""); setFilterCategory(""); }}
+            onClick={() => { onClearSearch?.(); setFilterCategory(""); }}
             className="text-xs text-gray-400 dark:text-gray-500 underline underline-offset-2 active:opacity-60"
           >
             Show all
