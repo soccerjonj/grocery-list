@@ -23,25 +23,17 @@ export function useShoppingFlow(householdId: string) {
   const init = useCallback(async () => {
     setLoading(true);
 
-    // Find active list
-    const { data: active } = await supabase
-      .from("shopping_lists")
-      .select("id")
-      .eq("household_id", householdId)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Race-safe atomic primitive (see migration 017). Replaces the previous
+    // SELECT-then-INSERT pattern that could create a duplicate non-archived
+    // list when the SELECT failed transiently — that bug orphaned an entire
+    // household's items on the older list once the duplicate appeared.
+    const { data: listId, error: rpcErr } = await supabase
+      .rpc("get_or_create_active_shopping_list", { p_household_id: householdId });
 
-    let listId = active?.id ?? null;
-
-    if (!listId) {
-      const { data: created } = await supabase
-        .from("shopping_lists")
-        .insert({ household_id: householdId, name: "current" })
-        .select("id")
-        .single();
-      listId = created?.id ?? null;
+    if (rpcErr || !listId) {
+      console.error("Failed to get active shopping list:", rpcErr?.message);
+      setLoading(false);
+      return;
     }
 
     setActiveListId(listId);
@@ -238,28 +230,37 @@ export function useShoppingFlow(householdId: string) {
       .update({ archived_at: now, name: tripName() })
       .eq("id", activeListId);
 
-    // Create new active list
-    const { data: newList } = await supabase
-      .from("shopping_lists")
-      .insert({ household_id: householdId, name: "current" })
-      .select()
-      .single();
+    // Get-or-create the next active list via the race-safe RPC. The
+    // partial unique index from migration 017 means a direct insert here
+    // would fail with unique_violation if another client raced us; the
+    // RPC handles that case and returns whichever list won.
+    const { data: newListId, error: rpcErr } = await supabase
+      .rpc("get_or_create_active_shopping_list", { p_household_id: householdId });
 
-    if (!newList) { setFinishing(false); return null; }
+    if (rpcErr || !newListId) {
+      console.error("Failed to get-or-create new shopping list:", rpcErr?.message);
+      setFinishing(false);
+      return null;
+    }
 
     // Move unchecked items to the new list
     if (unchecked.length > 0) {
       await supabase
         .from("shopping_items")
-        .update({ list_id: newList.id, completed: false, completed_by: null, completed_at: null })
+        .update({ list_id: newListId, completed: false, completed_by: null, completed_at: null })
         .in("id", unchecked.map((i) => i.id));
     }
 
     // Update local state
-    const carried = unchecked.map((i) => ({ ...i, list_id: newList.id, completed: false, completed_by: null, completed_at: null }));
+    const carried = unchecked.map((i) => ({ ...i, list_id: newListId, completed: false, completed_by: null, completed_at: null }));
     setItems(carried);
-    setActiveListId(newList.id);
-    setPastLists((prev) => [{ ...newList, id: archivedListId, archived_at: now, name: tripName() }, ...prev]);
+    setActiveListId(newListId);
+    // Synthesize a past-list entry for the archived trip so it appears in
+    // the "Past trips" list immediately without a refetch.
+    setPastLists((prev) => [
+      { id: archivedListId, household_id: householdId, name: tripName(), created_at: now, archived_at: now, created_by: null },
+      ...prev,
+    ]);
     logActivity(householdId, "trip_finished");
     setFinishing(false);
     return archivedListId;
