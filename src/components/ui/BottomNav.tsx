@@ -73,6 +73,14 @@ export default function BottomNav({ householdId }: BottomNavProps) {
               key={tab.label}
               href={href}
               style={{ touchAction: "manipulation" }}
+              onClick={(e) => {
+                // Standard iOS pattern: tapping the already-active tab snaps
+                // the page back to the top instead of being a no-op.
+                if (active && typeof window !== "undefined") {
+                  e.preventDefault();
+                  window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+                }
+              }}
               className={cn(
                 "relative flex-1 flex flex-col items-center gap-1 pt-2.5 pb-3 min-h-[56px] transition-colors duration-150 active:opacity-70",
                 active ? "text-gray-900 dark:text-gray-50" : "text-gray-400 dark:text-gray-500"
