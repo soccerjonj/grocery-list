@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -11,6 +11,7 @@ import Input from "@/components/ui/Input";
 import ColorPicker from "@/components/ui/ColorPicker";
 import { getErrorMessage } from "@/lib/utils";
 import { Suspense } from "react";
+import { lookupInvite, joinHouseholdWithCode, type InviteContext } from "@/lib/inviteRpcs";
 
 type Mode = "login" | "signup";
 
@@ -20,6 +21,14 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   const supabase = createClient();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+
+  // Invite context: an unauthenticated user who arrived via /household/join?code=
+  // is redirected here with the code preserved. We look up the household so we
+  // can show "Joining X" and pre-filter taken colors so they pick once.
+  const inviteCode = searchParams.get("code")?.trim() ?? "";
+  const [inviteContext, setInviteContext] = useState<InviteContext | null>(null);
+  const [inviteLookupDone, setInviteLookupDone] = useState(false);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -32,6 +41,29 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   );
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+
+  // Only the signup mode needs the household context (banner + taken-color
+  // filtering). Login just needs the code on hand for the post-signin join.
+  useEffect(() => {
+    if (mode !== "signup" || !inviteCode) {
+      setInviteLookupDone(true);
+      return;
+    }
+    let cancelled = false;
+    lookupInvite(inviteCode).then((ctx) => {
+      if (!cancelled) {
+        setInviteContext(ctx);
+        setInviteLookupDone(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [inviteCode, mode]);
+
+  // Preserve ?code= on the bottom-of-form sign-in/sign-up cross-link so the
+  // invite intent survives switching between modes.
+  const otherModeHref = inviteCode
+    ? `${mode === "login" ? "/auth/signup" : "/auth/login"}?code=${encodeURIComponent(inviteCode)}`
+    : (mode === "login" ? "/auth/signup" : "/auth/login");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +83,9 @@ function AuthFormInner({ mode }: { mode: Mode }) {
               last_name: lastName.trim(),
               display_name: fullName,
               color: selectedColor,
+              // Stash the invite code in user_metadata so /auth/confirmed
+              // can pick it up after the email round-trip and auto-join.
+              ...(inviteCode ? { invite_code: inviteCode } : {}),
             },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
@@ -64,10 +99,22 @@ function AuthFormInner({ mode }: { mode: Mode }) {
             display_name: fullName,
             color: selectedColor,
           });
+          // No email round-trip — auto-join right now if we have an invite.
+          if (inviteCode) {
+            try {
+              const hhId = await joinHouseholdWithCode(inviteCode);
+              router.push(`/household/${hhId}/pantry`);
+              router.refresh();
+              return;
+            } catch {
+              // Invalid code or other failure — fall through to dashboard.
+            }
+          }
           router.push("/dashboard");
           router.refresh();
         } else {
-          // Email confirmation required — color is in user_metadata, applied on confirm
+          // Email confirmation required — color + invite_code are in user_metadata
+          // and will be picked up on /auth/confirmed.
           setConfirming(true);
         }
       } else {
@@ -76,6 +123,17 @@ function AuthFormInner({ mode }: { mode: Mode }) {
           password,
         });
         if (signInError) throw signInError;
+        // If they signed in via an invite link, auto-join then jump to pantry.
+        if (inviteCode) {
+          try {
+            const hhId = await joinHouseholdWithCode(inviteCode);
+            router.push(`/household/${hhId}/pantry`);
+            router.refresh();
+            return;
+          } catch {
+            // Invalid code (e.g. household deleted) — fall through to dashboard.
+          }
+        }
         router.push("/dashboard");
         router.refresh();
       }
@@ -122,7 +180,7 @@ function AuthFormInner({ mode }: { mode: Mode }) {
             and sign in.
           </p>
           <Link
-            href="/auth/login"
+            href={inviteCode ? `/auth/login?code=${encodeURIComponent(inviteCode)}` : "/auth/login"}
             className="inline-flex items-center justify-center w-full bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-xl px-5 py-3 hover:bg-gray-700 dark:hover:bg-zinc-200 active:scale-[0.97] active:bg-gray-800 transition-all"
           >
             Go to sign in
@@ -168,11 +226,18 @@ function AuthFormInner({ mode }: { mode: Mode }) {
             {mode === "login" ? "Welcome back" : "Create account"}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {mode === "login"
-              ? "Sign in to your household"
-              : "Start tracking together"}
+            {inviteContext
+              ? <>Joining <span className="font-semibold text-gray-900 dark:text-gray-50">{inviteContext.householdName}</span></>
+              : (mode === "login" ? "Sign in to your household" : "Start tracking together")}
           </p>
         </div>
+
+        {/* Soft warning when an invite code was passed but doesn't resolve */}
+        {mode === "signup" && inviteCode && inviteLookupDone && !inviteContext && (
+          <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            That invite code didn&apos;t match a household — you can still create your account and join one later.
+          </div>
+        )}
 
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-md shadow-gray-200/60 dark:shadow-none border border-gray-100/80 dark:border-zinc-800 p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -206,7 +271,11 @@ function AuthFormInner({ mode }: { mode: Mode }) {
                     <span className="text-red-400 ml-0.5">*</span>
                   </p>
                   <p className="text-xs text-gray-400 -mt-1">Shown to your household so they know it&apos;s you</p>
-                  <ColorPicker value={selectedColor} onChange={setSelectedColor} />
+                  <ColorPicker
+                    value={selectedColor}
+                    onChange={setSelectedColor}
+                    takenColors={inviteContext?.takenColors ?? []}
+                  />
                 </div>
               </>
             )}
@@ -253,14 +322,14 @@ function AuthFormInner({ mode }: { mode: Mode }) {
           {mode === "login" ? (
             <>
               No account?{" "}
-              <Link href="/auth/signup" className="font-medium text-gray-900 dark:text-gray-50 hover:underline">
+              <Link href={otherModeHref} className="font-medium text-gray-900 dark:text-gray-50 hover:underline">
                 Sign up
               </Link>
             </>
           ) : (
             <>
               Already have an account?{" "}
-              <Link href="/auth/login" className="font-medium text-gray-900 dark:text-gray-50 hover:underline">
+              <Link href={otherModeHref} className="font-medium text-gray-900 dark:text-gray-50 hover:underline">
                 Sign in
               </Link>
             </>

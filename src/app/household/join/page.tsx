@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,6 +22,28 @@ function JoinForm() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Defer rendering until we've confirmed the user is authenticated. If they
+  // aren't, we redirect to /auth/signup with the invite code preserved so the
+  // signup page can show "Joining X" and pre-filter taken colors.
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled) return;
+      if (!user) {
+        const incoming = (searchParams.get("code") ?? "").trim();
+        const target = incoming
+          ? `/auth/signup?code=${encodeURIComponent(incoming)}`
+          : "/auth/signup";
+        router.replace(target);
+        return;
+      }
+      setAuthChecked(true);
+    });
+    return () => { cancelled = true; };
+  }, [router, searchParams]);
 
   async function handleCodeSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,6 +147,17 @@ function JoinForm() {
       setError(getErrorMessage(err));
       setLoading(false);
     }
+  }
+
+  if (!authChecked) {
+    // Brief blank-or-spinner moment while we check auth. We avoid showing
+    // the form to unauthenticated users so they don't fill in a code and
+    // then hit a "Not authenticated" error on submit.
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 dark:bg-zinc-950">
+        <div className="w-6 h-6 border-2 border-gray-300 dark:border-zinc-700 border-t-gray-600 dark:border-t-zinc-400 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
