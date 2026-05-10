@@ -489,8 +489,13 @@ export default function ImportToPantrySheet({
               </button>
             </div>
 
-            {/* Scrollable item list */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+            {/* Scrollable item list. `overscroll-contain` keeps iOS rubber-band
+                inside this container so a pull-up doesn't propagate to the
+                page-level pull-to-refresh. */}
+            <div
+              className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3"
+              style={{ overscrollBehavior: "contain" }}
+            >
               {loadingItems ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-6 h-6 border-2 border-gray-300 dark:border-zinc-700 border-t-gray-600 dark:border-t-zinc-400 rounded-full animate-spin" />

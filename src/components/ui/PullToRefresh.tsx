@@ -52,9 +52,38 @@ export default function PullToRefresh({
       return document.body.style.overflow === "hidden";
     }
 
+    /**
+     * Walks up from `target` looking for an ancestor that is itself a
+     * vertically-scrollable container (not the page body). When such an
+     * ancestor exists, the user is interacting with something like the
+     * inner scroll area of a bottom-sheet, a textarea, or a dropdown —
+     * the gesture belongs to that element, never to pull-to-refresh.
+     *
+     * Stops at `document.body` so the regular page scroll doesn't count
+     * (PTR only ever runs at the top of the page anyway).
+     */
+    function startsInVerticalScroller(target: EventTarget | null): boolean {
+      let el = target as HTMLElement | null;
+      while (el && el !== document.body) {
+        const style = window.getComputedStyle(el);
+        if (
+          (style.overflowY === "auto" || style.overflowY === "scroll") &&
+          el.scrollHeight > el.clientHeight + 1
+        ) {
+          return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    }
+
     function handleStart(e: TouchEvent) {
       if (refreshingRef.current) return;
       if (isModalOpen()) return;
+      // Hard guard: don't claim the gesture if it started inside any
+      // vertical scroller (bottom sheets, dropdowns, textareas, etc.).
+      // This is more robust than the body.overflow convention.
+      if (startsInVerticalScroller(e.target)) return;
       if (window.scrollY > 0) return;
       // Multi-touch (pinch-zoom etc.) — bail out
       if (e.touches.length !== 1) return;
