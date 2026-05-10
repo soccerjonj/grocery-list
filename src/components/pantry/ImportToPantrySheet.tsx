@@ -469,7 +469,13 @@ export default function ImportToPantrySheet({
               <div className="flex-1">
                 <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">Review your haul</h2>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                  Edit details, then add everything to your pantry.
+                  {(() => {
+                    const f = drafts.filter((d) => d.kind === "food").length;
+                    const s = drafts.filter((d) => d.kind === "supplies").length;
+                    if (f > 0 && s > 0) return `${f} food · ${s} supplies — toggle on any row if we got it wrong.`;
+                    if (s > 0)          return "All supplies — heading to your Supplies tab.";
+                    return "Edit details, then add to your pantry.";
+                  })()}
                 </p>
               </div>
               <button
@@ -484,7 +490,7 @@ export default function ImportToPantrySheet({
             </div>
 
             {/* Scrollable item list */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5">
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
               {loadingItems ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-6 h-6 border-2 border-gray-300 dark:border-zinc-700 border-t-gray-600 dark:border-t-zinc-400 rounded-full animate-spin" />
@@ -493,9 +499,17 @@ export default function ImportToPantrySheet({
                 <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                   <p className="text-sm">No items to import</p>
                 </div>
-              ) : (
-                <AnimatePresence mode="popLayout">
-                  {drafts.map((draft) => (
+              ) : (() => {
+                // Split drafts into food vs supplies groups so the user sees
+                // at a glance where each item is heading. Section headers only
+                // render when *both* groups have items — otherwise we keep
+                // the flat layout to avoid visual noise.
+                const foodDrafts = drafts.filter((d) => d.kind === "food");
+                const supplyDrafts = drafts.filter((d) => d.kind === "supplies");
+                const showHeaders = foodDrafts.length > 0 && supplyDrafts.length > 0;
+
+                function renderCards(group: typeof drafts) {
+                  return group.map((draft) => (
                     <DraftCard
                       key={draft.key}
                       item={draft}
@@ -504,9 +518,34 @@ export default function ImportToPantrySheet({
                       members={members}
                       currentUserId={currentUserId}
                     />
-                  ))}
-                </AnimatePresence>
-              )}
+                  ));
+                }
+
+                return (
+                  <AnimatePresence mode="popLayout">
+                    {foodDrafts.length > 0 && (
+                      <div key="food-group" className="flex flex-col gap-2.5">
+                        {showHeaders && (
+                          <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 px-1">
+                            Food · {foodDrafts.length}
+                          </p>
+                        )}
+                        {renderCards(foodDrafts)}
+                      </div>
+                    )}
+                    {supplyDrafts.length > 0 && (
+                      <div key="supplies-group" className="flex flex-col gap-2.5">
+                        {showHeaders && (
+                          <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 px-1 pt-1">
+                            Supplies · {supplyDrafts.length}
+                          </p>
+                        )}
+                        {renderCards(supplyDrafts)}
+                      </div>
+                    )}
+                  </AnimatePresence>
+                );
+              })()}
             </div>
 
             {/* Footer */}
@@ -523,7 +562,13 @@ export default function ImportToPantrySheet({
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      Added to pantry!
+                      {(() => {
+                        const f = drafts.filter((d) => d.kind === "food").length;
+                        const s = drafts.filter((d) => d.kind === "supplies").length;
+                        if (f > 0 && s > 0) return "Added to pantry & supplies!";
+                        if (s > 0)          return "Added to supplies!";
+                        return "Added to pantry!";
+                      })()}
                     </motion.div>
                   ) : (
                     <motion.button
@@ -544,7 +589,13 @@ export default function ImportToPantrySheet({
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
-                          Add {drafts.length} item{drafts.length !== 1 ? "s" : ""} to pantry
+                          {(() => {
+                            const f = drafts.filter((d) => d.kind === "food").length;
+                            const s = drafts.filter((d) => d.kind === "supplies").length;
+                            if (f > 0 && s > 0) return `Add ${f} to pantry, ${s} to supplies`;
+                            if (s > 0)          return `Add ${s} to supplies`;
+                            return `Add ${f} to pantry`;
+                          })()}
                         </>
                       )}
                     </motion.button>
