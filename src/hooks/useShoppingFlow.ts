@@ -16,12 +16,17 @@ export function useShoppingFlow(householdId: string) {
   const [pastLists, setPastLists] = useState<ShoppingList[]>([]);
   const [loading, setLoading] = useState(true);
   const [finishing, setFinishing] = useState(false);
+  // When init fails, we surface an error so the UI can show a "Couldn't
+  // load — retry" banner instead of silently rendering an empty list
+  // (which looks identical to data loss and has caused real user panic).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const selfInsertedIds = useRef<Set<string>>(new Set());
   const supabase = createClient();
 
   // ── Bootstrap: find or create the active list ─────────────────
   const init = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
 
     // Race-safe atomic primitive (see migration 017). Replaces the previous
     // SELECT-then-INSERT pattern that could create a duplicate non-archived
@@ -32,23 +37,30 @@ export function useShoppingFlow(householdId: string) {
 
     if (rpcErr || !listId) {
       console.error("Failed to get active shopping list:", rpcErr?.message);
+      setLoadError(rpcErr?.message || "Couldn't load your shopping list");
       setLoading(false);
       return;
     }
 
     setActiveListId(listId);
 
-    if (listId) {
-      const { data: itemData } = await supabase
-        .from("shopping_items")
-        .select("*")
-        .eq("list_id", listId)
-        .is("cleared_at", null)
-        .order("created_at", { ascending: true });
+    const { data: itemData, error: itemsErr } = await supabase
+      .from("shopping_items")
+      .select("*")
+      .eq("list_id", listId)
+      .is("cleared_at", null)
+      .order("created_at", { ascending: true });
+    if (itemsErr) {
+      // Don't overwrite a stale items list with [] on a transient fetch
+      // failure. Preserving prior state means the user keeps seeing what
+      // they had instead of an alarming "empty list" flash.
+      console.error("Failed to fetch shopping items:", itemsErr.message);
+      setLoadError(itemsErr.message || "Couldn't load your shopping list");
+    } else {
       setItems(itemData ?? []);
     }
 
-    // Fetch past trips
+    // Fetch past trips (non-critical — failure here doesn't surface as an error)
     const { data: past } = await supabase
       .from("shopping_lists")
       .select("*")
@@ -276,6 +288,8 @@ export function useShoppingFlow(householdId: string) {
     pastLists,
     loading,
     finishing,
+    loadError,
+    retry: init,
     addItem,
     updateItem,
     toggleComplete,

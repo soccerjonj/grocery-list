@@ -133,6 +133,8 @@ export default function ShoppingPage() {
     pastLists,
     loading,
     finishing,
+    loadError,
+    retry,
     addItem,
     updateItem,
     toggleComplete,
@@ -201,6 +203,32 @@ export default function ShoppingPage() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Spinner />
+          </div>
+        ) : loadError ? (
+          // Surface a recoverable error instead of silently rendering an
+          // empty list. Empty-on-error caused a user to think their entire
+          // shopping list had been wiped — never again.
+          <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" />
+              </svg>
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  Couldn&apos;t load your shopping list
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                  Your items are safe — this is a temporary loading problem. Tap retry, or pull down to refresh the app.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => retry()}
+              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-sm font-medium transition-colors active:scale-[0.98]"
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
