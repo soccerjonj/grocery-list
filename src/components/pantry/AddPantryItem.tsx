@@ -12,6 +12,7 @@ import { getPantryHint, getOrClassify, getSuggestedExpiryDays, formatSuggestedDa
 import AmountField from "@/components/ui/AmountField";
 import BarcodeScanner from "@/components/pantry/BarcodeScanner";
 import { lookupBarcode } from "@/lib/openFoodFacts";
+import ReceiptImportButton from "@/components/pantry/ReceiptImportButton";
 
 interface AddPantryItemProps {
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
@@ -677,6 +678,19 @@ export default function AddPantryItem({
           )}
         </AnimatePresence>
       </form>
+
+      {/* "Import from receipt" entry (T3-E) — small unobtrusive link below
+          the form, same visual weight as the recipe entry on Shopping. */}
+      <div className="flex justify-center mt-2">
+        <ReceiptImportButton
+          householdId={householdId}
+          members={members}
+          currentUserId={currentUserId}
+          // ImportToPantrySheet's onAddItem expects the same shape as our
+          // onAdd prop. Wrap to return a Promise (onAdd is fire-and-forget).
+          onAddItem={async (n, q, u, opts) => { onAdd(n, q, u, opts); }}
+        />
+      </div>
 
       {sheet}
 

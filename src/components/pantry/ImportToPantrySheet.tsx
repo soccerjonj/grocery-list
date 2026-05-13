@@ -29,8 +29,27 @@ interface DraftItem {
   conflictAction?: "merge" | "add";
 }
 
+/**
+ * An item provided directly to the import sheet (instead of being loaded
+ * from an archived shopping list). Used by the receipt-OCR path (T3-E) —
+ * the LLM returns items as a JSON array, which we feed in here without
+ * having to round-trip through shopping_items.
+ */
+export interface ImportSeedItem {
+  name: string;
+  quantity?: number;
+  unit?: string;
+}
+
 interface ImportToPantrySheetProps {
-  listId: string;
+  /**
+   * Archived shopping list id to load items from. Optional — supply
+   * either `listId` OR `initialItems`. If both are provided, `initialItems`
+   * wins.
+   */
+  listId?: string;
+  /** Pre-loaded items (e.g. from receipt extraction). */
+  initialItems?: ImportSeedItem[];
   householdId: string;
   members?: MemberProfile[];
   currentUserId?: string | null;
@@ -269,6 +288,7 @@ function DraftCard({
 // ── Main sheet ─────────────────────────────────────────────────────
 export default function ImportToPantrySheet({
   listId,
+  initialItems,
   householdId,
   members = [],
   currentUserId = null,
@@ -292,13 +312,64 @@ export default function ImportToPantrySheet({
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Fetch completed items from the archived list, then check for pantry duplicates.
-  // Retries once after 900 ms if the first attempt returns nothing — guards against
-  // a brief race between finishTrip() writing to the DB and this sheet opening.
+  // Build a DraftItem from a name+quantity+unit, running the keyword
+  // classifier so storage/category/zone get pre-populated. Used for both
+  // the archived-list load path AND the receipt-OCR path (T3-E).
+  function buildDraft(input: { id: string; name: string; quantity: number | null; unit: string | null; kind?: string }): DraftItem {
+    const hint = getPantryHint(input.name);
+    const resolvedKind: Kind =
+      input.kind === "supplies" || input.kind === "food"
+        ? input.kind
+        : (hint?.kind ?? "food");
+    return {
+      key: input.id,
+      name: input.name,
+      quantity: input.quantity ?? 1,
+      unit: input.unit ?? "",
+      kind: resolvedKind,
+      storageLocation: hint?.storage_location ?? null,
+      fridgeZone: hint?.fridge_zone ?? null,
+      foodCategory: hint?.food_category ?? null,
+      assignedTo: null,
+      expiresAt: null,
+    };
+  }
+
+  // Load drafts. Two paths:
+  //   1. `initialItems` provided (receipt OCR) — short-circuit to those.
+  //   2. `listId` provided (post-trip flow) — fetch completed shopping_items.
+  // After either path, fire `getPantryDuplicates` so existing pantry rows
+  // get flagged as merge candidates.
   useEffect(() => {
     let cancelled = false;
 
-    async function load(attempt = 0) {
+    async function loadFromInitial(items: ImportSeedItem[]) {
+      const raw: DraftItem[] = items.map((i, idx) =>
+        buildDraft({
+          id: `seed-${idx}`,
+          name: i.name,
+          quantity: i.quantity ?? null,
+          unit: i.unit ?? null,
+        }),
+      );
+      const conflicts = await getPantryDuplicates(householdId, raw.map((r) => r.name));
+      if (cancelled) return;
+      setDrafts(
+        raw.map((item) => {
+          const c = conflicts.get(item.name.toLowerCase());
+          return c
+            ? { ...item, conflict: { existingId: c.id, existingQty: c.quantity }, conflictAction: "merge" as const }
+            : item;
+        }),
+      );
+      setLoadingItems(false);
+    }
+
+    async function loadFromList(attempt = 0) {
+      if (!listId) {
+        setLoadingItems(false);
+        return;
+      }
       if (attempt === 0) setLoadingItems(true);
 
       const { data } = await supabase
@@ -310,33 +381,19 @@ export default function ImportToPantrySheet({
 
       if (cancelled) return;
 
-      const raw: DraftItem[] = (data ?? []).map((item) => {
-        const hint = getPantryHint(item.name);
-        // Prefer the shopping item's own kind (if it was set when added) over
-        // the hint, so users who explicitly tagged something keep their choice.
-        const rowKind = (item as { kind?: string }).kind;
-        const resolvedKind: Kind =
-          rowKind === "supplies" || rowKind === "food"
-            ? rowKind
-            : (hint?.kind ?? "food");
-        return {
-          key: item.id,
-          name: item.name,
-          quantity: item.quantity ?? 1,
-          unit: item.unit ?? "",
-          kind: resolvedKind,
-          storageLocation: hint?.storage_location ?? null,
-          fridgeZone: hint?.fridge_zone ?? null,
-          foodCategory: hint?.food_category ?? null,
-          assignedTo: null,
-          expiresAt: null,
-        };
-      });
+      const raw: DraftItem[] = (data ?? []).map((item) => buildDraft({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        kind: (item as { kind?: string }).kind,
+      }));
 
-      // If the list came back empty on the first try, give the DB one more chance
+      // Retry once if the list came back empty on first try — guards against
+      // a brief race between finishTrip writing to the DB and this sheet opening.
       if (raw.length === 0 && attempt === 0) {
         await new Promise((r) => setTimeout(r, 900));
-        if (!cancelled) load(1);
+        if (!cancelled) loadFromList(1);
         return;
       }
 
@@ -355,10 +412,16 @@ export default function ImportToPantrySheet({
       }
     }
 
-    load();
+    if (initialItems && initialItems.length > 0) {
+      loadFromInitial(initialItems);
+    } else if (listId) {
+      loadFromList();
+    } else {
+      setLoadingItems(false);
+    }
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listId, householdId]);
+  }, [listId, householdId, initialItems]);
 
   function updateDraft(key: string, patch: Partial<DraftItem>) {
     setDrafts((prev) =>
@@ -383,6 +446,10 @@ export default function ImportToPantrySheet({
     const draft = drafts.find((d) => d.key === key);
     if (!draft) return;
     setDrafts((prev) => prev.filter((d) => d.key !== key));
+
+    // Receipt-OCR drafts have synthetic keys ("seed-…"), no shopping_items
+    // row to send back. Just remove from the import and we're done.
+    if (draft.key.startsWith("seed-")) return;
 
     const { data: activeListId, error: rpcErr } = await supabase
       .rpc("get_or_create_active_shopping_list", { p_household_id: householdId });
