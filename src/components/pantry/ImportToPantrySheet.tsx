@@ -46,12 +46,15 @@ function DraftCard({
   item,
   onChange,
   onDelete,
+  onSkip,
   members = [],
   currentUserId,
 }: {
   item: DraftItem;
   onChange: (patch: Partial<DraftItem>) => void;
   onDelete: () => void;
+  /** Send this item back to the active shopping list as uncompleted. Optional. */
+  onSkip?: () => void;
   members?: MemberProfile[];
   currentUserId?: string | null;
 }) {
@@ -92,7 +95,7 @@ function DraftCard({
         </div>
       )}
 
-      {/* Row 1: name + delete */}
+      {/* Row 1: name + skip/delete actions */}
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -103,6 +106,22 @@ function DraftCard({
           className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           placeholder="Item name"
         />
+        {/* "Skip" — sends this back to the active shopping list rather than
+            adding it to the pantry. For "actually didn't buy it" cases (T2-C). */}
+        {onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="flex-shrink-0 px-2 h-7 flex items-center gap-1 rounded-lg text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors active:scale-95"
+            aria-label="Send back to list"
+            title="Didn't buy this — send back to your shopping list"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+            </svg>
+            Skip
+          </button>
+        )}
         <button
           type="button"
           onClick={onDelete}
@@ -351,6 +370,45 @@ export default function ImportToPantrySheet({
     setDrafts((prev) => prev.filter((d) => d.key !== key));
   }
 
+  /**
+   * "Skip" — the user checked this off at the store but didn't actually
+   * buy it. Move the underlying shopping_items row back to the active
+   * list as uncompleted, so it reappears on the Shopping tab. (T2-C)
+   *
+   * We use the same race-safe RPC the rest of the app uses to find the
+   * active list, so this works correctly even if a parallel finishTrip
+   * was running.
+   */
+  async function skipDraft(key: string) {
+    const draft = drafts.find((d) => d.key === key);
+    if (!draft) return;
+    setDrafts((prev) => prev.filter((d) => d.key !== key));
+
+    const { data: activeListId, error: rpcErr } = await supabase
+      .rpc("get_or_create_active_shopping_list", { p_household_id: householdId });
+    if (rpcErr || !activeListId) {
+      // Best-effort: re-add the draft so user can retry. The shopping
+      // item row is still on the archived list and not lost.
+      console.error("skipDraft: couldn't find active list", rpcErr?.message);
+      setDrafts((prev) => [...prev, draft]);
+      return;
+    }
+    await supabase
+      .from("shopping_items")
+      .update({ list_id: activeListId, completed: false, completed_by: null, completed_at: null })
+      .eq("id", draft.key);
+  }
+
+  /**
+   * Bulk-apply an expiry date to every food draft. Supplies are unaffected.
+   * (T1-C — turns the "set expiry on each of 8 items" chore into one tap.)
+   */
+  function applyExpiryToAllFood(date: string | null) {
+    setDrafts((prev) =>
+      prev.map((d) => (d.kind === "food" ? { ...d, expiresAt: date } : d))
+    );
+  }
+
   async function handleAdd() {
     if (saving || drafts.length === 0) return;
     setSaving(true);
@@ -470,6 +528,16 @@ export default function ImportToPantrySheet({
                 const supplyDrafts = drafts.filter((d) => d.kind === "supplies");
                 const showHeaders = foodDrafts.length > 0 && supplyDrafts.length > 0;
 
+                // Bulk-expiry control (T1-C) only when there are 2+ food
+                // drafts — for a single item it's faster to just tap that
+                // row's date input.
+                const showBulkExpiry = foodDrafts.length >= 2;
+                // If every food draft already shares one expiry, prefill it.
+                const sharedExpiry = (() => {
+                  const dates = new Set(foodDrafts.map((d) => d.expiresAt ?? ""));
+                  return dates.size === 1 ? foodDrafts[0]?.expiresAt ?? "" : "";
+                })();
+
                 function renderCards(group: typeof drafts) {
                   return group.map((draft) => (
                     <DraftCard
@@ -477,6 +545,7 @@ export default function ImportToPantrySheet({
                       item={draft}
                       onChange={(patch) => updateDraft(draft.key, patch)}
                       onDelete={() => deleteDraft(draft.key)}
+                      onSkip={() => skipDraft(draft.key)}
                       members={members}
                       currentUserId={currentUserId}
                     />
@@ -485,6 +554,32 @@ export default function ImportToPantrySheet({
 
                 return (
                   <AnimatePresence mode="popLayout">
+                    {showBulkExpiry && (
+                      <div
+                        key="bulk-expiry"
+                        className="flex items-center gap-2 rounded-2xl border border-gray-100 dark:border-zinc-800 bg-blue-50/40 dark:bg-blue-950/20 px-3 py-2.5"
+                      >
+                        <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <p className="text-xs text-gray-700 dark:text-gray-300 flex-shrink-0">Expiry for all food:</p>
+                          <input
+                            type="date"
+                            value={sharedExpiry}
+                            onChange={(e) => applyExpiryToAllFood(e.target.value || null)}
+                            className="flex-1 min-w-0 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
+                          />
+                          {sharedExpiry && (
+                            <button
+                              type="button"
+                              onClick={() => applyExpiryToAllFood(null)}
+                              className="flex-shrink-0 text-[11px] text-gray-400 dark:text-gray-500 hover:text-red-400 transition-colors active:opacity-60"
+                            >Clear</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {foodDrafts.length > 0 && (
                       <div key="food-group" className="flex flex-col gap-2.5">
                         {showHeaders && (

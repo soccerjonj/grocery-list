@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem, ShoppingList } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
 import { getPantryHint } from "@/lib/pantryHints";
+import { useToast } from "@/context/ToastContext";
 
 function tripName() {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -22,6 +23,7 @@ export function useShoppingFlow(householdId: string) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const selfInsertedIds = useRef<Set<string>>(new Set());
   const supabase = createClient();
+  const { withAction } = useToast();
 
   // ── Bootstrap: find or create the active list ─────────────────
   const init = useCallback(async () => {
@@ -246,7 +248,43 @@ export function useShoppingFlow(householdId: string) {
         next.splice(Math.min(idx, next.length), 0, snapshot);
         return next;
       });
+      return;
     }
+
+    // Undo toast (T2-D): re-insert with the same fields if the user taps
+    // within the toast's lifetime. New row gets a fresh id; the rest is
+    // preserved.
+    withAction(
+      `Removed "${snapshot.name}"`,
+      {
+        label: "Undo",
+        onClick: async () => {
+          if (!activeListId) return;
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data } = await supabase
+            .from("shopping_items")
+            .insert({
+              household_id: snapshot.household_id,
+              list_id: snapshot.list_id ?? activeListId,
+              name: snapshot.name,
+              quantity: snapshot.quantity,
+              unit: snapshot.unit,
+              store: snapshot.store,
+              notes: snapshot.notes,
+              added_by: user?.id ?? null,
+              assigned_to: snapshot.assigned_to,
+              kind: snapshot.kind,
+            })
+            .select()
+            .single();
+          if (data) {
+            selfInsertedIds.current.add(data.id);
+            setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
+            setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [...prev, data]));
+          }
+        },
+      },
+    );
   }
 
   // ── Finish trip ───────────────────────────────────────────────

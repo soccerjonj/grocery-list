@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PantryItem } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
+import { useToast } from "@/context/ToastContext";
 
 export interface AddPantryOptions {
   notes?: string | null;
@@ -23,6 +24,7 @@ export function usePantry(householdId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
+  const { withAction } = useToast();
   // Tracks IDs we inserted ourselves so Realtime doesn't double-add them
   const selfInsertedIds = useRef<Set<string>>(new Set());
 
@@ -223,6 +225,45 @@ export function usePantry(householdId: string) {
       return;
     }
     logActivity(householdId, "pantry_delete", snapshot.name);
+
+    // Undo toast (T2-D): re-insert the same item if the user taps within
+    // the toast's lifetime. New row gets a fresh id but every other field
+    // is preserved, including kind/storage/category/expiry/notes/assignees.
+    withAction(
+      `Removed "${snapshot.name}"`,
+      {
+        label: "Undo",
+        onClick: async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data } = await supabase
+            .from("pantry_items")
+            .insert({
+              household_id: snapshot.household_id,
+              name: snapshot.name,
+              quantity: snapshot.quantity,
+              unit: snapshot.unit,
+              notes: snapshot.notes,
+              added_by: user?.id ?? null,
+              expires_at: snapshot.expires_at,
+              kind: snapshot.kind,
+              storage_location: snapshot.storage_location,
+              fridge_zone: snapshot.fridge_zone,
+              food_category: snapshot.food_category,
+              assigned_to: snapshot.assigned_to,
+              running_low: snapshot.running_low,
+              running_low_dismissed: snapshot.running_low_dismissed,
+              opened: snapshot.opened,
+            })
+            .select()
+            .single();
+          if (data) {
+            selfInsertedIds.current.add(data.id);
+            setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
+            setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [data, ...prev]));
+          }
+        },
+      },
+    );
   }
 
   return { items, loading, error, addItem, updateQuantity, updateItem, deleteItem };

@@ -47,6 +47,26 @@ function buildLandingPreview(name: string): string | null {
 
 const LAST_STORE_KEY = (householdId: string) => `last_store_${householdId}`;
 
+// Minimal Web Speech API typings — the standard TS DOM lib doesn't ship
+// them and we only need a tiny slice for voice-to-text.
+interface ISpeechRecognition {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((e: unknown) => void) | null;
+}
+interface SpeechRecognitionCtor {
+  new (): ISpeechRecognition;
+}
+interface SpeechRecognitionEvent {
+  results: { [index: number]: { [alt: number]: { transcript: string } } };
+}
+
 export default function AddShoppingItem({ onAdd, householdId, members = [], currentUserId, existingNames = [] }: AddShoppingItemProps) {
   const [name, setName] = useState("");
   // Default qty "1" (T2-F): the empty-then-tap-+ dance was confusing.
@@ -78,6 +98,64 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
 
   // Landing preview (T2-A): what will pantryHints route this to?
   const landingPreview = buildLandingPreview(name);
+
+  // ── Voice input (T2-B) ────────────────────────────────────────────
+  // Web Speech API is supported in Safari (iOS/macOS) and Chromium-based
+  // browsers, but NOT Firefox. We feature-detect and only render the mic
+  // button when it's available.
+  const [voiceListening, setVoiceListening] = useState(false);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    setVoiceSupported(!!SR);
+  }, []);
+
+  function toggleVoice() {
+    if (typeof window === "undefined") return;
+    if (voiceListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) return;
+    const recog = new SR();
+    recog.lang = "en-US";
+    recog.continuous = false;
+    recog.interimResults = false;
+    recog.maxAlternatives = 1;
+    recog.onresult = (e: SpeechRecognitionEvent) => {
+      const transcript = e.results[0]?.[0]?.transcript ?? "";
+      // Normalize spoken separators ("and") into commas so the existing
+      // bulk-add parser can split a list naturally: "milk, eggs, and bread"
+      // → "milk, eggs, bread"
+      const cleaned = transcript
+        .replace(/\b(and|plus|also)\b/gi, ",")
+        .replace(/\s*,\s*,\s*/g, ", ")
+        .trim();
+      setName(cleaned);
+      setExpanded(true);
+    };
+    recog.onend = () => { setVoiceListening(false); recognitionRef.current = null; };
+    recog.onerror = () => { setVoiceListening(false); recognitionRef.current = null; };
+    try {
+      recog.start();
+      recognitionRef.current = recog;
+      setVoiceListening(true);
+    } catch {
+      // Already started or permission denied — ignore.
+    }
+  }
 
   // Multi-line / comma-separated parser for T1-E bulk-add.
   // Trim, split on commas or newlines, drop empties, cap at 20 to prevent
@@ -251,6 +329,29 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
               </motion.span>
             )}
           </AnimatePresence>
+
+          {/* Voice / mic button (T2-B) — only when the browser supports it.
+              While listening, pulses red. Tap again to stop. */}
+          {voiceSupported && (
+            <motion.button
+              type="button"
+              onClick={toggleVoice}
+              whileTap={{ scale: 0.88 }}
+              animate={voiceListening ? {
+                backgroundColor: ["#dc2626", "#fca5a5", "#dc2626"],
+                transition: { duration: 1.1, repeat: Infinity },
+              } : { backgroundColor: "#f3f4f6" }}
+              className={`w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 ${
+                voiceListening ? "text-white" : "text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800"
+              }`}
+              aria-label={voiceListening ? "Stop listening" : "Speak items"}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 1.5a3 3 0 00-3 3v7.5a3 3 0 006 0V4.5a3 3 0 00-3-3z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 11.5a7 7 0 0014 0M12 18.5v3" />
+              </svg>
+            </motion.button>
+          )}
 
           {/* Close button — visible while expanded */}
           <AnimatePresence initial={false}>
