@@ -12,6 +12,7 @@ import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
+import SortFilterSheet, { type SortKey as SortFilterKey, type ViewLayout } from "./SortFilterSheet";
 
 interface PantryListProps {
   items: PantryItemType[];
@@ -34,21 +35,21 @@ interface PantryListProps {
   onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null, kind?: string | null) => Promise<boolean>;
 }
 
-type SortKey = "freshness" | "expiry" | "name" | "category" | "added";
+type SortKey = SortFilterKey;
 
 const FOOD_SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "freshness", label: "Freshness" },
   { key: "expiry",    label: "Expiry" },
   { key: "name",      label: "Name" },
   { key: "category",  label: "Category" },
-  { key: "added",     label: "Recent" },
+  { key: "quantity",  label: "Quantity" }, // Audit N3: replaced "Recent" — heaviest first is more actionable.
 ];
 
 // Supplies don't expire / don't have freshness logic — fewer options
 const SUPPLIES_SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "name",      label: "Name" },
   { key: "category",  label: "Category" },
-  { key: "added",     label: "Recent" },
+  { key: "quantity",  label: "Quantity" },
 ];
 
 // Location urgency: lower = more perishable / needs attention sooner
@@ -100,7 +101,13 @@ function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
       const cb = b.food_category ?? "zzz";
       return ca.localeCompare(cb) || a.name.localeCompare(b.name);
     }
-    return b.created_at.localeCompare(a.created_at);
+    if (sort === "quantity") {
+      // Heaviest stock first — useful for "what do I have a lot of?"
+      // Tie-break alphabetically so equal-stock items have a stable order.
+      if (a.quantity !== b.quantity) return b.quantity - a.quantity;
+      return a.name.localeCompare(b.name);
+    }
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -217,6 +224,8 @@ interface SectionProps {
   expandedId: string | null;
   /** When true, this section subdivides fridge items by `fridge_zone`. Food only. */
   showFridgeZones?: boolean;
+  /** Pantry item render variant — passed to each card. */
+  layout: ViewLayout;
   onToggleExpand: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
@@ -233,6 +242,7 @@ function StorageSection({
   sort,
   expandedId,
   showFridgeZones = false,
+  layout,
   onToggleExpand,
   onUpdateQuantity,
   onUpdateItem,
@@ -247,11 +257,13 @@ function StorageSection({
   const longTerm  = isFridge ? items.filter((i) => i.fridge_zone === "long_term") : [];
   const unzoned   = isFridge ? items.filter((i) => !i.fridge_zone) : items;
 
-  const itemProps = { members, currentUserId, householdId, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
+  const itemProps = { members, currentUserId, householdId, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList, layout };
 
   function renderGrid(group: PantryItemType[]) {
+    // Same 2-col grid for both layouts — list-layout items set
+    // `gridColumn: span 2` on themselves so they fill the row.
     return (
-      <div className="grid grid-cols-2 gap-2">
+      <div className={layout === "list" ? "flex flex-col gap-1.5" : "grid grid-cols-2 gap-2"}>
         <AnimatePresence mode="popLayout">
           {sortItems(group, sort).map((item) => (
             <PantryItem
@@ -357,6 +369,27 @@ export default function PantryList({
   const [filterCategory, setFilterCategory] = useState<string>("");
   // Reset category filter when switching tabs (categories differ between kinds)
   useEffect(() => { setFilterCategory(""); }, [kind]);
+
+  // Card layout preference (P6) — persisted per household so users with
+  // bigger inventories don't have to flip to list view every session.
+  const VIEW_KEY = `pantry_view_${householdId}`;
+  const [layout, setLayout] = useState<ViewLayout>("compact");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(VIEW_KEY);
+    if (saved === "compact" || saved === "list") setLayout(saved);
+  }, [VIEW_KEY]);
+  function changeLayout(v: ViewLayout) {
+    setLayout(v);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(VIEW_KEY, v);
+    }
+  }
+
+  // Sort & filter sheet (P3) — replaces the sticky chip bar that costs
+  // ~36px of vertical real estate forever even though most users never
+  // change the defaults.
+  const [sortFilterOpen, setSortFilterOpen] = useState(false);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
@@ -535,7 +568,7 @@ export default function PantryList({
     bathroom: "Bathroom", laundry: "Laundry", kitchen: "Kitchen", garage: "Garage", other: "Other",
   };
 
-  const sectionProps = { members, currentUserId, householdId, sort, expandedId, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
+  const sectionProps = { members, currentUserId, householdId, sort, expandedId, layout, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
 
   return (
     <div className="flex flex-col gap-3">
@@ -551,50 +584,50 @@ export default function PantryList({
         className="flex flex-col gap-4"
       >
 
-      {kindFiltered.length > 0 && (
-        /* Sort + category filter bar — sticky */
-        <div className="sticky top-0 z-10 -mx-4 px-4 py-1.5 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-sm">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-          {sortOptions.map(({ key, label }) => (
+      {kindFiltered.length > 0 && (() => {
+        // Audit P3: replaced the sticky horizontal chip bar (15+ items
+        // sharing two concerns: sort vs filter) with a single small pill
+        // that summarizes current state. Tap → opens the SortFilterSheet.
+        // 95% of users never change defaults, so the pill is unobtrusive
+        // by design and shows extra info only when the user has tweaked
+        // something.
+        const defaultSort = kind === "supplies" ? "name" : "freshness";
+        const sortLabel = sortOptions.find((s) => s.key === sort)?.label;
+        const filterLabel = filterCategory
+          ? categoryOptions.find((c) => c.value === filterCategory)?.label
+          : null;
+        const isDefault = sort === defaultSort && !filterCategory && layout === "compact";
+        const pillText = isDefault
+          ? "Sort & filter"
+          : [
+              sort !== defaultSort && sortLabel ? sortLabel : null,
+              filterLabel,
+              layout === "list" ? "List view" : null,
+            ].filter(Boolean).join(" · ");
+        return (
+          <div className="sticky top-0 z-10 -mx-4 px-4 py-1 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-sm flex items-center justify-between gap-2">
             <button
-              key={key}
-              onClick={() => setSort(key)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 active:scale-[0.94] ${
-                sort === key
-                  ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                  : "bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500"
+              type="button"
+              onClick={() => setSortFilterOpen(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.96] ${
+                isDefault
+                  ? "bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400"
+                  : "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
               }`}
             >
-              {label}
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {pillText}
             </button>
-          ))}
-          <div className="w-px h-4 bg-gray-200 dark:bg-zinc-700 flex-shrink-0 mx-0.5" />
-          <button
-            onClick={() => setFilterCategory("")}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 active:scale-[0.94] ${
-              !filterCategory
-                ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                : "bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500"
-            }`}
-          >
-            All
-          </button>
-          {categoryOptions.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setFilterCategory(filterCategory === value ? "" : value)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 active:scale-[0.94] ${
-                filterCategory === value
-                  ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                  : "bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        </div>
-      )}
+            {/* Item count for the active view, right-aligned for a quick
+                "how many do I have?" glance now that the chip bar's gone. */}
+            <span className="text-[11px] text-gray-400 dark:text-zinc-500 tabular-nums">
+              {filtered.length} item{filtered.length === 1 ? "" : "s"}
+            </span>
+          </div>
+        );
+      })()}
 
       {!hasItems && kindFiltered.length === 0 ? (
         <div className="flex flex-col items-center py-14 gap-3">
@@ -726,6 +759,19 @@ export default function PantryList({
         </div>
       )}
       </div>
+
+      <SortFilterSheet
+        open={sortFilterOpen}
+        onClose={() => setSortFilterOpen(false)}
+        kind={kind}
+        sort={sort}
+        onSortChange={setSort}
+        filterCategory={filterCategory}
+        onFilterChange={setFilterCategory}
+        view={layout}
+        onViewChange={changeLayout}
+        availableSorts={sortOptions}
+      />
     </div>
   );
 }

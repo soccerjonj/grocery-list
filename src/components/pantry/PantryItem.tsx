@@ -20,6 +20,8 @@ interface PantryItemProps {
   members: MemberProfile[];
   householdId: string;
   currentUserId: string | null;
+  /** "compact" = 2-col tile (default); "list" = 1-row row with full name. */
+  layout?: "compact" | "list";
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -102,6 +104,7 @@ export default function PantryItem({
   members,
   currentUserId,
   householdId,
+  layout = "compact",
 }: PantryItemProps) {
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(item.name);
@@ -587,7 +590,7 @@ export default function PantryItem({
             ? { duration: exitVariant === "consume" ? 0.3 : 0.24, ease: [0.4, 0, 1, 1] }
             : { duration: 0.18, ease: "easeOut" }
         }
-        style={{ gridColumn: "span 1" }}
+        style={{ gridColumn: layout === "list" ? "span 2" : "span 1" }}
         className={`bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border border-gray-100 dark:border-zinc-800 ${item.running_low ? "border-l-[3px] border-l-amber-400" : ""}`}
         onClick={handleCardClick}
         onPointerDown={handleLongPressStart}
@@ -595,26 +598,27 @@ export default function PantryItem({
         onPointerLeave={handleLongPressEnd}
         onPointerCancel={handleLongPressEnd}
       >
-        {/* Compact card layout. Audit P1: dropped the bare "opened" (orange)
-            and "notes" (blue) glance dots — they were unlabelled, present
-            5% of the time, and meaningless on first encounter. Those
-            properties remain visible & editable in the bottom-sheet.
-            Audit N4: dropped the fixed min-h. Grid `gap-2` aligns rows to
-            the tallest card per row, so short-name cards no longer look
-            artificially padded. */}
-        <div className="p-3 flex flex-col gap-2">
-          <div className="flex items-start gap-1.5">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-50 leading-snug line-clamp-2 flex-1">{item.name}</p>
+        {layout === "list" ? (
+          /* List layout (audit P6) — single row, full name visible.
+             Spans both grid columns so 2-col-grid pages render this as
+             one row of items. */
+          <div className="px-3 py-2.5 flex items-center gap-3">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-50 leading-snug flex-1 min-w-0 truncate">
+              {item.name}
+            </p>
+            {expiry && (
+              <span className={`text-xs font-medium flex-shrink-0 ${expiry.text}`}>{expiry.label}</span>
+            )}
+            <span className={`text-xs font-semibold tabular-nums flex-shrink-0 ${item.running_low ? "text-amber-500" : "text-gray-500 dark:text-gray-400"}`}>
+              ×{qtyDisplay}
+            </span>
             {assignedMembers.length > 0 && (
-              <div className="flex -space-x-1 flex-shrink-0 mt-[1px]">
+              <div className="flex -space-x-1 flex-shrink-0">
                 {assignedMembers.map((m) => {
                   const c = m.color ?? DEFAULT_COLOR;
                   return (
                     <span
                       key={m.user_id}
-                      // Audit M9: bump from w-4/h-4 to w-5/h-5 and show full
-                      // 2-char initials. With 3+ members the single-letter
-                      // version was hard to disambiguate.
                       className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ring-1 ring-white dark:ring-zinc-900"
                       style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
                       title={m.short_name}
@@ -626,14 +630,45 @@ export default function PantryItem({
               </div>
             )}
           </div>
-          <div className="flex items-center justify-between mt-auto">
-            {expiry
-              ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
-              : <span className="text-xs text-gray-300 dark:text-zinc-600">—</span>
-            }
-            <span className={`text-xs font-semibold tabular-nums ${item.running_low ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
+        ) : (
+          /* Compact card layout (default). Audit P1: dropped the bare
+             "opened" (orange) and "notes" (blue) glance dots — they were
+             unlabelled, present 5% of the time, and meaningless on first
+             encounter. Those properties remain visible & editable in the
+             bottom-sheet. Audit N4: dropped the fixed min-h. */
+          <div className="p-3 flex flex-col gap-2">
+            <div className="flex items-start gap-1.5">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-50 leading-snug line-clamp-2 flex-1">{item.name}</p>
+              {assignedMembers.length > 0 && (
+                <div className="flex -space-x-1 flex-shrink-0 mt-[1px]">
+                  {assignedMembers.map((m) => {
+                    const c = m.color ?? DEFAULT_COLOR;
+                    return (
+                      <span
+                        key={m.user_id}
+                        // Audit M9: bump from w-4/h-4 to w-5/h-5 and show full
+                        // 2-char initials. With 3+ members the single-letter
+                        // version was hard to disambiguate.
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ring-1 ring-white dark:ring-zinc-900"
+                        style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
+                        title={m.short_name}
+                      >
+                        {m.initials}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between mt-auto">
+              {expiry
+                ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
+                : <span className="text-xs text-gray-300 dark:text-zinc-600">—</span>
+              }
+              <span className={`text-xs font-semibold tabular-nums ${item.running_low ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
+            </div>
           </div>
-        </div>
+        )}
       </motion.div>
 
       {/* ── Bottom sheet (portal) ─────────────────────────────── */}
