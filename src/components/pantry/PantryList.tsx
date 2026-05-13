@@ -226,6 +226,11 @@ interface SectionProps {
   showFridgeZones?: boolean;
   /** Pantry item render variant — passed to each card. */
   layout: ViewLayout;
+  /** Controlled open state — persisted at parent level (P4). */
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  /** Long-press handler: collapse all OTHER sections, leaving this one open. */
+  onIsolate: () => void;
   onToggleExpand: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
@@ -243,13 +248,47 @@ function StorageSection({
   expandedId,
   showFridgeZones = false,
   layout,
+  isOpen,
+  onToggleOpen,
+  onIsolate,
   onToggleExpand,
   onUpdateQuantity,
   onUpdateItem,
   onDelete,
   onAddToShoppingList,
 }: SectionProps) {
-  const [open, setOpen] = useState(true);
+  const open = isOpen;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+
+  // Long-press the header → "show only this section" (P4 sub-feature).
+  // Useful when the user only cares about the fridge today and has 50+
+  // pantry items they don't want to scroll past.
+  function startLongPress() {
+    longPressFired.current = false;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate(20); } catch { /* ignore */ }
+      }
+      onIsolate();
+    }, 500);
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+  function handleHeaderClick() {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onToggleOpen();
+  }
+
   if (items.length === 0) return null;
 
   const isFridge = showFridgeZones && label === "Fridge";
@@ -281,14 +320,21 @@ function StorageSection({
 
   return (
     <div className="flex flex-col gap-1.5">
+      {/* Audit N7 — refined header: uppercase tracking, count right-aligned,
+          smaller chevron. Less "chunky bold" and more iOS-section. */}
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 py-0.5 active:opacity-60 transition-opacity"
+        onClick={handleHeaderClick}
+        onPointerDown={startLongPress}
+        onPointerUp={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        className="flex items-center gap-1.5 py-0.5 w-full active:opacity-60 transition-opacity"
+        title="Long-press to show only this section"
       >
         <motion.svg
           animate={{ rotate: open ? 90 : 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-          className="w-3 h-3 text-gray-400"
+          className="w-2.5 h-2.5 text-gray-400 dark:text-zinc-500 flex-shrink-0"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -296,8 +342,8 @@ function StorageSection({
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </motion.svg>
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{label}</span>
-        <span className="text-xs text-gray-300 dark:text-gray-600 tabular-nums">({items.length})</span>
+        <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">{label}</span>
+        <span className="text-[10px] text-gray-300 dark:text-zinc-600 tabular-nums ml-auto">{items.length}</span>
       </button>
 
       <AnimatePresence initial={false}>
@@ -390,6 +436,37 @@ export default function PantryList({
   // ~36px of vertical real estate forever even though most users never
   // change the defaults.
   const [sortFilterOpen, setSortFilterOpen] = useState(false);
+
+  // Section open state (P4) — persisted per household + kind so a user
+  // who collapses Freezer today still has it collapsed tomorrow. Also
+  // lets the parent implement "isolate this section" (long-press a
+  // header → collapse all others).
+  const SECTION_KEY = `pantry_sections_${householdId}_${kind}`;
+  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(SECTION_KEY);
+      setSectionOpen(raw ? JSON.parse(raw) : {});
+    } catch {
+      setSectionOpen({});
+    }
+  }, [SECTION_KEY]);
+  function persistSectionState(next: Record<string, boolean>) {
+    setSectionOpen(next);
+    if (typeof window !== "undefined") {
+      try { window.localStorage.setItem(SECTION_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    }
+  }
+  function toggleSection(label: string) {
+    const currentlyOpen = sectionOpen[label] ?? true;
+    persistSectionState({ ...sectionOpen, [label]: !currentlyOpen });
+  }
+  function isolateSection(label: string, allLabels: string[]) {
+    const next: Record<string, boolean> = {};
+    for (const l of allLabels) next[l] = l === label;
+    persistSectionState(next);
+  }
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
@@ -528,20 +605,28 @@ export default function PantryList({
   // Running-low scoped to active tab so users only see what's relevant
   const runningLowItems = kindFiltered.filter((i) => i.running_low && !i.running_low_dismissed);
 
+  // Audit P5: items already shown in the running-low strip should NOT
+  // duplicate in their storage section. The strip is the canonical
+  // "needs attention" view; sections are the inventory view. Showing
+  // them twice means the user thinks they have two milks when they
+  // have one running-low milk.
+  const runningLowIds = new Set(runningLowItems.map((i) => i.id));
+  const sectionItems = filtered.filter((i) => !runningLowIds.has(i.id));
+
   // Food sections (only used when kind === 'food')
-  const fridgeItems   = filtered.filter((i) => i.storage_location === "fridge");
-  const freezerItems  = filtered.filter((i) => i.storage_location === "freezer");
-  const pantryItems   = filtered.filter((i) => i.storage_location === "pantry");
-  const roomTempItems = filtered.filter((i) => i.storage_location === "room_temp");
+  const fridgeItems   = sectionItems.filter((i) => i.storage_location === "fridge");
+  const freezerItems  = sectionItems.filter((i) => i.storage_location === "freezer");
+  const pantryItems   = sectionItems.filter((i) => i.storage_location === "pantry");
+  const roomTempItems = sectionItems.filter((i) => i.storage_location === "room_temp");
 
   // Supplies section bins, keyed by SUPPLIES_LOCATIONS values.
   // Items with null/unknown storage_location land in the "other" bin so they
-  // never get hidden from the user.
+  // never get hidden from the user. P5: running-low items already removed.
   const supplyKnown = new Set(SUPPLIES_LOCATIONS.map((l) => l.value as string));
   const suppliesByLocation = SUPPLIES_LOCATIONS.map((loc) => ({
     value: loc.value,
     label: loc.label,
-    items: filtered.filter((i) => {
+    items: sectionItems.filter((i) => {
       // The "other" bin catches three cases: items explicitly placed there,
       // items with no location set, and items with a location we don't know
       // about (e.g. legacy food locations on a row that flipped to supplies).
@@ -557,9 +642,15 @@ export default function PantryList({
   }));
   // Food sections use a fixed list above; "unsorted" food = no storage_location set
   const foodKnown = new Set(["fridge", "freezer", "pantry", "room_temp"]);
-  const unsortedItems = filtered.filter(
+  const unsortedItems = sectionItems.filter(
     (i) => !i.storage_location || !foodKnown.has(i.storage_location)
   );
+
+  // All section labels for the active kind — needed by `isolateSection`
+  // to know which other sections to collapse.
+  const allSectionLabels = kind === "food"
+    ? ["Fridge", "Freezer", "Pantry", "Counter", "Other"]
+    : SUPPLIES_LOCATIONS.map((l) => l.label);
 
   const hasItems = filtered.length > 0;
 
@@ -569,6 +660,14 @@ export default function PantryList({
   };
 
   const sectionProps = { members, currentUserId, householdId, sort, expandedId, layout, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
+  // Helper to build the controlled-section props for each <StorageSection>.
+  function sectionControl(label: string) {
+    return {
+      isOpen: sectionOpen[label] ?? true,
+      onToggleOpen: () => toggleSection(label),
+      onIsolate: () => isolateSection(label, allSectionLabels),
+    };
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -741,18 +840,18 @@ export default function PantryList({
 
           {kind === "food" ? (
             <>
-              <StorageSection label="Fridge"  items={fridgeItems}   showFridgeZones {...sectionProps} />
-              <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} />
-              <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} />
-              <StorageSection label="Counter" items={roomTempItems} {...sectionProps} />
+              <StorageSection label="Fridge"  items={fridgeItems}   showFridgeZones {...sectionProps} {...sectionControl("Fridge")} />
+              <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} {...sectionControl("Freezer")} />
+              <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} {...sectionControl("Pantry")} />
+              <StorageSection label="Counter" items={roomTempItems} {...sectionProps} {...sectionControl("Counter")} />
               {unsortedItems.length > 0 && (
-                <StorageSection label="Other" items={unsortedItems} {...sectionProps} />
+                <StorageSection label="Other" items={unsortedItems} {...sectionProps} {...sectionControl("Other")} />
               )}
             </>
           ) : (
             <>
               {suppliesByLocation.map((bin) => (
-                <StorageSection key={bin.value} label={bin.label} items={bin.items} {...sectionProps} />
+                <StorageSection key={bin.value} label={bin.label} items={bin.items} {...sectionProps} {...sectionControl(bin.label)} />
               ))}
             </>
           )}
