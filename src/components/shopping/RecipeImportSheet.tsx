@@ -52,7 +52,7 @@ function asDrafts(items: ExtractedIngredient[]): Draft[] {
 }
 
 export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
-  const { recipes: { recipes, saveRecipe, deleteRecipe } } = useHouseholdData();
+  const { recipes: { recipes, saveRecipe, updateRecipe, deleteRecipe } } = useHouseholdData();
 
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<Tab>("new");
@@ -74,6 +74,16 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
   const [savedJustNow, setSavedJustNow] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
 
+  // Edit mode for an already-saved recipe (Commit 8).
+  // `editingRecipeId` is the id of the saved recipe being edited; null
+  // means we're either viewing a fresh import or browsing the library.
+  // `editing` is the toggle for the actual edit affordances (rename
+  // input, +/- ingredient controls, save button).
+  const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+
   useEffect(() => { setMounted(true); }, []);
 
   // Lock body scroll while open
@@ -94,6 +104,7 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
       setMode("url");
       setSourceUrl(null); setSourceKind("manual");
       setSaveName(""); setSavedJustNow(false); setSaveBusy(false);
+      setEditingRecipeId(null); setEditing(false); setEditName(""); setEditBusy(false);
     } else {
       // Default tab depends on whether the household has recipes.
       setTab(recipes.length > 0 ? "saved" : "new");
@@ -177,6 +188,58 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
     // No save flow for already-saved recipes — `savedJustNow` flag suppresses it.
     setSavedJustNow(true);
     setSaveName(recipe.name);
+    // Track that this is an editable saved recipe.
+    setEditingRecipeId(recipe.id);
+    setEditing(false);
+    setEditName(recipe.name);
+  }
+
+  /** Append a blank ingredient row (edit mode only). */
+  function addBlankIngredient() {
+    setDrafts((prev) => {
+      const next = prev ? [...prev] : [];
+      const newKey = `new-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      next.push({ key: newKey, name: "", raw: "" });
+      return next;
+    });
+  }
+
+  /** Delete an ingredient row from the working set (edit mode only). */
+  function removeIngredient(key: string) {
+    setDrafts((prev) => (prev ? prev.filter((d) => d.key !== key) : prev));
+  }
+
+  /** Persist edits back to the saved recipe. */
+  async function handleSaveEdits() {
+    if (!editingRecipeId || !drafts) return;
+    const cleanName = editName.trim();
+    if (!cleanName) return;
+    const ingredients = drafts
+      .filter((d) => d.name.trim())
+      .map<ExtractedIngredient>(({ key: _key, skipped: _skipped, ...rest }) => ({ ...rest, name: rest.name.trim() }));
+    setEditBusy(true);
+    try {
+      const ok = await updateRecipe(editingRecipeId, { name: cleanName, ingredients });
+      if (ok) {
+        setEditing(false);
+        setTitle(cleanName);
+        setSaveName(cleanName);
+      }
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  /** Discard local edits, reload from the current saved-recipe state. */
+  function cancelEdits() {
+    if (!editingRecipeId) return;
+    const fresh = recipes.find((r) => r.id === editingRecipeId);
+    if (fresh) {
+      setDrafts(asDrafts(recipeIngredients(fresh)));
+      setEditName(fresh.name);
+      setTitle(fresh.name);
+    }
+    setEditing(false);
   }
 
   async function handleSaveForLater() {
@@ -257,9 +320,34 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
             {/* Header */}
             <div className="flex items-center gap-3 px-5 pt-2 pb-3 flex-shrink-0 border-b border-gray-100 dark:border-zinc-800">
               <div className="flex-1 min-w-0">
-                <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">{headerTitle}</h2>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{headerSubtitle}</p>
+                {editing ? (
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Recipe name"
+                    className="w-full text-base font-semibold text-gray-900 dark:text-gray-50 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2.5 py-1 outline-none focus:border-gray-400 dark:focus:border-zinc-500"
+                  />
+                ) : (
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">{headerTitle}</h2>
+                )}
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{editing ? "Editing saved recipe" : headerSubtitle}</p>
               </div>
+              {/* Pencil button — only shown when viewing a loaded saved
+                  recipe and not yet in edit mode. */}
+              {editingRecipeId && !editing && drafts && (
+                <button
+                  type="button"
+                  onClick={() => { setEditing(true); setEditName(title ?? ""); }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-90"
+                  aria-label="Edit recipe"
+                  title="Edit recipe"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -514,22 +602,37 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                           className={`flex-1 text-sm font-medium bg-transparent outline-none ${d.skipped ? "line-through text-gray-400" : "text-gray-900 dark:text-gray-100"}`}
                           placeholder="Ingredient name"
                         />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDrafts((prev) =>
-                              prev!.map((x) => (x.key === d.key ? { ...x, skipped: !x.skipped } : x)),
-                            )
-                          }
-                          className={`flex-shrink-0 px-2 h-7 flex items-center gap-1 rounded-lg text-[11px] font-medium transition-colors active:scale-95 ${
-                            d.skipped
-                              ? "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
-                              : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
-                          }`}
-                          aria-label={d.skipped ? "Include this item" : "Skip this item"}
-                        >
-                          {d.skipped ? "Restore" : "Skip"}
-                        </button>
+                        {editing ? (
+                          /* In edit mode, the action is a real delete from
+                             the recipe — not a per-trip skip. */
+                          <button
+                            type="button"
+                            onClick={() => removeIngredient(d.key)}
+                            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 dark:text-zinc-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors active:scale-90"
+                            aria-label="Remove from recipe"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDrafts((prev) =>
+                                prev!.map((x) => (x.key === d.key ? { ...x, skipped: !x.skipped } : x)),
+                              )
+                            }
+                            className={`flex-shrink-0 px-2 h-7 flex items-center gap-1 rounded-lg text-[11px] font-medium transition-colors active:scale-95 ${
+                              d.skipped
+                                ? "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
+                                : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
+                            }`}
+                            aria-label={d.skipped ? "Include this item" : "Skip this item"}
+                          >
+                            {d.skipped ? "Restore" : "Skip"}
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
                         {(d.quantity !== undefined || d.unit) && (
@@ -543,6 +646,17 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                     </motion.div>
                   ))}
                 </AnimatePresence>
+              )}
+
+              {/* + Add ingredient — only visible while editing a saved recipe. */}
+              {editing && drafts && (
+                <button
+                  type="button"
+                  onClick={addBlankIngredient}
+                  className="w-full py-2.5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500 transition-colors text-sm font-medium active:scale-[0.98]"
+                >
+                  + Add ingredient
+                </button>
               )}
 
               {/* "Save for next time" — shown after a fresh extract, hidden
@@ -587,6 +701,29 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
             {/* Footer */}
             {drafts && drafts.length > 0 && (() => {
               const keeperCount = drafts.filter((d) => !d.skipped && d.name.trim()).length;
+              const editableCount = drafts.filter((d) => d.name.trim()).length;
+              if (editing) {
+                return (
+                  <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-gray-100 dark:border-zinc-800 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdits}
+                      disabled={editBusy}
+                      className="flex-1 py-3.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-sm font-medium disabled:opacity-50 active:scale-[0.98] transition-transform"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEdits}
+                      disabled={editBusy || !editName.trim() || editableCount === 0}
+                      className="flex-1 py-3.5 rounded-2xl bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-semibold disabled:opacity-50 active:scale-[0.98] transition-transform"
+                    >
+                      {editBusy ? "Saving…" : "Save changes"}
+                    </button>
+                  </div>
+                );
+              }
               return (
                 <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-gray-100 dark:border-zinc-800">
                   <button
