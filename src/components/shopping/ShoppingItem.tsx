@@ -462,7 +462,7 @@ export default function ShoppingItem({
             Note <span className="font-normal">(optional)</span>
           </p>
           <textarea
-            placeholder="Brand, where to find it…"
+            placeholder="Brand, location, anything useful…"
             value={notesDraft}
             onChange={(e) => handleNotesChange(e.target.value)}
             rows={2}
