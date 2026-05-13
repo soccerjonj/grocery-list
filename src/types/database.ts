@@ -238,6 +238,41 @@ export interface Database {
         };
         Update: Record<string, never>;
       };
+      household_recipes: {
+        Row: {
+          id: string;
+          household_id: string;
+          name: string;
+          ingredients: Json;
+          source_url: string | null;
+          source_kind: string; // 'url' | 'photo' | 'manual'
+          added_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          name: string;
+          ingredients: Json;
+          source_url?: string | null;
+          source_kind?: string;
+          added_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          name?: string;
+          ingredients?: Json;
+          source_url?: string | null;
+          source_kind?: string;
+          added_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 }
@@ -249,6 +284,7 @@ export type HouseholdMember = Database["public"]["Tables"]["household_members"][
 export type ShoppingList = Database["public"]["Tables"]["shopping_lists"]["Row"];
 export type PantryItem = Database["public"]["Tables"]["pantry_items"]["Row"];
 export type ShoppingItem = Database["public"]["Tables"]["shopping_items"]["Row"];
+export type HouseholdRecipe = Database["public"]["Tables"]["household_recipes"]["Row"];
 
 // ── Derived display types ─────────────────────────────────────────
 
