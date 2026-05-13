@@ -259,6 +259,48 @@ export function getPantryHint(name: string): PantryHint | null {
   return null;
 }
 
+/**
+ * Like `getPantryHint` but falls back to the server-side AI classifier
+ * (T3-D) when the keyword lookup returns nothing. Always returns
+ * synchronously what we know now; if the keyword lookup misses, fires
+ * the network call and resolves the returned promise when the LLM
+ * answers. Callers typically use this in a debounced effect.
+ *
+ * The fallback's result is cached server-side, so subsequent calls for
+ * the same name skip the LLM entirely (~50 ms response from cache).
+ */
+export async function getOrClassify(name: string): Promise<PantryHint | null> {
+  const local = getPantryHint(name);
+  if (local) return local;
+  if (!name || name.trim().length < 3) return null;
+
+  try {
+    const res = await fetch("/api/classify-item", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      kind?: "food" | "supplies";
+      food_category?: string | null;
+      storage_location?: string | null;
+      fridge_zone?: string | null;
+    };
+    if (data.kind !== "food" && data.kind !== "supplies") return null;
+    return {
+      kind: data.kind,
+      food_category: data.food_category ?? "other",
+      storage_location: data.storage_location ?? (data.kind === "supplies" ? "other" : "pantry"),
+      ...(data.fridge_zone === "quick_use" || data.fridge_zone === "long_term"
+        ? { fridge_zone: data.fridge_zone }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Suggested days to expiry based on where/what the item is. Food only. */
 export function getSuggestedExpiryDays(storage: string, category: string): number | null {
   if (!storage) return null;

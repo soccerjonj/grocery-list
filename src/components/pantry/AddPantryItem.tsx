@@ -8,7 +8,7 @@ import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
 import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES, SUPPLIES_LOCATIONS, SUPPLIES_CATEGORIES, type Kind } from "@/types/database";
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
-import { getPantryHint, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
+import { getPantryHint, getOrClassify, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
 import AmountField from "@/components/ui/AmountField";
 import BarcodeScanner from "@/components/pantry/BarcodeScanner";
 import { lookupBarcode } from "@/lib/openFoodFacts";
@@ -90,33 +90,53 @@ export default function AddPantryItem({
     return () => { document.body.style.overflow = ""; };
   }, [sheetOpen]);
 
-  // ── Name change with debounced auto-detect
+  // ── Name change with debounced auto-detect.
+  // Keyword classifier (pantryHints) runs first and synchronously. If it
+  // returns null, fall through to the AI classifier (T3-D) — it's a
+  // network call but the result is cached server-side after first hit.
+  function applyHint(hint: ReturnType<typeof getPantryHint>) {
+    if (!hint) {
+      setAutoDetected(false);
+      return;
+    }
+    if (hint.kind !== kind) {
+      setKind(hint.kind);
+      setKindAutoDetected(true);
+      setStorageLocation(hint.storage_location);
+      setFoodCategory(hint.food_category);
+      setFridgeZone(hint.fridge_zone ?? "");
+    } else {
+      setStorageLocation((prev) => prev || hint.storage_location);
+      setFoodCategory((prev) => prev || hint.food_category);
+      if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
+    }
+    setAutoDetected(true);
+  }
+
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setName(val);
     setShowSuggestions(true);
     if (autoDetectTimer.current) clearTimeout(autoDetectTimer.current);
-    autoDetectTimer.current = setTimeout(() => {
-      const hint = getPantryHint(val);
-      if (hint) {
-        // If the hint's kind disagrees with the active tab, switch — this is
-        // the "user typed 'toothpaste' on Food tab" case.
-        if (hint.kind !== kind) {
-          setKind(hint.kind);
-          setKindAutoDetected(true);
-          // Clear any stale storage/category chosen for the wrong kind
-          setStorageLocation(hint.storage_location);
-          setFoodCategory(hint.food_category);
-          setFridgeZone(hint.fridge_zone ?? "");
-        } else {
-          setStorageLocation((prev) => prev || hint.storage_location);
-          setFoodCategory((prev) => prev || hint.food_category);
-          if (hint.fridge_zone) setFridgeZone((prev) => prev || hint.fridge_zone!);
-        }
-        setAutoDetected(true);
-      } else {
-        setAutoDetected(false);
+    autoDetectTimer.current = setTimeout(async () => {
+      const local = getPantryHint(val);
+      if (local) {
+        applyHint(local);
+        return;
       }
+      // Fallback: ask the server-side AI classifier (T3-D). Use the
+      // current input as the cancellation token — if the user has
+      // typed more by the time the network call resolves, ignore it.
+      const tokenAtRequest = val.trim();
+      const ai = await getOrClassify(val);
+      // Stale-response guard: bail if the user has edited the name in
+      // the meantime, or if they've already opened the sheet.
+      if (!ai) {
+        setAutoDetected(false);
+        return;
+      }
+      if (nameRef.current && nameRef.current.value.trim() !== tokenAtRequest) return;
+      applyHint(ai);
     }, 350);
   }
 
