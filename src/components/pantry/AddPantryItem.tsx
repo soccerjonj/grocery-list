@@ -10,6 +10,8 @@ import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES, SUPPLIES_LOCATIONS, S
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
 import { getPantryHint, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
 import AmountField from "@/components/ui/AmountField";
+import BarcodeScanner from "@/components/pantry/BarcodeScanner";
+import { lookupBarcode } from "@/lib/openFoodFacts";
 
 interface AddPantryItemProps {
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
@@ -68,6 +70,10 @@ export default function AddPantryItem({
   // ── Duplicate
   const [duplicate, setDuplicate] = useState<{ id: string; quantity: number } | null>(null);
   const [conflictAction, setConflictAction] = useState<"merge" | "add">("merge");
+
+  // ── Barcode scanner (T3-C)
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanLookupBusy, setScanLookupBusy] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const autoDetectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -185,6 +191,42 @@ export default function AddPantryItem({
   function handleNameSubmit(e: React.FormEvent) {
     e.preventDefault();
     openSheet();
+  }
+
+  /**
+   * Called when the barcode scanner detects a code (T3-C). We:
+   *   1. Look up the barcode against OpenFoodFacts (free, public).
+   *   2. Pre-fill name, qty, unit from the response.
+   *   3. Fall through to pantryHints / kind detection in openSheet().
+   *   4. If the barcode isn't in OFF, we still open the sheet but with an
+   *      empty name — the user can type. Better than a dead-end.
+   */
+  async function handleBarcodeDetect(code: string) {
+    setScannerOpen(false);
+    setScanLookupBusy(true);
+    try {
+      const product = await lookupBarcode(code);
+      if (product?.name) {
+        setName(product.name);
+        if (product.unit) setUnit(product.unit);
+        if (product.quantity) setQuantity(String(product.quantity));
+        // If OFF returned a strong category hint, let it seed kind; the
+        // existing openSheet logic will further refine via pantryHints.
+        if (product.categoryHint && product.categoryHint !== kind) {
+          setKind(product.categoryHint);
+          setKindAutoDetected(true);
+        }
+        // Defer openSheet by a microtask so the state updates flush first.
+        setTimeout(() => openSheet(product.name), 0);
+      } else {
+        // No match — open the sheet anyway with the barcode as a placeholder
+        // hint. User can rename.
+        setName("");
+        nameRef.current?.focus();
+      }
+    } finally {
+      setScanLookupBusy(false);
+    }
   }
 
   function closeSheet() {
@@ -538,6 +580,29 @@ export default function AddPantryItem({
             className="flex-1 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
           />
 
+          {/* Barcode-scan button (T3-C) — only visible when the input is
+              empty, since once they've started typing the → submit is the
+              primary action. Tap opens the fullscreen scanner. */}
+          {!name.trim() && (
+            <motion.button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              disabled={scanLookupBusy}
+              whileTap={{ scale: 0.88 }}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 flex-shrink-0"
+              aria-label="Scan barcode"
+            >
+              {scanLookupBusy ? (
+                <div className="w-3 h-3 border-2 border-gray-300 dark:border-zinc-600 border-t-gray-600 dark:border-t-zinc-300 rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 8v8M10 8v8M13 8v8M17 8v8" />
+                </svg>
+              )}
+            </motion.button>
+          )}
+
           {/* → button: opens detail sheet */}
           <motion.button
             type="submit"
@@ -594,6 +659,13 @@ export default function AddPantryItem({
       </form>
 
       {sheet}
+
+      {/* Barcode scanner (T3-C) — rendered as a fullscreen portal */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onDetect={handleBarcodeDetect}
+        onClose={() => setScannerOpen(false)}
+      />
     </div>
   );
 }
