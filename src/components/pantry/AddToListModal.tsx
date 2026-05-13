@@ -7,6 +7,7 @@ import { useItemSuggestions } from "@/hooks/useItemSuggestions";
 import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import AmountField from "@/components/ui/AmountField";
 
 interface Props {
   itemName: string;
@@ -18,7 +19,9 @@ interface Props {
 }
 
 export default function AddToListModal({ itemName, householdId, members, currentUserId, onConfirm, onClose }: Props) {
-  const [qty, setQty] = useState("");
+  // Default qty to "1" (T2-F): the empty-then-tap-+ dance was confusing,
+  // and the most common case is "I want one of these".
+  const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
   const [store, setStore] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
@@ -110,15 +113,10 @@ export default function AddToListModal({ itemName, householdId, members, current
 
           {!duplicate && (
             <>
-              {/* Qty + unit */}
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Quantity &amp; unit</p>
-                <div className="flex gap-2">
-                  <input type="number" min="1" step="any" placeholder="Qty" value={qty} onChange={(e) => setQty(e.target.value)}
-                    className="w-20 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 text-center transition-colors" />
-                  <input type="text" placeholder="Unit (optional)" value={unit} onChange={(e) => setUnit(e.target.value)}
-                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors" />
-                </div>
+              {/* Amount — stepper + unit chips, same as AddShoppingItem (T1-A) */}
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Amount</p>
+                <AmountField quantity={qty} unit={unit} onQuantityChange={setQty} onUnitChange={setUnit} size="sm" />
               </div>
 
               {/* Store */}

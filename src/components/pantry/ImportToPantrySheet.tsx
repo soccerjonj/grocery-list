@@ -10,6 +10,7 @@ import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { getPantryDuplicates, increasePantryQty } from "@/lib/checkPantryDuplicate";
 import { getPantryHint } from "@/lib/pantryHints";
+import AmountField from "@/components/ui/AmountField";
 
 interface DraftItem {
   key: string;
@@ -37,37 +38,8 @@ interface ImportToPantrySheetProps {
   onClose: () => void;
 }
 
-// ── Quantity stepper ──────────────────────────────────────────────
-function QtyControl({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-}) {
-  const display = value % 1 === 0 ? String(value) : value.toFixed(1);
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(0.5, value - 1))}
-        className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 flex items-center justify-center text-base font-light active:scale-90 transition-transform"
-      >
-        −
-      </button>
-      <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-        {display}
-      </span>
-      <button
-        type="button"
-        onClick={() => onChange(value + 1)}
-        className="w-7 h-7 rounded-lg bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center text-base font-light active:scale-90 transition-transform"
-      >
-        +
-      </button>
-    </div>
-  );
-}
+// Quantity controls now use the shared `AmountField` from
+// @/components/ui/AmountField — see DraftCard.
 
 // ── Single draft item card ─────────────────────────────────────────
 function DraftCard({
@@ -84,21 +56,14 @@ function DraftCard({
   currentUserId?: string | null;
 }) {
   const [nameVal, setNameVal] = useState(item.name);
-  const [unitVal, setUnitVal] = useState(item.unit);
 
   // Keep local inputs in sync if parent resets
   useEffect(() => { setNameVal(item.name); }, [item.name]);
-  useEffect(() => { setUnitVal(item.unit); }, [item.unit]);
 
   function commitName() {
     const trimmed = nameVal.trim();
     if (trimmed && trimmed !== item.name) onChange({ name: trimmed });
     else setNameVal(item.name);
-  }
-
-  function commitUnit() {
-    const trimmed = unitVal.trim();
-    onChange({ unit: trimmed });
   }
 
   return (
@@ -150,22 +115,14 @@ function DraftCard({
         </button>
       </div>
 
-      {/* Row 2: qty stepper + unit input */}
-      <div className="flex items-center gap-3">
-        <QtyControl
-          value={item.quantity}
-          onChange={(n) => onChange({ quantity: n })}
-        />
-        <input
-          type="text"
-          value={unitVal}
-          onChange={(e) => setUnitVal(e.target.value)}
-          onBlur={commitUnit}
-          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-          placeholder="unit"
-          className="w-16 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-600"
-        />
-      </div>
+      {/* Amount — shared stepper + unit chips (T1-A unification) */}
+      <AmountField
+        quantity={item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toString()}
+        unit={item.unit}
+        onQuantityChange={(q) => onChange({ quantity: q ? parseFloat(q) : 1 })}
+        onUnitChange={(u) => onChange({ unit: u })}
+        size="sm"
+      />
 
       {/* Row 2.5: Food / Supplies toggle */}
       <div className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-zinc-800 self-start">

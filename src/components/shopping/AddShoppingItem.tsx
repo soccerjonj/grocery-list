@@ -6,6 +6,7 @@ import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggesti
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import AmountField from "@/components/ui/AmountField";
 
 interface AddShoppingItemProps {
   onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null, notes?: string) => void;
@@ -14,11 +15,10 @@ interface AddShoppingItemProps {
   currentUserId?: string | null;
 }
 
-const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
-
 export default function AddShoppingItem({ onAdd, householdId, members = [], currentUserId }: AddShoppingItemProps) {
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("");
+  // Default qty "1" (T2-F): the empty-then-tap-+ dance was confusing.
+  const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
   const [store, setStore] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
@@ -82,8 +82,16 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   }
 
   function doAdd() {
-    onAdd(name.trim(), quantity ? parseFloat(quantity) : undefined, unit || undefined, store.trim() || undefined, assignedTo, notes.trim() || undefined);
-    setName(""); setQuantity(""); setUnit(""); setStore(""); setAssignedTo(null); setNotes("");
+    const qtyNum = quantity ? parseFloat(quantity) : undefined;
+    onAdd(
+      name.trim(),
+      qtyNum && qtyNum > 0 ? qtyNum : undefined,
+      unit || undefined,
+      store.trim() || undefined,
+      assignedTo,
+      notes.trim() || undefined,
+    );
+    setName(""); setQuantity("1"); setUnit(""); setStore(""); setAssignedTo(null); setNotes("");
     if (customStoreMode && store.trim()) saveStore(store.trim());
     setShowSuggestions(false); setCustomStoreMode(false); setManagingStores(false); setDuplicate(null);
     setSubmitted(true);
@@ -94,7 +102,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
     if (!duplicate) return;
     await increaseShoppingQty(duplicate.id, duplicate.quantity, quantity ? parseFloat(quantity) : 1);
     setDuplicate(null);
-    setName(""); setQuantity(""); setUnit(""); setStore(""); setAssignedTo(null);
+    setName(""); setQuantity("1"); setUnit(""); setStore(""); setAssignedTo(null);
     collapse();
   }
 
@@ -123,16 +131,18 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
             className="flex-1 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
           />
 
-          {/* Amount preview chip — visible when collapsed and amount is set */}
+          {/* Amount preview chip — visible when collapsed and amount differs
+              from the default of "1". With default qty "1" (T2-F) we hide
+              the chip unless the user explicitly customized it. */}
           <AnimatePresence initial={false}>
-            {!expanded && (quantity || unit) && (
+            {!expanded && ((quantity && quantity !== "1") || unit) && (
               <motion.span
                 initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.12 }}
                 className="flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs font-medium text-gray-600 dark:text-gray-300 flex-shrink-0"
               >
                 {[quantity, unit].filter(Boolean).join(" ")}
-                <button type="button" onClick={(e) => { e.stopPropagation(); setQuantity(""); setUnit(""); }}
+                <button type="button" onClick={(e) => { e.stopPropagation(); setQuantity("1"); setUnit(""); }}
                   className="w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-gray-400">×</button>
               </motion.span>
             )}
@@ -264,31 +274,10 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                     </div>
                   </div>
                 )}
-                {/* Amount: stepper + unit chips */}
+                {/* Amount: stepper + unit chips (shared, T1-A unification) */}
                 <div className="flex flex-col gap-2">
                   <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Amount</p>
-                  <div className="flex items-center gap-1.5">
-                    <button type="button"
-                      onClick={() => { const n = (parseFloat(quantity) || 1) - 1; setQuantity(n <= 0 ? "" : String(n)); }}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-lg leading-none active:scale-90 transition-transform">−</button>
-                    <input type="number" min="1" step="any" placeholder="—"
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      className="w-12 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-lg py-1 bg-transparent dark:bg-zinc-800 placeholder:text-gray-300 dark:placeholder:text-zinc-600" />
-                    <button type="button"
-                      onClick={() => setQuantity(String((parseFloat(quantity) || 0) + 1))}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-lg leading-none active:scale-90 transition-transform">+</button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COMMON_UNITS.map((u) => (
-                      <button key={u} type="button" onClick={() => setUnit(unit === u ? "" : u)}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                          unit === u
-                            ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                            : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
-                        }`}>{u}</button>
-                    ))}
-                  </div>
+                  <AmountField quantity={quantity} unit={unit} onQuantityChange={setQuantity} onUnitChange={setUnit} size="sm" />
                 </div>
                 {/* Note */}
                 <div className="flex flex-col gap-1.5">

@@ -9,6 +9,7 @@ import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggesti
 import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES, SUPPLIES_LOCATIONS, SUPPLIES_CATEGORIES, type Kind } from "@/types/database";
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
 import { getPantryHint, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
+import AmountField from "@/components/ui/AmountField";
 
 interface AddPantryItemProps {
   onAdd: (name: string, quantity: number, unit?: string, options?: AddPantryOptions) => void;
@@ -20,7 +21,8 @@ interface AddPantryItemProps {
   kind: Kind;
 }
 
-const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
+// Common units now live in `AmountField`. Kept here only when callers
+// need to override the chip list.
 
 export default function AddPantryItem({
   onAdd,
@@ -38,7 +40,7 @@ export default function AddPantryItem({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // ── Detail fields
+  // ── Detail fields. Quantity defaults to "1" (T2-F).
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
   const [storageLocation, setStorageLocation] = useState("");
@@ -349,35 +351,10 @@ export default function AddPantryItem({
                     </div>
                   )}
 
-                  {/* Amount */}
+                  {/* Amount — shared stepper + chips (T1-A) */}
                   <div className="flex flex-col gap-2">
                     <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Amount</p>
-                    <div className="flex items-center gap-2">
-                      <button type="button"
-                        onClick={() => setQuantity(String(Math.max(0.5, (parseFloat(quantity) || 1) - 1)))}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-lg leading-none active:scale-90 transition-transform flex-shrink-0"
-                      >−</button>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        className="w-14 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-xl py-2 bg-transparent dark:bg-zinc-800"
-                      />
-                      <button type="button"
-                        onClick={() => setQuantity(String((parseFloat(quantity) || 1) + 1))}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-lg leading-none active:scale-90 transition-transform flex-shrink-0"
-                      >+</button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {COMMON_UNITS.map((u) => (
-                        <button key={u} type="button"
-                          onClick={() => setUnit(unit === u ? "" : u)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${unit === u ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                        >{u}</button>
-                      ))}
-                    </div>
+                    <AmountField quantity={quantity} unit={unit} onQuantityChange={setQuantity} onUnitChange={setUnit} size="md" />
                   </div>
 
                   {/* Storage / Location */}

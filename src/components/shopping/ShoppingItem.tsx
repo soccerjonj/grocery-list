@@ -8,11 +8,7 @@ import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { useItemSuggestions } from "@/hooks/useItemSuggestions";
-
-// Keep in sync with AddShoppingItem's unit chips so add + edit feel
-// like the same flow. If we ever extract these to a shared module,
-// AddShoppingItem should use the same import.
-const COMMON_UNITS = ["kg", "g", "lb", "oz", "L", "mL", "pack", "can", "bag", "box", "bottle"];
+import AmountField from "@/components/ui/AmountField";
 
 interface ShoppingItemProps {
   item: ShoppingItemType;
@@ -193,49 +189,10 @@ export default function ShoppingItem({
                 />
               </div>
 
-              {/* Amount — stepper + unit chips, matches AddShoppingItem */}
+              {/* Amount — shared stepper + chips (T1-A unification) */}
               <div className="flex flex-col gap-2">
                 <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Amount</p>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const n = (parseFloat(editQty) || 1) - 1;
-                      setEditQty(n <= 0 ? "" : String(n));
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-lg leading-none active:scale-90 transition-transform"
-                  >−</button>
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    placeholder="—"
-                    value={editQty}
-                    onChange={(e) => setEditQty(e.target.value)}
-                    className="w-12 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none border border-gray-200 dark:border-zinc-700 rounded-lg py-1 bg-transparent dark:bg-zinc-800 placeholder:text-gray-300 dark:placeholder:text-zinc-600"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditQty(String((parseFloat(editQty) || 0) + 1))}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-lg leading-none active:scale-90 transition-transform"
-                  >+</button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {COMMON_UNITS.map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      onClick={() => setEditUnit(editUnit === u ? "" : u)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        editUnit === u
-                          ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                          : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
-                      }`}
-                    >
-                      {u}
-                    </button>
-                  ))}
-                </div>
+                <AmountField quantity={editQty} unit={editUnit} onQuantityChange={setEditQty} onUnitChange={setEditUnit} size="sm" />
               </div>
 
               {/* Store */}
