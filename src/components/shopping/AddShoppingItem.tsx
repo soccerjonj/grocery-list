@@ -7,20 +7,58 @@ import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 import AmountField from "@/components/ui/AmountField";
+import { getPantryHint } from "@/lib/pantryHints";
+import {
+  STORAGE_LOCATIONS,
+  FOOD_CATEGORIES,
+  SUPPLIES_LOCATIONS,
+  SUPPLIES_CATEGORIES,
+} from "@/types/database";
 
 interface AddShoppingItemProps {
   onAdd: (name: string, quantity?: number, unit?: string, store?: string, assignedTo?: string[] | null, notes?: string) => void;
   householdId: string;
   members?: MemberProfile[];
   currentUserId?: string | null;
+  /** Names already on the list — excluded from "recently bought" chips. */
+  existingNames?: string[];
 }
 
-export default function AddShoppingItem({ onAdd, householdId, members = [], currentUserId }: AddShoppingItemProps) {
+const STORAGE_LABEL = Object.fromEntries(
+  [...STORAGE_LOCATIONS, ...SUPPLIES_LOCATIONS].map((l) => [l.value, l.label])
+);
+const CATEGORY_LABEL = Object.fromEntries(
+  [...FOOD_CATEGORIES, ...SUPPLIES_CATEGORIES].map((c) => [c.value, c.label])
+);
+
+/**
+ * "Where will this land?" preview — shown under the name input as the user
+ * types. Reuses the existing pantryHints classifier; if it doesn't recognize
+ * the name we render nothing rather than guessing wrong. (T2-A)
+ */
+function buildLandingPreview(name: string): string | null {
+  const hint = getPantryHint(name);
+  if (!hint) return null;
+  const tab = hint.kind === "supplies" ? "Supplies" : "Pantry";
+  const cat = CATEGORY_LABEL[hint.food_category];
+  const loc = STORAGE_LABEL[hint.storage_location];
+  return [tab, cat, loc].filter(Boolean).join(" · ");
+}
+
+const LAST_STORE_KEY = (householdId: string) => `last_store_${householdId}`;
+
+export default function AddShoppingItem({ onAdd, householdId, members = [], currentUserId, existingNames = [] }: AddShoppingItemProps) {
   const [name, setName] = useState("");
   // Default qty "1" (T2-F): the empty-then-tap-+ dance was confusing.
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
-  const [store, setStore] = useState("");
+  // Last-store memory (T1-B): sessionStorage so adding 10 items to the
+  // same trip doesn't require picking "Target" 10 times. Cleared on
+  // session end so a new shopping trip the next day starts fresh.
+  const [store, setStore] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.sessionStorage.getItem(LAST_STORE_KEY(householdId)) ?? "";
+  });
   const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
   const [notes, setNotes] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -30,12 +68,29 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   const nameRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { getSuggestions, getStores, saveStore, deleteStore, savedStores } = useItemSuggestions(householdId);
+  const { getSuggestions, getRecent, getStores, saveStore, deleteStore, savedStores } = useItemSuggestions(householdId);
   const suggestions = getSuggestions(name, 5);
+  const recentChips = name.trim() ? [] : getRecent(8, existingNames);
   const knownStores = getStores();
   const [customStoreMode, setCustomStoreMode] = useState(false);
   const [managingStores, setManagingStores] = useState(false);
   const [duplicate, setDuplicate] = useState<{ id: string; quantity: number } | null>(null);
+
+  // Landing preview (T2-A): what will pantryHints route this to?
+  const landingPreview = buildLandingPreview(name);
+
+  // Multi-line / comma-separated parser for T1-E bulk-add.
+  // Trim, split on commas or newlines, drop empties, cap at 20 to prevent
+  // accidental megalists. Returns 0 or 1 items → treat as single-add.
+  function parseBulkNames(raw: string): string[] {
+    return raw
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+  }
+  const bulkNames = parseBulkNames(name);
+  const isBulk = bulkNames.length > 1;
 
   // Close on outside tap
   useEffect(() => {
@@ -76,9 +131,28 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    // Bulk-add path (T1-E): when the user pasted or typed multiple names
+    // separated by commas or newlines, add them all in one go. We skip
+    // the duplicate check here — the prompt would be confusing for many
+    // items and the user is in "bulk" intent.
+    if (isBulk) {
+      doBulkAdd();
+      return;
+    }
     const dup = await checkShoppingDuplicate(householdId, name.trim());
     if (dup) { setDuplicate(dup); return; }
     doAdd();
+  }
+
+  /** Persist the chosen store for future adds in this session (T1-B). */
+  function rememberStore() {
+    if (typeof window === "undefined") return;
+    const trimmed = store.trim();
+    if (trimmed) {
+      window.sessionStorage.setItem(LAST_STORE_KEY(householdId), trimmed);
+    } else {
+      window.sessionStorage.removeItem(LAST_STORE_KEY(householdId));
+    }
   }
 
   function doAdd() {
@@ -91,8 +165,38 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
       assignedTo,
       notes.trim() || undefined,
     );
-    setName(""); setQuantity("1"); setUnit(""); setStore(""); setAssignedTo(null); setNotes("");
     if (customStoreMode && store.trim()) saveStore(store.trim());
+    rememberStore();
+    // Reset name + qty/unit/notes but KEEP store (T1-B) and assignedTo —
+    // those are sticky within a session because they're usually the
+    // same for the next 8 items you add.
+    setName(""); setQuantity("1"); setUnit(""); setNotes("");
+    setShowSuggestions(false); setCustomStoreMode(false); setManagingStores(false); setDuplicate(null);
+    setSubmitted(true);
+    setTimeout(() => { setSubmitted(false); nameRef.current?.focus(); }, 700);
+  }
+
+  /**
+   * Bulk-add: split the name input by commas/newlines, fire onAdd for
+   * each name with the shared metadata (qty / unit / store / assignedTo).
+   * Skips duplicate detection — the user clearly intends bulk-add. (T1-E)
+   */
+  function doBulkAdd() {
+    const qtyNum = quantity ? parseFloat(quantity) : undefined;
+    const qtyToUse = qtyNum && qtyNum > 0 ? qtyNum : undefined;
+    for (const itemName of bulkNames) {
+      onAdd(
+        itemName,
+        qtyToUse,
+        unit || undefined,
+        store.trim() || undefined,
+        assignedTo,
+        undefined, // notes intentionally not duplicated across bulk items
+      );
+    }
+    if (customStoreMode && store.trim()) saveStore(store.trim());
+    rememberStore();
+    setName(""); setQuantity("1"); setUnit(""); setNotes("");
     setShowSuggestions(false); setCustomStoreMode(false); setManagingStores(false); setDuplicate(null);
     setSubmitted(true);
     setTimeout(() => { setSubmitted(false); nameRef.current?.focus(); }, 700);
@@ -242,6 +346,87 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
                   )}
                 </button>
               ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Recently-bought chips — empty-state shortcut (T1-D) ─── */}
+        <AnimatePresence>
+          {showSuggestions && !name.trim() && recentChips.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="overflow-hidden border-t border-gray-50 dark:border-zinc-800"
+            >
+              <div className="px-4 py-3 flex flex-col gap-2">
+                <p className="text-[10px] font-semibold tracking-wider uppercase text-gray-400 dark:text-gray-500">Recently bought</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentChips.map((s) => (
+                    <button
+                      key={s.name}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applySuggestion(s); }}
+                      onTouchEnd={(e) => { e.preventDefault(); applySuggestion(s); }}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-[0.94]"
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Landing preview (T2-A): "→ Pantry · Dairy · Fridge" ─── */}
+        <AnimatePresence>
+          {!isBulk && landingPreview && name.trim() && (
+            <motion.div
+              key="landing"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15 }}
+              className="overflow-hidden border-t border-gray-50 dark:border-zinc-800"
+            >
+              <p className="px-4 py-2 text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                {landingPreview}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Bulk-add preview (T1-E) ──────────────────────────── */}
+        <AnimatePresence>
+          {isBulk && (
+            <motion.div
+              key="bulk-preview"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18 }}
+              className="overflow-hidden border-t border-gray-50 dark:border-zinc-800"
+            >
+              <div className="px-4 py-3 flex flex-col gap-2 bg-blue-50/40 dark:bg-blue-950/20">
+                <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                  {bulkNames.length} items detected — tap + to add all
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {bulkNames.map((n, i) => (
+                    <span
+                      key={`${n}-${i}`}
+                      className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-900/50 text-gray-700 dark:text-gray-200"
+                    >
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

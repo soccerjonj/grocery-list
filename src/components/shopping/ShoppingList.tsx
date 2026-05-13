@@ -160,7 +160,15 @@ export default function ShoppingList({
 
   return (
     <div className="flex flex-col gap-3">
-      {!readOnly && <AddShoppingItem onAdd={onAdd} householdId={householdId} members={members} currentUserId={currentUserId} />}
+      {!readOnly && (
+        <AddShoppingItem
+          onAdd={onAdd}
+          householdId={householdId}
+          members={members}
+          currentUserId={currentUserId}
+          existingNames={[...activeItems, ...completedItems].map((i) => i.name)}
+        />
+      )}
 
       {isEmpty ? (
         <div className="flex flex-col items-center py-14 gap-3">

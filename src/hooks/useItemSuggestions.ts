@@ -88,6 +88,20 @@ export function useItemSuggestions(householdId: string) {
       .slice(0, limit);
   }
 
+  /**
+   * Top-N most-recently-used items, no query filter. Used to surface
+   * "tap to add" chips in the empty-state of the add form so a common
+   * weekly item is one tap away (T1-D). Excludes any names in `exclude`
+   * so already-on-list items don't show up as add-again suggestions.
+   */
+  function getRecent(limit = 8, exclude: string[] = []): ItemSuggestion[] {
+    if (!suggestions.length) return [];
+    const excludeSet = new Set(exclude.map((n) => n.trim().toLowerCase()));
+    return suggestions
+      .filter((s) => !excludeSet.has(s.name.toLowerCase()))
+      .slice(0, limit);
+  }
+
   /** All unique stores (saved + history), sorted A-Z. */
   function getStores(): string[] {
     const seen = new Set<string>(savedStores);
@@ -116,5 +130,5 @@ export function useItemSuggestions(householdId: string) {
     setSavedStores((prev) => prev.filter((s) => s !== name));
   }
 
-  return { suggestions, getSuggestions, getStores, saveStore, deleteStore, savedStores };
+  return { suggestions, getSuggestions, getRecent, getStores, saveStore, deleteStore, savedStores };
 }
