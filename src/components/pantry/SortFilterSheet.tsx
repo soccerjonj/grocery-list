@@ -19,7 +19,7 @@ import { FOOD_CATEGORIES, SUPPLIES_CATEGORIES } from "@/types/database";
  * sections. Reset puts everything back to defaults in one tap.
  */
 
-export type SortKey = "freshness" | "expiry" | "name" | "category" | "quantity";
+export type SortKey = "expiry" | "name" | "category" | "quantity";
 export type ViewLayout = "compact" | "list";
 
 interface Props {
@@ -61,7 +61,9 @@ export default function SortFilterSheet({
   }, [open]);
 
   const categories = kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
-  const defaultSort: SortKey = kind === "supplies" ? "name" : "freshness";
+  // Default sort is "name" for both kinds now — urgent items surface in the
+  // Use Soon / Running Low strips at the top of the list (audit P2).
+  const defaultSort: SortKey = "name";
   const isDefault = sort === defaultSort && !filterCategory && view === "compact";
 
   function resetAll() {

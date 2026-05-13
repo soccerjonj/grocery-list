@@ -37,58 +37,26 @@ interface PantryListProps {
 
 type SortKey = SortFilterKey;
 
+// Audit P2: dropped "Freshness" sort. It was a 6-tier hidden scoring
+// algorithm that made the list look half-random because the rules
+// weren't surfaced. Replaced with the "Use Soon" section at the top
+// of the page (rendered below) — explicit & visible.
 const FOOD_SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "freshness", label: "Freshness" },
-  { key: "expiry",    label: "Expiry" },
   { key: "name",      label: "Name" },
+  { key: "expiry",    label: "Expiry" },
   { key: "category",  label: "Category" },
-  { key: "quantity",  label: "Quantity" }, // Audit N3: replaced "Recent" — heaviest first is more actionable.
+  { key: "quantity",  label: "Quantity" },
 ];
 
-// Supplies don't expire / don't have freshness logic — fewer options
+// Supplies don't expire — fewer options
 const SUPPLIES_SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "name",      label: "Name" },
   { key: "category",  label: "Category" },
   { key: "quantity",  label: "Quantity" },
 ];
 
-// Location urgency: lower = more perishable / needs attention sooner
-const LOCATION_PRIORITY: Record<string, number> = {
-  fridge: 0,
-  room_temp: 1,
-  freezer: 2,
-  pantry: 3,
-};
-
-function freshnessScore(item: PantryItemType): number {
-  // Items with upcoming expiry get top priority (0–4 range)
-  if (item.expires_at) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.round(
-      (new Date(item.expires_at + "T00:00:00").getTime() - today.getTime()) / 86_400_000
-    );
-    if (diff < 0) return 0;       // expired
-    if (diff === 0) return 1;     // today
-    if (diff <= 2) return 2;      // 1-2 days
-    if (diff <= 7) return 3;      // this week
-    return 4;                     // future expiry
-  }
-  // No expiry — rank by storage location perishability
-  const loc = item.storage_location ?? "";
-  return 5 + (LOCATION_PRIORITY[loc] ?? 4);
-}
-
 function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
   return [...items].sort((a, b) => {
-    if (sort === "freshness") {
-      const sa = freshnessScore(a);
-      const sb = freshnessScore(b);
-      if (sa !== sb) return sa - sb;
-      // Within same priority: soonest expiry first, then alphabetical
-      if (a.expires_at && b.expires_at) return a.expires_at.localeCompare(b.expires_at);
-      return a.name.localeCompare(b.name);
-    }
     if (sort === "expiry") {
       if (!a.expires_at && !b.expires_at) return 0;
       if (!a.expires_at) return 1;
@@ -102,13 +70,25 @@ function sortItems(items: PantryItemType[], sort: SortKey): PantryItemType[] {
       return ca.localeCompare(cb) || a.name.localeCompare(b.name);
     }
     if (sort === "quantity") {
-      // Heaviest stock first — useful for "what do I have a lot of?"
-      // Tie-break alphabetically so equal-stock items have a stable order.
       if (a.quantity !== b.quantity) return b.quantity - a.quantity;
       return a.name.localeCompare(b.name);
     }
     return a.name.localeCompare(b.name);
   });
+}
+
+/** Days from today to the given ISO date string. Negative = past, 0 = today. */
+function daysUntil(expiresAt: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(expiresAt + "T00:00:00");
+  return Math.round((expiry.getTime() - today.getTime()) / 86_400_000);
+}
+
+/** Items expiring within a week (or already expired) go in the Use Soon strip. */
+function isUseSoon(expiresAt: string | null): boolean {
+  if (!expiresAt) return false;
+  return daysUntil(expiresAt) <= 7;
 }
 
 function RunningLowRow({
@@ -404,12 +384,17 @@ export default function PantryList({
   onDelete,
   onAddToShoppingList,
 }: PantryListProps) {
-  const [sort, setSort] = useState<SortKey>("freshness");
-  // When switching to Supplies, ensure we're on a sort key that's still valid
+  // Default sort is now "name" (predictable). Items needing attention
+  // surface in the Use Soon and Running Low strips at the top.
+  const [sort, setSort] = useState<SortKey>("name");
   useEffect(() => {
-    if (kind === "supplies" && (sort === "freshness" || sort === "expiry")) {
-      setSort("name");
-    }
+    // Supplies don't have "expiry" sort — fall back to name.
+    // (We also defensively handle any legacy "freshness" value that may
+    // have been persisted in some earlier version of the app.)
+    if (kind === "supplies" && sort === "expiry") setSort("name");
+    // The TS type no longer includes "freshness" but real-world state
+    // might still carry it momentarily during the upgrade.
+    if ((sort as string) === "freshness") setSort("name");
   }, [kind, sort]);
 
   const [filterCategory, setFilterCategory] = useState<string>("");
@@ -604,14 +589,24 @@ export default function PantryList({
 
   // Running-low scoped to active tab so users only see what's relevant
   const runningLowItems = kindFiltered.filter((i) => i.running_low && !i.running_low_dismissed);
-
-  // Audit P5: items already shown in the running-low strip should NOT
-  // duplicate in their storage section. The strip is the canonical
-  // "needs attention" view; sections are the inventory view. Showing
-  // them twice means the user thinks they have two milks when they
-  // have one running-low milk.
   const runningLowIds = new Set(runningLowItems.map((i) => i.id));
-  const sectionItems = filtered.filter((i) => !runningLowIds.has(i.id));
+
+  // Audit P2: "Use Soon" strip — items expiring within a week (or already
+  // expired). Surfaces them at the top of the list explicitly instead of
+  // burying them in a hidden "freshness" sort algorithm. Excludes items
+  // already in the Running Low strip (user's explicit signal wins).
+  const useSoonItems = kind === "food"
+    ? kindFiltered
+        .filter((i) => isUseSoon(i.expires_at) && !runningLowIds.has(i.id))
+        // Most urgent first
+        .sort((a, b) => (a.expires_at ?? "").localeCompare(b.expires_at ?? ""))
+    : [];
+  const useSoonIds = new Set(useSoonItems.map((i) => i.id));
+
+  // P5 + P2: items already shown in either attention strip should NOT
+  // duplicate in their storage section. The strips are the canonical
+  // "needs action" views; sections are inventory.
+  const sectionItems = filtered.filter((i) => !runningLowIds.has(i.id) && !useSoonIds.has(i.id));
 
   // Food sections (only used when kind === 'food')
   const fridgeItems   = sectionItems.filter((i) => i.storage_location === "fridge");
@@ -690,7 +685,7 @@ export default function PantryList({
         // 95% of users never change defaults, so the pill is unobtrusive
         // by design and shows extra info only when the user has tweaked
         // something.
-        const defaultSort = kind === "supplies" ? "name" : "freshness";
+        const defaultSort: SortKey = "name";
         const sortLabel = sortOptions.find((s) => s.key === sort)?.label;
         const filterLabel = filterCategory
           ? categoryOptions.find((c) => c.value === filterCategory)?.label
@@ -766,6 +761,66 @@ export default function PantryList({
         </div>
       ) : (
         <div className="flex flex-col gap-4">
+
+          {/* ── Use Soon (audit P2) ─────────────────────────────
+              Items expiring within 7 days (or already expired) get a
+              dedicated strip at the top of the list. Replaces the
+              old "Freshness" sort whose ordering was invisible logic. */}
+          <AnimatePresence>
+            {useSoonItems.length > 0 && (
+              <motion.div
+                key="use-soon"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-950/40 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-2.5 h-2.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <span className="text-xs font-semibold text-red-600 dark:text-red-400">Use soon</span>
+                  <span className="text-xs text-red-400 dark:text-red-500 tabular-nums">({useSoonItems.length})</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {useSoonItems.map((item) => {
+                    const d = item.expires_at ? daysUntil(item.expires_at) : 7;
+                    const urgencyLabel = d < 0
+                      ? (d === -1 ? "Expired yesterday" : `Expired ${Math.abs(d)} days ago`)
+                      : d === 0 ? "Expires today"
+                      : d === 1 ? "Expires tomorrow"
+                      : `${d} days left`;
+                    const locationLabel = LOCATION_LABEL[item.storage_location ?? ""] ?? null;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleToggleExpand(item.id)}
+                        className="flex items-center gap-2 border border-red-200 dark:border-red-900/50 border-l-[3px] border-l-red-500 rounded-xl px-3 py-2 bg-red-50/50 dark:bg-red-950/20 text-left active:scale-[0.99] transition-transform"
+                      >
+                        <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                          <p className="text-xs font-semibold truncate text-gray-800 dark:text-gray-200">
+                            {item.name}
+                          </p>
+                          {locationLabel && (
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                              {locationLabel}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-medium text-red-600 dark:text-red-400 flex-shrink-0">
+                          {urgencyLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* ── Running Low ─────────────────────────────────── */}
           <AnimatePresence>
