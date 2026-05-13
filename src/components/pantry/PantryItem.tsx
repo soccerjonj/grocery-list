@@ -39,6 +39,11 @@ interface PantryItemProps {
   currentUserId: string | null;
   /** "compact" = 2-col tile (default); "list" = 1-row row with full name. */
   layout?: "compact" | "list";
+  /** Multi-select mode props (audit M1). When inMultiSelect is true,
+      tapping the card toggles selection instead of opening the sheet. */
+  inMultiSelect?: boolean;
+  selected?: boolean;
+  onSelectToggle?: () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -122,6 +127,9 @@ export default function PantryItem({
   currentUserId,
   householdId,
   layout = "compact",
+  inMultiSelect = false,
+  selected = false,
+  onSelectToggle,
 }: PantryItemProps) {
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(item.name);
@@ -234,6 +242,15 @@ export default function PantryItem({
 
   function increment() { onUpdateQuantity(item.id, item.quantity + 1); }
 
+  /** Quick +1 from the card itself — bypasses opening the sheet (audit M2). */
+  function handleQuickIncrement(e: React.MouseEvent | React.PointerEvent) {
+    e.stopPropagation();
+    onUpdateQuantity(item.id, item.quantity + 1);
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate(8); } catch { /* ignore */ }
+    }
+  }
+
   function decrement() {
     if (item.quantity <= 1) {
       setConfirmDelete(true);
@@ -245,6 +262,7 @@ export default function PantryItem({
   }
 
   function handleLongPressStart() {
+    if (inMultiSelect) return; // No long-press in multi-select mode
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     longPressFired.current = false;
     longPressTimer.current = setTimeout(() => {
@@ -260,6 +278,10 @@ export default function PantryItem({
 
   function handleCardClick() {
     if (longPressFired.current) { longPressFired.current = false; return; }
+    if (inMultiSelect) {
+      onSelectToggle?.();
+      return;
+    }
     onToggleExpand();
   }
 
@@ -677,13 +699,34 @@ export default function PantryItem({
             : { duration: 0.18, ease: "easeOut" }
         }
         style={{ gridColumn: layout === "list" ? "span 2" : "span 1" }}
-        className={`bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border border-gray-100 dark:border-zinc-800 ${item.running_low ? "border-l-[3px] border-l-amber-400" : ""}`}
+        className={`relative bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.97] transition-transform border ${
+          selected
+            ? "border-blue-500 ring-2 ring-blue-500/30"
+            : "border-gray-100 dark:border-zinc-800"
+        } ${item.running_low && !selected ? "border-l-[3px] border-l-amber-400" : ""}`}
         onClick={handleCardClick}
         onPointerDown={handleLongPressStart}
         onPointerUp={handleLongPressEnd}
         onPointerLeave={handleLongPressEnd}
         onPointerCancel={handleLongPressEnd}
       >
+        {/* Selection check overlay (audit M1) — shown only in multi-select
+            mode. Top-left so it doesn't compete with the member dots in
+            the top-right. */}
+        {inMultiSelect && (
+          <span
+            className={`absolute top-1.5 left-1.5 z-10 w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+              selected ? "bg-blue-500 text-white" : "bg-white/90 dark:bg-zinc-800/90 border border-gray-300 dark:border-zinc-600"
+            }`}
+            aria-hidden
+          >
+            {selected && (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </span>
+        )}
         {layout === "list" ? (
           /* List layout (audit P6) — single row, full name visible.
              Spans both grid columns so 2-col-grid pages render this as
@@ -695,9 +738,16 @@ export default function PantryItem({
             {expiry && (
               <span className={`text-xs font-medium flex-shrink-0 ${expiry.text}`}>{expiry.label}</span>
             )}
-            <span className={`text-xs font-semibold tabular-nums flex-shrink-0 ${item.running_low ? "text-amber-500" : "text-gray-500 dark:text-gray-400"}`}>
+            {/* Tap to +1 (audit M2). stopPropagation so the card itself
+                still opens the sheet on tap elsewhere. */}
+            <button
+              type="button"
+              onClick={handleQuickIncrement}
+              aria-label="Add one"
+              className={`text-xs font-semibold tabular-nums flex-shrink-0 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all ${item.running_low ? "text-amber-500" : "text-gray-500 dark:text-gray-400"}`}
+            >
               ×{qtyDisplay}
-            </span>
+            </button>
             {assignedMembers.length > 0 && (
               <div className="flex -space-x-1 flex-shrink-0">
                 {assignedMembers.map((m) => {
@@ -751,7 +801,16 @@ export default function PantryItem({
                 ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
                 : <span className="text-xs text-gray-300 dark:text-zinc-600">—</span>
               }
-              <span className={`text-xs font-semibold tabular-nums ${item.running_low ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
+              {/* Tap-to-+1 (audit M2). The rest of the card still opens
+                  the sheet; this is the "just bought another" shortcut. */}
+              <button
+                type="button"
+                onClick={handleQuickIncrement}
+                aria-label="Add one"
+                className={`text-xs font-semibold tabular-nums px-2 py-0.5 -mr-1 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all ${item.running_low ? "text-amber-500" : "text-gray-400"}`}
+              >
+                ×{qtyDisplay}
+              </button>
             </div>
           </div>
         )}

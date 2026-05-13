@@ -13,6 +13,17 @@ import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
 import SortFilterSheet, { type SortKey as SortFilterKey, type ViewLayout } from "./SortFilterSheet";
+import { getPantryHint } from "@/lib/pantryHints";
+import { useToast } from "@/context/ToastContext";
+
+// Quick-add starter items shown on the empty state (audit M4). Picked
+// to cover the most common household goods so a new user can populate
+// their pantry with one tap each. pantryHints will auto-classify them
+// into the right storage/category.
+const STARTER_ITEMS: Record<Kind, string[]> = {
+  food: ["Milk", "Eggs", "Bread", "Butter", "Cheese", "Apples", "Bananas", "Chicken", "Rice", "Pasta", "Yogurt", "Coffee"],
+  supplies: ["Toilet paper", "Paper towels", "Toothpaste", "Dish soap", "Laundry detergent", "Trash bags", "Shampoo", "Hand soap"],
+};
 
 interface PantryListProps {
   items: PantryItemType[];
@@ -211,6 +222,10 @@ interface SectionProps {
   onToggleOpen: () => void;
   /** Long-press handler: collapse all OTHER sections, leaving this one open. */
   onIsolate: () => void;
+  /** Multi-select state (audit M1). */
+  inMultiSelect: boolean;
+  selectedIds: Set<string>;
+  onSelectToggle: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
@@ -231,6 +246,9 @@ function StorageSection({
   isOpen,
   onToggleOpen,
   onIsolate,
+  inMultiSelect,
+  selectedIds,
+  onSelectToggle,
   onToggleExpand,
   onUpdateQuantity,
   onUpdateItem,
@@ -290,6 +308,9 @@ function StorageSection({
               item={item}
               expanded={expandedId === item.id}
               onToggleExpand={() => onToggleExpand(item.id)}
+              inMultiSelect={inMultiSelect}
+              selected={selectedIds.has(item.id)}
+              onSelectToggle={() => onSelectToggle(item.id)}
               {...itemProps}
             />
           ))}
@@ -453,7 +474,57 @@ export default function PantryList({
     persistSectionState(next);
   }
 
+  // First-time tip: long-press → mark running low (audit M6). Shown once
+  // per household, only after the user has enough items to make it a
+  // useful gesture. Stored in localStorage so it doesn't nag.
+  const { info: toastInfo } = useToast();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (items.length < 3) return;
+    const HINT_KEY = `pantry_longpress_hint_${householdId}`;
+    if (window.localStorage.getItem(HINT_KEY)) return;
+    const timer = setTimeout(() => {
+      toastInfo("Tip: long-press an item to mark it running low");
+      window.localStorage.setItem(HINT_KEY, "1");
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [items.length, householdId, toastInfo]);
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Multi-select (audit M1). Entered via the "Select" button next to the
+  // sort/filter pill. Cards show a check overlay; the action bar at the
+  // top lets the user delete or mark running-low in bulk.
+  const [inMultiSelect, setInMultiSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  function enterSelect() {
+    setInMultiSelect(true);
+    setSelectedIds(new Set());
+  }
+  function exitSelect() {
+    setInMultiSelect(false);
+    setSelectedIds(new Set());
+  }
+  function toggleSelectItem(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  async function bulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Remove ${ids.length} item${ids.length === 1 ? "" : "s"} from your pantry?`)) return;
+    for (const id of ids) await Promise.resolve(onDelete(id));
+    exitSelect();
+  }
+  function bulkMarkRunningLow() {
+    for (const id of selectedIds) onUpdateItem(id, { running_low: true });
+    exitSelect();
+  }
+  // Exit select mode automatically when switching tabs.
+  useEffect(() => { exitSelect(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [kind]);
   const [exitReasons, setExitReasons] = useState<Record<string, "dismiss" | "added">>({});
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
   const { resolvedTheme } = useTheme();
@@ -654,7 +725,11 @@ export default function PantryList({
     bathroom: "Bathroom", laundry: "Laundry", kitchen: "Kitchen", garage: "Garage", other: "Other",
   };
 
-  const sectionProps = { members, currentUserId, householdId, sort, expandedId, layout, onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList };
+  const sectionProps = {
+    members, currentUserId, householdId, sort, expandedId, layout,
+    inMultiSelect, selectedIds, onSelectToggle: toggleSelectItem,
+    onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList,
+  };
   // Helper to build the controlled-section props for each <StorageSection>.
   function sectionControl(label: string) {
     return {
@@ -698,7 +773,33 @@ export default function PantryList({
               filterLabel,
               layout === "list" ? "List view" : null,
             ].filter(Boolean).join(" · ");
-        return (
+        return inMultiSelect ? (
+          /* Multi-select action bar (audit M1) — replaces the pill row
+             while the user is in selection mode. Sticky so actions are
+             always reachable while scrolling. */
+          <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-blue-50/95 dark:bg-blue-950/30 backdrop-blur-sm border-b border-blue-100 dark:border-blue-900/50 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exitSelect}
+              className="text-xs font-medium text-gray-600 dark:text-gray-300 active:opacity-60"
+            >Cancel</button>
+            <span className="flex-1 text-center text-xs font-semibold text-gray-800 dark:text-gray-100 tabular-nums">
+              {selectedIds.size} selected
+            </span>
+            <button
+              type="button"
+              onClick={bulkMarkRunningLow}
+              disabled={selectedIds.size === 0}
+              className="text-xs font-medium px-2.5 py-1 rounded-lg text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 active:scale-95 transition-transform disabled:opacity-40"
+            >Mark low</button>
+            <button
+              type="button"
+              onClick={bulkDelete}
+              disabled={selectedIds.size === 0}
+              className="text-xs font-medium px-2.5 py-1 rounded-lg text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 active:scale-95 transition-transform disabled:opacity-40"
+            >Delete</button>
+          </div>
+        ) : (
           <div className="sticky top-0 z-10 -mx-4 px-4 py-1 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-sm flex items-center justify-between gap-2">
             <button
               type="button"
@@ -714,17 +815,22 @@ export default function PantryList({
               </svg>
               {pillText}
             </button>
-            {/* Item count for the active view, right-aligned for a quick
-                "how many do I have?" glance now that the chip bar's gone. */}
-            <span className="text-[11px] text-gray-400 dark:text-zinc-500 tabular-nums">
-              {filtered.length} item{filtered.length === 1 ? "" : "s"}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={enterSelect}
+                className="text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 active:opacity-60 transition-colors"
+              >Select</button>
+              <span className="text-[11px] text-gray-400 dark:text-zinc-500 tabular-nums">
+                {filtered.length} item{filtered.length === 1 ? "" : "s"}
+              </span>
+            </div>
           </div>
         );
       })()}
 
       {!hasItems && kindFiltered.length === 0 ? (
-        <div className="flex flex-col items-center py-14 gap-3">
+        <div className="flex flex-col items-center py-10 gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-zinc-800 flex items-center justify-center">
             {kind === "supplies" ? (
               <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
@@ -741,10 +847,33 @@ export default function PantryList({
               {kind === "supplies" ? "No supplies tracked yet" : "Your pantry is empty"}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              {kind === "supplies"
-                ? "Add things like toothpaste, paper towels, or pet food"
-                : "Add items to track what you have"}
+              Tap to add common items, or use the input above
             </p>
+          </div>
+          {/* Quick-add starter chips (audit M4). One tap → adds with auto-
+              detected storage/category via pantryHints. */}
+          <div className="flex flex-wrap justify-center gap-1.5 max-w-md mt-1 px-4">
+            {STARTER_ITEMS[kind].map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  const hint = getPantryHint(name);
+                  onAdd(name, 1, undefined, {
+                    kind: hint?.kind ?? kind,
+                    storageLocation: hint?.storage_location ?? null,
+                    fridgeZone: hint?.fridge_zone ?? null,
+                    foodCategory: hint?.food_category ?? null,
+                  });
+                  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                    try { navigator.vibrate(8); } catch { /* ignore */ }
+                  }
+                }}
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-zinc-500 hover:text-gray-900 dark:hover:text-gray-50 active:scale-95 transition-all"
+              >
+                + {name}
+              </button>
+            ))}
           </div>
         </div>
       ) : !hasItems ? (
