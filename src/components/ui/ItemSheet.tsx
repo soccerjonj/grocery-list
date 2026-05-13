@@ -109,6 +109,8 @@ interface ItemSheetHeaderProps {
   title: string;
   /** Inline meta strip rendered below the title (badges, owner, etc.). */
   meta?: React.ReactNode;
+  /** Inline action icons rendered to the left of the close button. */
+  actions?: React.ReactNode;
   /** Called when user taps the pencil-edit affordance. Omit to hide it. */
   onEditTitle?: () => void;
   onClose: () => void;
@@ -123,6 +125,7 @@ interface ItemSheetHeaderProps {
 export function ItemSheetHeader({
   title,
   meta,
+  actions,
   onEditTitle,
   onClose,
   editing,
@@ -177,9 +180,12 @@ export function ItemSheetHeader({
           </div>
         )}
         {meta && (
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{meta}</div>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">{meta}</div>
         )}
       </div>
+      {actions && (
+        <div className="flex items-center gap-1 flex-shrink-0">{actions}</div>
+      )}
       <button
         type="button"
         onClick={onClose}

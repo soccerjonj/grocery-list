@@ -146,17 +146,37 @@ export default function ShoppingItem({
       : ["rgb(254,226,226)", "rgb(255,241,242)", "rgb(255,255,255)"]
   );
 
-  // ── Edit-sheet header meta ──────────────────────────────────────
+  // ── Edit-sheet header meta (M7+M10): clean chip-style row with
+  // avatar pills, no mid-sentence "·" separators. ─────────────────
   const headerMeta = (
     <>
-      {item.store && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{item.store}</span>
-      )}
       {item.quantity && item.quantity !== 1 && (
-        <span className="text-xs text-gray-400 dark:text-gray-500">
-          {item.store ? "· " : ""}×{item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)}
+        <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+          ×{item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)}
           {item.unit ? ` ${item.unit}` : ""}
         </span>
+      )}
+      {item.store && (
+        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+          {item.store}
+        </span>
+      )}
+      {assignedMembers.length > 0 && (
+        <div className="flex -space-x-1">
+          {assignedMembers.map((m) => {
+            const c = m.color ?? DEFAULT_COLOR;
+            return (
+              <span
+                key={m.user_id}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ring-1 ring-white dark:ring-zinc-900"
+                style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
+                title={m.short_name}
+              >
+                {m.initials}
+              </span>
+            );
+          })}
+        </div>
       )}
     </>
   );
@@ -449,7 +469,8 @@ export default function ShoppingItem({
             maxLength={150}
             className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
           />
-          {notesDraft.length >= 100 && (
+          {/* Audit M9: only surface the counter in the final stretch. */}
+          {notesDraft.length >= 130 && (
             <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">
               {150 - notesDraft.length} left
             </p>

@@ -82,28 +82,6 @@ function getExpiryBadge(expiresAt: string | null) {
   return null;
 }
 
-interface OwnerInfo { label: string; color: string }
-
-function getOwnerInfo(
-  assignedTo: string[] | null,
-  members: MemberProfile[],
-  currentUserId: string | null
-): OwnerInfo | null {
-  if (!assignedTo || assignedTo.length === 0) return null;
-  if (assignedTo.length >= members.length && members.length > 0) return null;
-  if (assignedTo.length === 1) {
-    const m = members.find((m) => m.user_id === assignedTo[0]);
-    const label = assignedTo[0] === currentUserId ? "Mine" : (m?.short_name ?? null);
-    if (!label) return null;
-    return { label, color: m?.color ?? DEFAULT_COLOR };
-  }
-  const first = members.find((m) => m.user_id === assignedTo[0]);
-  const label = assignedTo
-    .map((uid) => (uid === currentUserId ? "Me" : members.find((m) => m.user_id === uid)?.short_name ?? "?"))
-    .join(" & ");
-  return { label, color: first?.color ?? DEFAULT_COLOR };
-}
-
 /** Returns member objects for assigned users, empty when assigned to everyone. */
 function getAssignedMembers(assignedTo: string[] | null, members: MemberProfile[]): MemberProfile[] {
   if (!assignedTo || assignedTo.length === 0) return [];
@@ -220,7 +198,6 @@ export default function PantryItem({
 
   const isSupplies = (item.kind ?? "food") === "supplies";
   const expiry = isSupplies ? null : getExpiryBadge(item.expires_at);
-  const ownerInfo = getOwnerInfo(item.assigned_to, members, currentUserId);
   const assignedMembers = getAssignedMembers(item.assigned_to, members);
   const qtyDisplay = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(1);
   const locationOptions = isSupplies ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS;
@@ -283,19 +260,72 @@ export default function PantryItem({
   }
 
   // ── Bottom sheet content ─────────────────────────────────────────
+  // Audit M7+M10: chip-style meta with avatar pills instead of text·dots.
   const headerMeta = (
     <>
-      {expiry && <span className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</span>}
-      {item.running_low && (
-        <span className="text-xs text-amber-500 font-medium">{expiry ? "· " : ""}Running low</span>
-      )}
-      {ownerInfo && (
-        <span
-          className="text-xs font-medium"
-          style={{ color: ownerInfo.color }}
-        >
-          {(expiry || item.running_low) ? "· " : ""}{ownerInfo.label}
+      {expiry && (
+        <span className={`text-[11px] font-semibold ${expiry.text}`}>
+          {expiry.detail}
         </span>
+      )}
+      {assignedMembers.length > 0 && (
+        <div className="flex -space-x-1">
+          {assignedMembers.map((m) => {
+            const c = m.color ?? DEFAULT_COLOR;
+            return (
+              <span
+                key={m.user_id}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ring-1 ring-white dark:ring-zinc-900"
+                style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
+                title={m.short_name}
+              >
+                {m.initials}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  // Audit M1: status toggles moved into the header as icon buttons.
+  // Frees a whole row in the sheet body and gives them parity with the X.
+  const headerActions = (
+    <>
+      <button
+        type="button"
+        onClick={() => onUpdateItem(item.id, { running_low: !item.running_low })}
+        aria-label={item.running_low ? "Mark as in stock" : "Mark as running low"}
+        title={item.running_low ? "Running low" : "Mark as running low"}
+        className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors active:scale-90 ${
+          item.running_low
+            ? "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400"
+            : "bg-gray-100 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 hover:text-gray-600"
+        }`}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+        </svg>
+      </button>
+      {!isSupplies && (
+        <button
+          type="button"
+          onClick={() => onUpdateItem(item.id, { opened: !item.opened })}
+          aria-label={item.opened ? "Mark sealed" : "Mark opened"}
+          title={item.opened ? "Opened" : "Sealed"}
+          className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors active:scale-90 ${
+            item.opened
+              ? "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400"
+              : "bg-gray-100 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 hover:text-gray-600"
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {item.opened
+              ? <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              : <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            }
+          </svg>
+        </button>
       )}
     </>
   );
@@ -308,6 +338,7 @@ export default function PantryItem({
         <ItemSheetHeader
           title={item.name}
           meta={headerMeta}
+          actions={headerActions}
           onClose={onToggleExpand}
           onEditTitle={() => { setEditName(item.name); setEditingName(true); }}
           editing={editingName}
@@ -318,257 +349,228 @@ export default function PantryItem({
         />
       }
     >
-              {/* Amount — shared AmountField. Decrement at quantity 1 opens
-                  the confirm-delete modal via onUnderflow (P3). */}
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Quantity</p>
-                <AmountField
-                  quantity={String(item.quantity)}
-                  unit={item.unit ?? ""}
-                  onQuantityChange={(q) => {
-                    const num = parseFloat(q);
-                    if (!isNaN(num) && num >= 1) onUpdateQuantity(item.id, num);
-                  }}
-                  onUnitChange={(u) => onUpdateItem(item.id, { unit: u || null })}
-                  size="md"
-                  min={1}
-                  onUnderflow={() => setConfirmDelete(true)}
-                />
-              </div>
+      {/* Quantity (P3) — shared AmountField. Decrement at quantity 1
+          opens the confirm-delete modal via onUnderflow. */}
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Quantity</p>
+        <AmountField
+          quantity={String(item.quantity)}
+          unit={item.unit ?? ""}
+          onQuantityChange={(q) => {
+            const num = parseFloat(q);
+            if (!isNaN(num) && num >= 1) onUpdateQuantity(item.id, num);
+          }}
+          onUnitChange={(u) => onUpdateItem(item.id, { unit: u || null })}
+          size="md"
+          min={1}
+          onUnderflow={() => setConfirmDelete(true)}
+        />
+      </div>
 
-              {/* Quick actions */}
-              <div className="flex flex-wrap gap-2">
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => onUpdateItem(item.id, { running_low: !item.running_low })}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors flex-1 justify-center min-w-[90px] ${
-                    item.running_low ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
-                  </svg>
-                  {item.running_low ? "Running low" : "Mark low"}
-                </motion.button>
+      {/* Add to list (audit M1) — now a single full-width primary CTA
+          since Mark low + Sealed/Opened moved to the header. */}
+      {onAddToShoppingList && (
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={handleAddToList}
+          disabled={addedToList}
+          className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl text-sm font-medium transition-colors ${
+            addedToList
+              ? "bg-green-100 text-green-700 border border-green-200"
+              : "bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-zinc-700"
+          }`}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            {addedToList ? (
+              <motion.span key="added" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                Added to list
+              </motion.span>
+            ) : (
+              <motion.span key="add" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z" /></svg>
+                Add to shopping list
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      )}
 
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => onUpdateItem(item.id, { opened: !item.opened })}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors flex-1 justify-center min-w-[80px] ${
-                    item.opened ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    {item.opened
-                      ? <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                      : <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    }
-                  </svg>
-                  {item.opened ? "Opened" : "Sealed"}
-                </motion.button>
-
-                {onAddToShoppingList && (
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.94 }}
-                    onClick={handleAddToList}
-                    disabled={addedToList}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all flex-1 justify-center min-w-[90px] ${
-                      addedToList ? "bg-green-100 text-green-700 border border-green-200" : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
-                    }`}
-                  >
-                    <AnimatePresence mode="wait" initial={false}>
-                      {addedToList ? (
-                        <motion.span key="added" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                          Added!
-                        </motion.span>
-                      ) : (
-                        <motion.span key="add" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z" /></svg>
-                          Add to list
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
-                )}
-              </div>
-
-              {/* Expiry — food only (supplies don't expire in any meaningful way) */}
-              {!isSupplies && (
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Expires</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={item.expires_at ?? ""}
-                      onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
-                      className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
-                    />
-                    {item.expires_at && (
-                      <button
-                        type="button"
-                        onClick={() => onUpdateItem(item.id, { expires_at: null })}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-950/30 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors active:scale-[0.96]"
-                      >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                  {/* Quick-set presets (audit M5) — common offsets save a
-                      trip into the date picker for "I want roughly +1 week". */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {EXPIRY_PRESETS.map((p) => (
-                      <button
-                        key={p.label}
-                        type="button"
-                        onClick={() => onUpdateItem(item.id, { expires_at: isoDateOffsetDays(p.days) })}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-[0.94] transition-colors"
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                  {item.expires_at && expiry && (
-                    <p className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Storage / Location */}
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                  {isSupplies ? "Location" : "Storage"}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {locationOptions.map(({ value, label }) => (
-                    <button key={value} type="button"
-                      onClick={() => onUpdateItem(item.id, { storage_location: item.storage_location === value ? null : value, fridge_zone: value !== "fridge" ? null : item.fridge_zone })}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.storage_location === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                    >{label}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Fridge zone — food only, only when fridge is selected */}
-              {!isSupplies && (
-                <AnimatePresence initial={false}>
-                  {item.storage_location === "fridge" && (
-                    <motion.div key="fridge-zone" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-1.5">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fridge zone</p>
-                      <div className="flex gap-1.5">
-                        {FRIDGE_ZONES.map(({ value, label }) => (
-                          <button key={value} type="button"
-                            onClick={() => onUpdateItem(item.id, { fridge_zone: item.fridge_zone === value ? null : value })}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.fridge_zone === value ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
-                          >{label}</button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              )}
-
-              {/* Category */}
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Category</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {categoryOptions.map(({ value, label }) => (
-                    <button key={value} type="button"
-                      onClick={() => onUpdateItem(item.id, { food_category: item.food_category === value ? null : value })}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.food_category === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                    >{label}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Assigned to */}
-              {members.length > 1 && (
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Assigned to</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {/* "Everyone" chip */}
-                    <button
-                      type="button"
-                      onClick={() => onUpdateItem(item.id, { assigned_to: null })}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        !item.assigned_to || item.assigned_to.length === 0
-                          ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                          : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
-                      }`}
-                    >
-                      Everyone
-                    </button>
-                    {members.map((member) => {
-                      const selected = !!item.assigned_to?.includes(member.user_id);
-                      const color = member.color ?? DEFAULT_COLOR;
-                      function toggleMember() {
-                        const current = item.assigned_to ?? [];
-                        const next = selected
-                          ? current.filter((id) => id !== member.user_id)
-                          : [...current, member.user_id];
-                        onUpdateItem(item.id, { assigned_to: next.length === 0 ? null : next });
-                      }
-                      return (
-                        <button
-                          key={member.user_id}
-                          type="button"
-                          onClick={toggleMember}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
-                          style={
-                            selected
-                              ? { backgroundColor: color, color: "#fff" }
-                              : { backgroundColor: hexAlpha(color, 0.1), color }
-                          }
-                        >
-                          <span
-                            className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                            style={selected ? { backgroundColor: "rgba(255,255,255,0.25)", color: "#fff" } : { backgroundColor: hexAlpha(color, 0.2), color }}
-                          >
-                            {member.initials}
-                          </span>
-                          {member.user_id === currentUserId ? "Me" : member.short_name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Notes (audit M7 — controlled + debounced save) */}
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Note</p>
-                <textarea
-                  placeholder="Brand, location, anything useful…"
-                  value={notesDraft}
-                  onChange={(e) => handleNotesChange(e.target.value)}
-                  rows={2}
-                  maxLength={150}
-                  className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
-                />
-                {notesDraft.length >= 100 && (
-                  <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">
-                    {150 - notesDraft.length} left
-                  </p>
-                )}
-              </div>
-
-              {/* Remove button (audit N8: softened — the confirm modal is
-                  where the red "destructive" treatment lives. This button
-                  is the entry point, not the irreversible action.) */}
-              <button type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 text-sm font-medium transition-colors active:scale-[0.97]">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      {/* Expiry — food only */}
+      {!isSupplies && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Expires</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={item.expires_at ?? ""}
+              onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
+              className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
+            />
+            {item.expires_at && (
+              <button
+                type="button"
+                onClick={() => onUpdateItem(item.id, { expires_at: null })}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-950/30 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors active:scale-[0.96]"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                Remove from pantry
+                Clear
               </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {EXPIRY_PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => onUpdateItem(item.id, { expires_at: isoDateOffsetDays(p.days) })}
+                className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-[0.94] transition-colors"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Storage + Fridge zone grouped — they're conceptually related
+          so we use a tighter gap-3 internal cluster. (Section rhythm.) */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
+            {isSupplies ? "Location" : "Storage"}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {locationOptions.map(({ value, label }) => (
+              <button key={value} type="button"
+                onClick={() => onUpdateItem(item.id, { storage_location: item.storage_location === value ? null : value, fridge_zone: value !== "fridge" ? null : item.fridge_zone })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.storage_location === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Fridge zone — food only, only when fridge is selected (M2:
+            re-colored to match every other chip — was the only blue
+            accent in the form). */}
+        {!isSupplies && (
+          <AnimatePresence initial={false}>
+            {item.storage_location === "fridge" && (
+              <motion.div key="fridge-zone" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-2">
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Fridge zone</p>
+                <div className="flex gap-1.5">
+                  {FRIDGE_ZONES.map(({ value, label }) => (
+                    <button key={value} type="button"
+                      onClick={() => onUpdateItem(item.id, { fridge_zone: item.fridge_zone === value ? null : value })}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.fridge_zone === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
+                    >{label}</button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Category */}
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Category</p>
+        <div className="flex flex-wrap gap-1.5">
+          {categoryOptions.map(({ value, label }) => (
+            <button key={value} type="button"
+              onClick={() => onUpdateItem(item.id, { food_category: item.food_category === value ? null : value })}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.food_category === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Assigned to */}
+      {members.length > 1 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Assigned to</p>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => onUpdateItem(item.id, { assigned_to: null })}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                !item.assigned_to || item.assigned_to.length === 0
+                  ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                  : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
+              }`}
+            >
+              Everyone
+            </button>
+            {members.map((member) => {
+              const selected = !!item.assigned_to?.includes(member.user_id);
+              const color = member.color ?? DEFAULT_COLOR;
+              function toggleMember() {
+                const current = item.assigned_to ?? [];
+                const next = selected
+                  ? current.filter((id) => id !== member.user_id)
+                  : [...current, member.user_id];
+                onUpdateItem(item.id, { assigned_to: next.length === 0 ? null : next });
+              }
+              return (
+                <button
+                  key={member.user_id}
+                  type="button"
+                  onClick={toggleMember}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
+                  style={
+                    selected
+                      ? { backgroundColor: color, color: "#fff" }
+                      : { backgroundColor: hexAlpha(color, 0.1), color }
+                  }
+                >
+                  <span
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                    style={selected ? { backgroundColor: "rgba(255,255,255,0.25)", color: "#fff" } : { backgroundColor: hexAlpha(color, 0.2), color }}
+                  >
+                    {member.initials}
+                  </span>
+                  {member.user_id === currentUserId ? "Me" : member.short_name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Note */}
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
+          Note <span className="font-normal">(optional)</span>
+        </p>
+        <textarea
+          placeholder="Brand, location, anything useful…"
+          value={notesDraft}
+          onChange={(e) => handleNotesChange(e.target.value)}
+          rows={2}
+          maxLength={150}
+          className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
+        />
+        {/* Audit M9: only show the char counter when it actually matters
+            (last 20 of 150) instead of jumping in halfway through. */}
+        {notesDraft.length >= 130 && (
+          <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">
+            {150 - notesDraft.length} left
+          </p>
+        )}
+      </div>
+
+      {/* Remove */}
+      <button type="button"
+        onClick={() => setConfirmDelete(true)}
+        className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 text-sm font-medium transition-colors active:scale-[0.97]">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+        Remove from pantry
+      </button>
     </ItemSheet>
   );
 
