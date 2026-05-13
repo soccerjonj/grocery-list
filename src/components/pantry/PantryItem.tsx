@@ -24,15 +24,14 @@ interface PantryItemProps {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function formatDateDisplay(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
+/**
+ * Returns a badge object suitable for at-a-glance display (card + sheet header).
+ *
+ * Audit M10: items expiring more than 90 days out are deliberately
+ * unbadged — a green "1yr+" pill suggests freshness but is mostly noise
+ * (shelf-stable items will permanently show it). Callers that want the
+ * raw date for far-future items should read `item.expires_at` directly.
+ */
 function getExpiryBadge(expiresAt: string | null) {
   if (!expiresAt) return null;
   const today = new Date();
@@ -41,19 +40,21 @@ function getExpiryBadge(expiresAt: string | null) {
   const diff = Math.round((expiry.getTime() - today.getTime()) / 86_400_000);
 
   if (diff < 0)
-    return { label: diff === -1 ? "Yesterday" : `${Math.abs(diff)}d ago`, text: "text-red-500", detail: diff === -1 ? "Expired yesterday" : `Expired ${Math.abs(diff)} days ago`, detailColor: "text-red-500", bg: "bg-red-50 border-red-200" };
+    return { label: diff === -1 ? "Yesterday" : `${Math.abs(diff)}d ago`, text: "text-red-500", detail: diff === -1 ? "Expired yesterday" : `Expired ${Math.abs(diff)} days ago` };
   if (diff === 0)
-    return { label: "Today", text: "text-red-500", detail: "Expires today", detailColor: "text-red-500", bg: "bg-red-50 border-red-200" };
+    return { label: "Today", text: "text-red-500", detail: "Expires today" };
   if (diff === 1)
-    return { label: "Tmw", text: "text-red-500", detail: "Expires tomorrow", detailColor: "text-red-500", bg: "bg-red-50 border-red-200" };
+    return { label: "Tmw", text: "text-red-500", detail: "Expires tomorrow" };
   if (diff <= 7)
-    return { label: `${diff}d`, text: "text-red-500", detail: `Expires in ${diff} days`, detailColor: "text-red-500", bg: "bg-red-50 border-red-200" };
+    return { label: `${diff}d`, text: "text-red-500", detail: `Expires in ${diff} days` };
   if (diff <= 28)
-    return { label: `${diff}d`, text: "text-yellow-600", detail: `Expires in ${diff} days`, detailColor: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200" };
-  if (diff >= 364)
-    return { label: "1yr+", text: "text-green-500", detail: "Expires in over a year", detailColor: "text-green-500", bg: "bg-green-50 border-green-200" };
-  const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}`, detailColor: "text-green-600", bg: "bg-green-50 border-green-200" };
+    return { label: `${diff}d`, text: "text-yellow-600", detail: `Expires in ${diff} days` };
+  if (diff <= 90) {
+    const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}` };
+  }
+  // > 90 days: shelf-stable / long-life. Don't badge at glance.
+  return null;
 }
 
 interface OwnerInfo { label: string; color: string }
@@ -594,7 +595,14 @@ export default function PantryItem({
         onPointerLeave={handleLongPressEnd}
         onPointerCancel={handleLongPressEnd}
       >
-        <div className="p-3 flex flex-col gap-2 min-h-[76px]">
+        {/* Compact card layout. Audit P1: dropped the bare "opened" (orange)
+            and "notes" (blue) glance dots — they were unlabelled, present
+            5% of the time, and meaningless on first encounter. Those
+            properties remain visible & editable in the bottom-sheet.
+            Audit N4: dropped the fixed min-h. Grid `gap-2` aligns rows to
+            the tallest card per row, so short-name cards no longer look
+            artificially padded. */}
+        <div className="p-3 flex flex-col gap-2">
           <div className="flex items-start gap-1.5">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-50 leading-snug line-clamp-2 flex-1">{item.name}</p>
             {assignedMembers.length > 0 && (
@@ -604,11 +612,14 @@ export default function PantryItem({
                   return (
                     <span
                       key={m.user_id}
-                      className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ring-1 ring-white"
+                      // Audit M9: bump from w-4/h-4 to w-5/h-5 and show full
+                      // 2-char initials. With 3+ members the single-letter
+                      // version was hard to disambiguate.
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ring-1 ring-white dark:ring-zinc-900"
                       style={{ backgroundColor: hexAlpha(c, 0.18), color: c }}
                       title={m.short_name}
                     >
-                      {m.initials[0]}
+                      {m.initials}
                     </span>
                   );
                 })}
@@ -616,14 +627,10 @@ export default function PantryItem({
             )}
           </div>
           <div className="flex items-center justify-between mt-auto">
-            <div className="flex items-center gap-1.5">
-              {expiry
-                ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
-                : <span className="text-xs text-gray-300">—</span>
-              }
-              {item.opened && <span className="w-1 h-1 rounded-full bg-orange-300 flex-shrink-0" />}
-              {item.notes && <span className="w-1 h-1 rounded-full bg-blue-300 flex-shrink-0" title={item.notes} />}
-            </div>
+            {expiry
+              ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
+              : <span className="text-xs text-gray-300 dark:text-zinc-600">—</span>
+            }
             <span className={`text-xs font-semibold tabular-nums ${item.running_low ? "text-amber-500" : "text-gray-400"}`}>×{qtyDisplay}</span>
           </div>
         </div>
