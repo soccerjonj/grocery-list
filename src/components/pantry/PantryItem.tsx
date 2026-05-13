@@ -8,7 +8,8 @@ import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES, SUPPLIES_CATEGORIES, 
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
-import { COMMON_UNITS } from "@/components/ui/AmountField";
+import AmountField from "@/components/ui/AmountField";
+import ItemSheet, { ItemSheetHeader } from "@/components/ui/ItemSheet";
 
 // Expiry preset offsets — chips that one-tap an "expires in N" date.
 // (Audit M5.) Same idea as the suggested-expiry chip in AddPantryItem
@@ -215,22 +216,7 @@ export default function PantryItem({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
 
-  // Lock body scroll when sheet is open (iOS-safe: fixed position trick)
-  useEffect(() => {
-    if (!expanded) return;
-    const scrollY = window.scrollY;
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.width = "";
-      window.scrollTo(0, scrollY);
-    };
-  }, [expanded]);
+  // Body scroll lock is now handled inside <ItemSheet/>.
 
   const isSupplies = (item.kind ?? "food") === "supplies";
   const expiry = isSupplies ? null : getExpiryBadge(item.expires_at);
@@ -297,146 +283,57 @@ export default function PantryItem({
   }
 
   // ── Bottom sheet content ─────────────────────────────────────────
+  const headerMeta = (
+    <>
+      {expiry && <span className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</span>}
+      {item.running_low && (
+        <span className="text-xs text-amber-500 font-medium">{expiry ? "· " : ""}Running low</span>
+      )}
+      {ownerInfo && (
+        <span
+          className="text-xs font-medium"
+          style={{ color: ownerInfo.color }}
+        >
+          {(expiry || item.running_low) ? "· " : ""}{ownerInfo.label}
+        </span>
+      )}
+    </>
+  );
+
   const sheet = (
-    <AnimatePresence>
-      {expanded && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/40"
-            onClick={onToggleExpand}
-          />
-
-          {/* Sheet */}
-          <motion.div
-            key="sheet"
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 380, damping: 40 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-          >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-700 rounded-full" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 pt-2 pb-3 flex-shrink-0">
-              <div className="flex-1 min-w-0">
-                {editingName ? (
-                  <input
-                    ref={nameInputRef}
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onBlur={handleSaveName}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { handleSaveName(); nameInputRef.current?.blur(); }
-                      if (e.key === "Escape") { setEditName(item.name); setEditingName(false); }
-                    }}
-                    autoFocus
-                    className="w-full text-lg font-semibold text-gray-900 dark:text-gray-50 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
-                  />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 truncate">{item.name}</h2>
-                    <button
-                      type="button"
-                      onClick={() => { setEditName(item.name); setEditingName(true); }}
-                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:scale-90"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                  {expiry && <span className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</span>}
-                  {item.running_low && <span className="text-xs text-amber-500 font-medium">· Running low</span>}
-                  {ownerInfo && (
-                    <span className="text-xs font-medium" style={{ color: ownerInfo.color }}>{ownerInfo.label}</span>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onToggleExpand}
-                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-90"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Scrollable content */}
-            <div className="overflow-y-auto overscroll-contain flex-1 min-h-0 px-5 pb-6 flex flex-col gap-5">
-
-              {/* Quantity stepper + unit chips (audit M3 — unit is now editable) */}
-              <div className="flex flex-col gap-2 bg-gray-50 dark:bg-zinc-800 rounded-2xl px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-1">Quantity</span>
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.88 }}
-                    onClick={decrement}
-                    animate={{
-                      backgroundColor: flashDecrement ? "#dcfce7" : "#e5e7eb",
-                      color: flashDecrement ? "#15803d" : "#374151",
-                    }}
-                    transition={{ duration: 0.15 }}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
-                  >
-                    −
-                  </motion.button>
-                  <div className="w-10 text-center select-none">
-                    <AnimatePresence mode="wait" initial={false}>
-                      <motion.p
-                        key={qtyDisplay}
-                        initial={{ scale: 1.2, opacity: 0.5 }}
-                        animate={{ scale: 1, opacity: 1, color: flashDecrement ? "#15803d" : "#111827" }}
-                        transition={{ duration: 0.15, ease: "easeOut" }}
-                        className="text-base font-bold tabular-nums"
-                      >
-                        {qtyDisplay}
-                      </motion.p>
-                    </AnimatePresence>
-                  </div>
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.88 }}
-                    onClick={increment}
-                    className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
-                  >
-                    +
-                  </motion.button>
-                </div>
-                {/* Unit chips. Tap to set or clear. */}
-                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-200/60 dark:border-zinc-700/60">
-                  {COMMON_UNITS.map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      onClick={() => onUpdateItem(item.id, { unit: item.unit === u ? null : u })}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                        item.unit === u
-                          ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                          : "bg-white dark:bg-zinc-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700 border border-gray-200 dark:border-zinc-700"
-                      }`}
-                    >
-                      {u}
-                    </button>
-                  ))}
-                </div>
+    <ItemSheet
+      open={expanded}
+      onClose={onToggleExpand}
+      header={
+        <ItemSheetHeader
+          title={item.name}
+          meta={headerMeta}
+          onClose={onToggleExpand}
+          onEditTitle={() => { setEditName(item.name); setEditingName(true); }}
+          editing={editingName}
+          editValue={editName}
+          onEditChange={setEditName}
+          onEditCommit={handleSaveName}
+          onEditCancel={() => { setEditName(item.name); setEditingName(false); }}
+        />
+      }
+    >
+              {/* Amount — shared AmountField. Decrement at quantity 1 opens
+                  the confirm-delete modal via onUnderflow (P3). */}
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Quantity</p>
+                <AmountField
+                  quantity={String(item.quantity)}
+                  unit={item.unit ?? ""}
+                  onQuantityChange={(q) => {
+                    const num = parseFloat(q);
+                    if (!isNaN(num) && num >= 1) onUpdateQuantity(item.id, num);
+                  }}
+                  onUnitChange={(u) => onUpdateItem(item.id, { unit: u || null })}
+                  size="md"
+                  min={1}
+                  onUnderflow={() => setConfirmDelete(true)}
+                />
               </div>
 
               {/* Quick actions */}
@@ -672,11 +569,7 @@ export default function PantryItem({
                 </svg>
                 Remove from pantry
               </button>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    </ItemSheet>
   );
 
   return (
@@ -816,8 +709,8 @@ export default function PantryItem({
         )}
       </motion.div>
 
-      {/* ── Bottom sheet (portal) ─────────────────────────────── */}
-      {mounted && createPortal(sheet, document.body)}
+      {/* ── Bottom sheet (self-portals via <ItemSheet/>) ────────── */}
+      {sheet}
 
       {/* ── Confirm delete modal (portal) ────────────────────── */}
       {mounted && createPortal(

@@ -49,6 +49,15 @@ interface AmountFieldProps {
   size?: "sm" | "md";
   /** Optional placeholder for the numeric input. Defaults to "1". */
   placeholder?: string;
+  /**
+   * Minimum quantity for the − button. Below this, the − button calls
+   * `onUnderflow` instead of decrementing. Free-form typing in the
+   * input is unaffected. Pantry uses this to open the confirm-remove
+   * modal when you press − at quantity 1.
+   */
+  min?: number;
+  /** Called when − is pressed at `min`. */
+  onUnderflow?: () => void;
 }
 
 export default function AmountField({
@@ -59,16 +68,23 @@ export default function AmountField({
   units = COMMON_UNITS,
   size = "sm",
   placeholder = "1",
+  min,
+  onUnderflow,
 }: AmountFieldProps) {
   const step = stepForUnit(unit);
 
   function decrement() {
     const current = parseFloat(quantity);
     if (isNaN(current)) {
-      onQuantityChange("");
+      if (min !== undefined && onUnderflow) onUnderflow();
+      else onQuantityChange("");
       return;
     }
     const next = current - step;
+    if (min !== undefined && next < min) {
+      onUnderflow?.();
+      return;
+    }
     if (next <= 0) onQuantityChange("");
     else onQuantityChange(clean(next));
   }
