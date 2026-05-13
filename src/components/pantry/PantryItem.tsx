@@ -8,6 +8,23 @@ import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES, SUPPLIES_CATEGORIES, 
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
+import { COMMON_UNITS } from "@/components/ui/AmountField";
+
+// Expiry preset offsets — chips that one-tap an "expires in N" date.
+// (Audit M5.) Same idea as the suggested-expiry chip in AddPantryItem
+// but with a small ladder of common windows for quick correction.
+const EXPIRY_PRESETS: { label: string; days: number }[] = [
+  { label: "+3 days",   days: 3 },
+  { label: "+1 week",   days: 7 },
+  { label: "+1 month",  days: 30 },
+  { label: "+3 months", days: 90 },
+];
+
+function isoDateOffsetDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
 
 interface PantryItemProps {
   item: PantryItemType;
@@ -113,6 +130,11 @@ export default function PantryItem({
   const [flashDecrement, setFlashDecrement] = useState(false);
   const [exitVariant, setExitVariant] = useState<"consume" | "delete" | null>(null);
   const [mounted, setMounted] = useState(false);
+  // Notes — controlled state with debounced save (audit M7). The old
+  // approach used defaultValue + onBlur which lost edits when the iOS
+  // keyboard dismissed without firing blur reliably.
+  const [notesDraft, setNotesDraft] = useState(item.notes ?? "");
+  const notesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
@@ -153,6 +175,36 @@ export default function PantryItem({
 
   useEffect(() => {
     if (!expanded) setConfirmDelete(false);
+  }, [expanded]);
+
+  // Keep notesDraft in sync if the item's notes change externally (e.g.
+  // another household member edits) while the sheet is closed.
+  useEffect(() => {
+    if (!expanded) setNotesDraft(item.notes ?? "");
+  }, [item.notes, expanded]);
+
+  // Debounced notes save (audit M7). Save 500ms after the user stops
+  // typing — no more lost edits when iOS dismisses the keyboard without
+  // firing onBlur. Also flush on unmount / sheet close.
+  function commitNotesNow(value: string) {
+    const trimmed = value.trim().slice(0, 150) || null;
+    if (trimmed !== (item.notes ?? null)) onUpdateItem(item.id, { notes: trimmed });
+  }
+  function handleNotesChange(value: string) {
+    const capped = value.slice(0, 150);
+    setNotesDraft(capped);
+    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+    notesSaveTimer.current = setTimeout(() => commitNotesNow(capped), 500);
+  }
+  // Flush pending notes save when the sheet closes.
+  useEffect(() => {
+    if (expanded) return;
+    if (notesSaveTimer.current) {
+      clearTimeout(notesSaveTimer.current);
+      notesSaveTimer.current = null;
+      commitNotesNow(notesDraft);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
 
   // Lock body scroll when sheet is open (iOS-safe: fixed position trick)
@@ -307,43 +359,62 @@ export default function PantryItem({
             {/* Scrollable content */}
             <div className="overflow-y-auto overscroll-contain flex-1 min-h-0 px-5 pb-6 flex flex-col gap-5">
 
-              {/* Quantity stepper */}
-              <div className="flex items-center gap-3 bg-gray-50 dark:bg-zinc-800 rounded-2xl px-4 py-3">
-                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-1">Quantity</span>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.88 }}
-                  onClick={decrement}
-                  animate={{
-                    backgroundColor: flashDecrement ? "#dcfce7" : "#e5e7eb",
-                    color: flashDecrement ? "#15803d" : "#374151",
-                  }}
-                  transition={{ duration: 0.15 }}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
-                >
-                  −
-                </motion.button>
-                <div className="w-10 text-center select-none">
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.p
-                      key={qtyDisplay}
-                      initial={{ scale: 1.2, opacity: 0.5 }}
-                      animate={{ scale: 1, opacity: 1, color: flashDecrement ? "#15803d" : "#111827" }}
-                      transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="text-base font-bold tabular-nums"
-                    >
-                      {qtyDisplay}
-                    </motion.p>
-                  </AnimatePresence>
+              {/* Quantity stepper + unit chips (audit M3 — unit is now editable) */}
+              <div className="flex flex-col gap-2 bg-gray-50 dark:bg-zinc-800 rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-1">Quantity</span>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.88 }}
+                    onClick={decrement}
+                    animate={{
+                      backgroundColor: flashDecrement ? "#dcfce7" : "#e5e7eb",
+                      color: flashDecrement ? "#15803d" : "#374151",
+                    }}
+                    transition={{ duration: 0.15 }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
+                  >
+                    −
+                  </motion.button>
+                  <div className="w-10 text-center select-none">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.p
+                        key={qtyDisplay}
+                        initial={{ scale: 1.2, opacity: 0.5 }}
+                        animate={{ scale: 1, opacity: 1, color: flashDecrement ? "#15803d" : "#111827" }}
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="text-base font-bold tabular-nums"
+                      >
+                        {qtyDisplay}
+                      </motion.p>
+                    </AnimatePresence>
+                  </div>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.88 }}
+                    onClick={increment}
+                    className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
+                  >
+                    +
+                  </motion.button>
                 </div>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.88 }}
-                  onClick={increment}
-                  className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center text-lg leading-none font-light select-none flex-shrink-0"
-                >
-                  +
-                </motion.button>
+                {/* Unit chips. Tap to set or clear. */}
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-200/60 dark:border-zinc-700/60">
+                  {COMMON_UNITS.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => onUpdateItem(item.id, { unit: item.unit === u ? null : u })}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                        item.unit === u
+                          ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                          : "bg-white dark:bg-zinc-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700 border border-gray-200 dark:border-zinc-700"
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Quick actions */}
@@ -417,20 +488,32 @@ export default function PantryItem({
                       onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
                       className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
                     />
-                    {item.expires_at ? (
+                    {item.expires_at && (
                       <button
                         type="button"
                         onClick={() => onUpdateItem(item.id, { expires_at: null })}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 transition-colors active:scale-[0.96]"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-950/30 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors active:scale-[0.96]"
                       >
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                         Clear
                       </button>
-                    ) : (
-                      expiry == null && null
                     )}
+                  </div>
+                  {/* Quick-set presets (audit M5) — common offsets save a
+                      trip into the date picker for "I want roughly +1 week". */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {EXPIRY_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => onUpdateItem(item.id, { expires_at: isoDateOffsetDays(p.days) })}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-[0.94] transition-colors"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
                   </div>
                   {item.expires_at && expiry && (
                     <p className={`text-xs font-medium ${expiry.text}`}>{expiry.detail}</p>
@@ -538,27 +621,30 @@ export default function PantryItem({
                 </div>
               )}
 
-              {/* Notes */}
+              {/* Notes (audit M7 — controlled + debounced save) */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Note</p>
                 <textarea
                   placeholder="Brand, location, anything useful…"
-                  defaultValue={item.notes ?? ""}
-                  onBlur={(e) => {
-                    const val = e.target.value.trim().slice(0, 150) || null;
-                    if (val !== (item.notes ?? null)) onUpdateItem(item.id, { notes: val });
-                  }}
-                  onChange={(e) => { if (e.target.value.length > 150) e.target.value = e.target.value.slice(0, 150); }}
+                  value={notesDraft}
+                  onChange={(e) => handleNotesChange(e.target.value)}
                   rows={2}
+                  maxLength={150}
                   className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
                 />
+                {notesDraft.length >= 100 && (
+                  <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">
+                    {150 - notesDraft.length} left
+                  </p>
+                )}
               </div>
 
-              {/* Delete confirmation */}
-              {/* Remove button */}
+              {/* Remove button (audit N8: softened — the confirm modal is
+                  where the red "destructive" treatment lives. This button
+                  is the entry point, not the irreversible action.) */}
               <button type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-50 text-red-500 text-sm font-medium hover:bg-red-100 transition-colors active:scale-[0.97]">
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 text-sm font-medium transition-colors active:scale-[0.97]">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
