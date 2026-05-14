@@ -45,6 +45,15 @@ interface PantryItemProps {
   inMultiSelect?: boolean;
   selected?: boolean;
   onSelectToggle?: () => void;
+  /**
+   * When true, skip rendering the card body entirely — only the sheet
+   * and confirm/add modals are emitted. The parent draws the visual
+   * (e.g. the bespoke Use Soon strip row) and this instance is mounted
+   * purely so that `expanded` can flip the sheet open. Without this,
+   * items filtered out of the regular sections (Use Soon, Running Low)
+   * have no PantryItem mounted and the sheet can't open.
+   */
+  hideCard?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -109,6 +118,7 @@ export default function PantryItem({
   inMultiSelect = false,
   selected = false,
   onSelectToggle,
+  hideCard = false,
 }: PantryItemProps) {
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(item.name);
@@ -576,7 +586,10 @@ export default function PantryItem({
 
   return (
     <>
-      {/* ── Compact card (always) ─────────────────────────────── */}
+      {/* ── Compact card (hidden when caller provides its own visual
+           — e.g. the Use Soon strip on PantryList — and only mounts
+           this PantryItem so the sheet can attach to expandedId.) ── */}
+      {!hideCard && (
       <motion.div
         layout
         initial={{ opacity: 0, scale: 0.96 }}
@@ -710,6 +723,7 @@ export default function PantryItem({
           </div>
         )}
       </motion.div>
+      )}
 
       {/* ── Bottom sheet (self-portals via <ItemSheet/>) ────────── */}
       {sheet}

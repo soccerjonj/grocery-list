@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
@@ -924,26 +924,46 @@ export default function PantryList({
                       : `${d} days left`;
                     const locationLabel = LOCATION_LABEL[item.storage_location ?? ""] ?? null;
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleToggleExpand(item.id)}
-                        className="flex items-center gap-2 border border-red-200 dark:border-red-900/50 border-l-[3px] border-l-red-500 rounded-xl px-3 py-2 bg-red-50/50 dark:bg-red-950/20 text-left active:scale-[0.99] transition-transform"
-                      >
-                        <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                          <p className="text-xs font-semibold truncate text-gray-800 dark:text-gray-200">
-                            {item.name}
-                          </p>
-                          {locationLabel && (
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
-                              {locationLabel}
+                      <Fragment key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleExpand(item.id)}
+                          className="flex items-center gap-2 border border-red-200 dark:border-red-900/50 border-l-[3px] border-l-red-500 rounded-xl px-3 py-2 bg-red-50/50 dark:bg-red-950/20 text-left active:scale-[0.99] transition-transform"
+                        >
+                          <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                            <p className="text-xs font-semibold truncate text-gray-800 dark:text-gray-200">
+                              {item.name}
                             </p>
-                          )}
-                        </div>
-                        <span className="text-[11px] font-medium text-red-600 dark:text-red-400 flex-shrink-0">
-                          {urgencyLabel}
-                        </span>
-                      </button>
+                            {locationLabel && (
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                                {locationLabel}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-medium text-red-600 dark:text-red-400 flex-shrink-0">
+                            {urgencyLabel}
+                          </span>
+                        </button>
+                        {/* Hidden PantryItem instance: card suppressed, but
+                            its bottom-sheet still attaches to expandedId so
+                            tapping the row above opens the editor like
+                            normal pantry items. Without this, Use Soon
+                            items were filtered out of the sections below
+                            and had no sheet mounted. */}
+                        <PantryItem
+                          item={item}
+                          hideCard
+                          expanded={expandedId === item.id}
+                          onToggleExpand={() => handleToggleExpand(item.id)}
+                          onUpdateQuantity={onUpdateQuantity}
+                          onUpdateItem={onUpdateItem}
+                          onDelete={onDelete}
+                          onAddToShoppingList={onAddToShoppingList}
+                          members={members}
+                          currentUserId={currentUserId}
+                          householdId={householdId}
+                        />
+                      </Fragment>
                     );
                   })}
                 </div>
