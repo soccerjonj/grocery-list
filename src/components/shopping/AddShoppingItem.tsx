@@ -304,7 +304,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
         className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm"
       >
         {/* ── Name row ─────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-2 px-4 py-3.5">
           <div className="flex-shrink-0 w-5 h-5 rounded-full border-2 border-dashed border-gray-300" />
           <input
             ref={nameRef}
@@ -319,7 +319,7 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
               setExpanded(true);
               setShowSuggestions(true);
             }}
-            className="flex-1 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
+            className="flex-1 min-w-0 text-sm text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none bg-transparent"
           />
 
           {/* Amount preview chip — visible when collapsed and amount differs
