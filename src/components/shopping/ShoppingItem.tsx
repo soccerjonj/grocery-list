@@ -28,8 +28,6 @@ function getAssignedMembers(assignedTo: string[] | null, members: MemberProfile[
   });
 }
 
-const CHECK_ANIMATION_MS = 850;
-
 export default function ShoppingItem({
   item,
   onToggle,
@@ -54,8 +52,6 @@ export default function ShoppingItem({
   const { getStores } = useItemSuggestions(item.household_id);
   const knownStores = getStores();
   const [customStoreMode, setCustomStoreMode] = useState(false);
-
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep nameDraft in sync if the item updates externally while we
   // aren't actively editing it.
@@ -127,8 +123,16 @@ export default function ShoppingItem({
     if (checking) return;
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(10);
     if (item.completed) { onToggle(item.id); return; }
+    // Persist the check-off IMMEDIATELY. The old code deferred the DB
+    // write by CHECK_ANIMATION_MS so the in-place ripple could play first
+    // — but if the phone locked or the app was backgrounded within that
+    // window, the pending timer was killed and the check-off was silently
+    // lost. (That's how a finished trip ended up empty with the "checked"
+    // items back on the active list.) We now write right away; the ripple
+    // still plays during the row's exit animation as the item reflows
+    // into the Checked-off section.
     setChecking(true);
-    timerRef.current = setTimeout(() => { setChecking(false); onToggle(item.id); }, CHECK_ANIMATION_MS);
+    onToggle(item.id);
   }
 
   const isChecked = checking || item.completed;
