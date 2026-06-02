@@ -56,7 +56,7 @@ export default function BottomNav({ householdId }: BottomNavProps) {
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-30 pb-safe",
+        "fixed bottom-0 left-0 right-0 z-30 pb-safe lg:hidden",
         "bg-white/[0.88] dark:bg-zinc-950/[0.88]",
         "border-t border-black/[0.07] dark:border-white/[0.08]",
         "[backdrop-filter:blur(20px)_saturate(180%)]",

@@ -40,7 +40,7 @@ export default function ShoppingListDetailPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
+    <div className="max-w-lg lg:max-w-3xl mx-auto px-4 lg:px-8 pt-6 pb-4">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">

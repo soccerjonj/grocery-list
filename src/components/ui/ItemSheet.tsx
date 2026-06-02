@@ -26,27 +26,48 @@ interface ItemSheetProps {
   onClose: () => void;
   header?: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * "sheet" (default) = mobile bottom sheet: portal, backdrop, drag-to-
+   * dismiss, body scroll lock, Esc. "rail" = desktop docked panel: renders
+   * header + scrollable body INLINE where placed (no portal/backdrop/drag/
+   * scroll-lock), so a page can host it in a master-detail right column.
+   */
+  variant?: "sheet" | "rail";
 }
 
-export default function ItemSheet({ open, onClose, header, children }: ItemSheetProps) {
+export default function ItemSheet({ open, onClose, header, children, variant = "sheet" }: ItemSheetProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  useBodyScrollLock(open);
+  // Only the bottom-sheet variant locks the page behind it.
+  useBodyScrollLock(variant === "sheet" && open);
 
-  // Esc to dismiss.
+  // Esc to dismiss (sheet only — the rail's container owns Esc-to-clear).
   useEffect(() => {
-    if (!open) return;
+    if (variant !== "sheet" || !open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [variant, open, onClose]);
 
   // Drag-to-dismiss: attached to the handle so it never interferes with
   // scrolling inside the sheet content.
   const y = useMotionValue(0);
+
+  // ── Rail variant: inline docked panel content ──────────────────────
+  if (variant === "rail") {
+    if (!open) return null;
+    return (
+      <>
+        {header}
+        <div className="overflow-y-auto overscroll-contain flex-1 min-h-0 px-5 pb-6 flex flex-col gap-5">
+          {children}
+        </div>
+      </>
+    );
+  }
 
   if (!mounted) return null;
 

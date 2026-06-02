@@ -54,6 +54,18 @@ interface PantryItemProps {
    * have no PantryItem mounted and the sheet can't open.
    */
   hideCard?: boolean;
+  /**
+   * Chrome for the edit surface. "sheet" (default) = mobile bottom sheet
+   * via portal. "rail" = desktop docked panel rendered inline (the parent
+   * supplies the bordered/sticky column). Passed straight to <ItemSheet>.
+   */
+  sheetVariant?: "sheet" | "rail";
+  /**
+   * Whether this instance emits the edit surface at all. Defaults to true.
+   * On desktop, grid cards set this false so they render card-only and a
+   * single shared rail (a separate hideCard instance) owns editing.
+   */
+  renderSheet?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -119,6 +131,8 @@ export default function PantryItem({
   selected = false,
   onSelectToggle,
   hideCard = false,
+  sheetVariant = "sheet",
+  renderSheet = true,
 }: PantryItemProps) {
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(item.name);
@@ -344,6 +358,7 @@ export default function PantryItem({
     <ItemSheet
       open={expanded}
       onClose={onToggleExpand}
+      variant={sheetVariant}
       header={
         <ItemSheetHeader
           title={item.name}
@@ -725,11 +740,13 @@ export default function PantryItem({
       </motion.div>
       )}
 
-      {/* ── Bottom sheet (self-portals via <ItemSheet/>) ────────── */}
-      {sheet}
+      {/* ── Edit surface (bottom sheet or docked rail). Suppressed when
+           renderSheet is false — desktop grid cards delegate editing to a
+           single shared rail instance. ─────────────────────────── */}
+      {renderSheet && sheet}
 
       {/* ── Confirm delete modal (portal) ────────────────────── */}
-      {mounted && createPortal(
+      {renderSheet && mounted && createPortal(
         <AnimatePresence>
           {confirmDelete && (
             <>
@@ -798,7 +815,7 @@ export default function PantryItem({
         document.body
       )}
 
-      {mounted && showAddModal && onAddToShoppingList && (
+      {renderSheet && mounted && showAddModal && onAddToShoppingList && (
         <AddToListModal
           itemName={item.name}
           householdId={householdId}

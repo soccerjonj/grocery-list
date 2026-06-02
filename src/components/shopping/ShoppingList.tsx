@@ -9,6 +9,7 @@ import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { FOOD_CATEGORIES, SUPPLIES_CATEGORIES } from "@/types/database";
 import { getPantryHint } from "@/lib/pantryHints";
+import { useIsDesktop } from "@/hooks/useMediaQuery";
 
 interface ShoppingListProps {
   activeItems: ShoppingItemType[];
@@ -112,6 +113,9 @@ function StoreGroup({
   members,
   currentUserId,
   defaultOpen,
+  isDesktop = false,
+  selectedId = null,
+  onSelect,
 }: {
   store: string;
   items: ShoppingItemType[];
@@ -121,6 +125,10 @@ function StoreGroup({
   members: MemberProfile[];
   currentUserId: string | null;
   defaultOpen: boolean;
+  /** Desktop master-detail: route row opens to the shared rail. */
+  isDesktop?: boolean;
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -168,6 +176,8 @@ function StoreGroup({
                     onUpdate={onUpdate}
                     members={members}
                     currentUserId={currentUserId}
+                    renderSheet={!isDesktop}
+                    onOpenChange={isDesktop && onSelect ? (o) => onSelect(o ? item.id : null) : undefined}
                   />
                 ))}
               </AnimatePresence>
@@ -193,15 +203,6 @@ export default function ShoppingList({
   onClearAll,
   readOnly = false,
 }: ShoppingListProps) {
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-3">
-        {!readOnly && <div className="h-[52px] bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm animate-pulse" />}
-        <SkeletonList />
-      </div>
-    );
-  }
-
   // Grouping preference, scoped per household + persisted (T3-A).
   // Defaults to "store" — what every existing user is used to.
   const [grouping, setGrouping] = useState<Grouping>("store");
@@ -215,6 +216,27 @@ export default function ShoppingList({
     if (typeof window !== "undefined") {
       window.localStorage.setItem(GROUPING_KEY(householdId), g);
     }
+  }
+
+  // Desktop master-detail (active lists only — archived/readOnly stays a
+  // plain checklist). isDesktop is false on SSR + first paint, so mobile
+  // is unchanged.
+  const isDesktop = useIsDesktop();
+  const desktopSplit = isDesktop && !readOnly;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedItem = selectedId
+    ? activeItems.find((i) => i.id === selectedId) ?? null
+    : null;
+
+  // Loading guard placed AFTER all hooks so a loading true→false transition
+  // doesn't change hook count between renders (rules of hooks).
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3">
+        {!readOnly && <div className="h-[52px] bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm animate-pulse" />}
+        <SkeletonList />
+      </div>
+    );
   }
 
   const isEmpty = activeItems.length === 0 && completedItems.length === 0;
@@ -250,7 +272,8 @@ export default function ShoppingList({
           </div>
         </div>
       ) : (
-        <>
+        <div className={desktopSplit ? "lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:items-start" : ""}>
+        <div className="flex flex-col gap-3 min-w-0">
           {activeItems.length > 0 && (
             <>
               {/* Grouping toggle (T3-A). Tiny segmented control — only
@@ -296,6 +319,9 @@ export default function ShoppingList({
                         members={members}
                         currentUserId={currentUserId}
                         defaultOpen={true}
+                        isDesktop={desktopSplit}
+                        selectedId={selectedId}
+                        onSelect={setSelectedId}
                       />
                     );
                   })}
@@ -312,6 +338,8 @@ export default function ShoppingList({
                         onUpdate={onUpdate}
                         members={members}
                         currentUserId={currentUserId}
+                        renderSheet={!desktopSplit}
+                        onOpenChange={desktopSplit ? (o) => setSelectedId(o ? item.id : null) : undefined}
                       />
                     ))}
                   </AnimatePresence>
@@ -328,7 +356,42 @@ export default function ShoppingList({
             members={members}
             currentUserId={currentUserId}
           />
-        </>
+        </div>
+
+        {/* ── Desktop editor rail (right column) ─────────────────── */}
+        {desktopSplit && (
+          <aside className="hidden lg:block lg:sticky lg:top-4 lg:self-start lg:h-[calc(100dvh-2rem)]">
+            <div className="h-full rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden flex flex-col">
+              {selectedItem ? (
+                <ShoppingItem
+                  key={selectedItem.id}
+                  item={selectedItem}
+                  hideRow
+                  renderSheet
+                  sheetVariant="rail"
+                  controlledOpen
+                  onToggle={onToggle}
+                  onDelete={(id) => { onDelete(id); setSelectedId(null); }}
+                  onUpdate={onUpdate}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onOpenChange={(o) => { if (!o) setSelectedId(null); }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center h-full px-8 gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-zinc-800 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-gray-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Select an item</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Click any item to edit it here</p>
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+        </div>
       )}
     </div>
   );

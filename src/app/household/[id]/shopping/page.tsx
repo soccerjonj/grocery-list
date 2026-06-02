@@ -177,7 +177,7 @@ export default function ShoppingPage() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-24">
+      <div className="max-w-lg lg:max-w-5xl mx-auto px-4 lg:px-8 pt-6 pb-24 lg:pb-12">
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -186,7 +186,8 @@ export default function ShoppingPage() {
             </p>
             <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Shopping</h1>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Bell + settings duplicate the desktop sidebar — hide at lg. */}
+          <div className="flex items-center gap-2 lg:hidden">
             <ActivityBellButton householdId={householdId} />
             <Link
               href={`/household/${householdId}/settings`}

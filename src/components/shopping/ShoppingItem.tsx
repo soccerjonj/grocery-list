@@ -17,6 +17,16 @@ interface ShoppingItemProps {
   onUpdate?: (id: string, fields: Partial<Pick<ShoppingItemType, "name" | "quantity" | "unit" | "store" | "notes" | "assigned_to">>) => void;
   members?: MemberProfile[];
   currentUserId?: string | null;
+  /** Edit-surface chrome — "sheet" (mobile bottom sheet) or "rail" (desktop docked panel). */
+  sheetVariant?: "sheet" | "rail";
+  /** Whether this instance emits the edit surface. Desktop rows set false; the shared rail owns editing. */
+  renderSheet?: boolean;
+  /** When defined, overrides the local open state (the desktop rail forces this true). */
+  controlledOpen?: boolean;
+  /** Notified when the row requests open/close. Desktop routes this to selection instead of a local sheet. */
+  onOpenChange?: (open: boolean) => void;
+  /** Render only the edit surface, no row (used by the desktop rail instance). */
+  hideRow?: boolean;
 }
 
 function getAssignedMembers(assignedTo: string[] | null, members: MemberProfile[]): MemberProfile[] {
@@ -35,9 +45,16 @@ export default function ShoppingItem({
   onUpdate,
   members = [],
   currentUserId = null,
+  sheetVariant = "sheet",
+  renderSheet = true,
+  controlledOpen,
+  onOpenChange,
+  hideRow = false,
 }: ShoppingItemProps) {
   const [checking, setChecking] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [localSheetOpen, setLocalSheetOpen] = useState(false);
+  // The rail forces open via controlledOpen; otherwise local state drives it.
+  const sheetOpen = controlledOpen !== undefined ? controlledOpen : localSheetOpen;
 
   // Name is the one field we still buffer locally — we only commit on
   // blur / Enter so we don't fire a DB write per keystroke. Every other
@@ -94,11 +111,15 @@ export default function ShoppingItem({
 
   function openSheet() {
     if (item.completed || checking) return;
-    setSheetOpen(true);
+    // Desktop lifts selection to the parent (which fills the rail); mobile
+    // opens its own local bottom sheet.
+    if (onOpenChange) onOpenChange(true);
+    else setLocalSheetOpen(true);
   }
 
   function closeSheet() {
-    setSheetOpen(false);
+    if (onOpenChange) onOpenChange(false);
+    else setLocalSheetOpen(false);
   }
 
   function commitName() {
@@ -187,6 +208,7 @@ export default function ShoppingItem({
 
   return (
     <>
+      {!hideRow && (
       <motion.div
         layout
         initial={{ opacity: 0, y: -4 }}
@@ -373,11 +395,16 @@ export default function ShoppingItem({
           </motion.button>
         </motion.div>
       </motion.div>
+      )}
 
-      {/* ── Edit sheet ─────────────────────────────────────────── */}
+      {/* ── Edit surface (bottom sheet on mobile, docked rail on desktop).
+           Suppressed when renderSheet is false — desktop rows delegate to a
+           single shared rail instance. ────────────────────────────── */}
+      {renderSheet && (
       <ItemSheet
         open={sheetOpen}
         onClose={closeSheet}
+        variant={sheetVariant}
         header={
           <ItemSheetHeader
             title={item.name}
@@ -539,6 +566,7 @@ export default function ShoppingItem({
           Remove from list
         </button>
       </ItemSheet>
+      )}
     </>
   );
 }

@@ -14,6 +14,7 @@ import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
 import SortFilterSheet, { type SortKey as SortFilterKey, type ViewLayout } from "./SortFilterSheet";
 import { getPantryHint } from "@/lib/pantryHints";
+import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useToast } from "@/context/ToastContext";
 
 // Quick-add starter items shown on the empty state (audit M4). Picked
@@ -231,6 +232,8 @@ interface SectionProps {
   onUpdateItem: (id: string, fields: Partial<Omit<PantryItemType, "id" | "household_id" | "created_at" | "added_by">>) => void;
   onDelete: (id: string) => void;
   onAddToShoppingList?: (name: string, quantity?: number | null, unit?: string | null, store?: string | null, assignedTo?: string[] | null, kind?: string | null) => Promise<boolean>;
+  /** When false, cards render without their own edit sheet (desktop rail owns editing). */
+  renderSheet?: boolean;
 }
 
 function StorageSection({
@@ -254,6 +257,7 @@ function StorageSection({
   onUpdateItem,
   onDelete,
   onAddToShoppingList,
+  renderSheet = true,
 }: SectionProps) {
   const open = isOpen;
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -294,13 +298,13 @@ function StorageSection({
   const longTerm  = isFridge ? items.filter((i) => i.fridge_zone === "long_term") : [];
   const unzoned   = isFridge ? items.filter((i) => !i.fridge_zone) : items;
 
-  const itemProps = { members, currentUserId, householdId, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList, layout };
+  const itemProps = { members, currentUserId, householdId, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList, layout, renderSheet };
 
   function renderGrid(group: PantryItemType[]) {
     // Same 2-col grid for both layouts — list-layout items set
     // `gridColumn: span 2` on themselves so they fill the row.
     return (
-      <div className={layout === "list" ? "flex flex-col gap-1.5" : "grid grid-cols-2 gap-2"}>
+      <div className={layout === "list" ? "flex flex-col gap-1.5" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3"}>
         <AnimatePresence mode="popLayout">
           {sortItems(group, sort).map((item) => (
             <PantryItem
@@ -638,7 +642,7 @@ export default function PantryList({
     return (
       <div className="flex flex-col gap-4">
         <div className="h-[52px] bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm animate-pulse" />
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-28 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
@@ -725,10 +729,17 @@ export default function PantryList({
     bathroom: "Bathroom", laundry: "Laundry", kitchen: "Kitchen", garage: "Garage", other: "Other",
   };
 
+  // Desktop master-detail: at lg+, cards delegate editing to a single
+  // docked rail instead of each opening its own bottom sheet. isDesktop is
+  // false on SSR + first paint (useMediaQuery), so mobile/SSR is unchanged.
+  const isDesktop = useIsDesktop();
+  const selectedItem = expandedId ? items.find((i) => i.id === expandedId) ?? null : null;
+
   const sectionProps = {
     members, currentUserId, householdId, sort, expandedId, layout,
     inMultiSelect, selectedIds, onSelectToggle: toggleSelectItem,
     onToggleExpand: handleToggleExpand, onUpdateQuantity, onUpdateItem, onDelete, onAddToShoppingList,
+    renderSheet: !isDesktop,
   };
   // Helper to build the controlled-section props for each <StorageSection>.
   function sectionControl(label: string) {
@@ -743,6 +754,10 @@ export default function PantryList({
     <div className="flex flex-col gap-3">
       <AddPantryItem onAdd={onAdd} members={members} currentUserId={currentUserId} householdId={householdId} existingNames={items.map((i) => i.name.toLowerCase())} kind={kind} />
 
+      {/* Desktop master-detail split: list (left) + editor rail (right).
+          Below lg the grid classes are inert, so it's just the list. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:items-start">
+
       {/* Swipeable region — covers sort/filter row + sections + empty state.
           Excludes AddPantryItem above so input taps & drags work normally. */}
       <div
@@ -750,7 +765,7 @@ export default function PantryList({
         onTouchMove={handleSwipeMove}
         onTouchEnd={handleSwipeEnd}
         onTouchCancel={handleSwipeEnd}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-4 min-w-0"
       >
 
       {kindFiltered.length > 0 && (() => {
@@ -947,12 +962,13 @@ export default function PantryList({
                         {/* Hidden PantryItem instance: card suppressed, but
                             its bottom-sheet still attaches to expandedId so
                             tapping the row above opens the editor like
-                            normal pantry items. Without this, Use Soon
-                            items were filtered out of the sections below
-                            and had no sheet mounted. */}
+                            normal pantry items. On desktop the shared rail
+                            owns editing, so this emits nothing (renderSheet
+                            false) and the rail reads the selected item. */}
                         <PantryItem
                           item={item}
                           hideCard
+                          renderSheet={!isDesktop}
                           expanded={expandedId === item.id}
                           onToggleExpand={() => handleToggleExpand(item.id)}
                           onUpdateQuantity={onUpdateQuantity}
@@ -1061,6 +1077,42 @@ export default function PantryList({
           )}
         </div>
       )}
+      </div>
+
+      {/* ── Desktop editor rail (right column) ─────────────────────── */}
+      <aside className="hidden lg:block lg:sticky lg:top-4 lg:self-start lg:h-[calc(100dvh-2rem)]">
+        <div className="h-full rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden flex flex-col">
+          {selectedItem ? (
+            <PantryItem
+              key={selectedItem.id}
+              item={selectedItem}
+              hideCard
+              sheetVariant="rail"
+              renderSheet
+              expanded
+              onToggleExpand={() => setExpandedId(null)}
+              members={members}
+              currentUserId={currentUserId}
+              householdId={householdId}
+              onUpdateQuantity={onUpdateQuantity}
+              onUpdateItem={onUpdateItem}
+              onDelete={onDelete}
+              onAddToShoppingList={onAddToShoppingList}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center h-full px-8 gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-zinc-800 flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 2h6M8 6h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2zM10 11h4M10 15h4" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Select an item</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Click any item to edit it here</p>
+            </div>
+          )}
+        </div>
+      </aside>
+
       </div>
 
       <SortFilterSheet
