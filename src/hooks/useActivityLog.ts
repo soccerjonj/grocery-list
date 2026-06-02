@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ActivityLog } from "@/types/database";
 
@@ -12,6 +12,20 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
+
+  // Unique per hook instance. Supabase reuses a realtime channel by topic
+  // name, so two consumers of this hook on the same household (e.g. the
+  // desktop sidebar bell AND a page-header bell mounted at once) would land
+  // on the same `activity-<id>` channel — and the second `.on()` runs after
+  // the first `.subscribe()`, which Supabase rejects with a hard throw
+  // ("cannot add postgres_changes callbacks ... after subscribe()") that
+  // crashes the whole tree. A per-instance suffix gives each mount its own
+  // channel; the postgres_changes filter still scopes to the household, so
+  // behavior is identical.
+  const instanceId = useRef<string>("");
+  if (!instanceId.current) {
+    instanceId.current = Math.random().toString(36).slice(2);
+  }
 
   const computeUnread = useCallback((items: ActivityLog[]) => {
     if (typeof window === "undefined") return;
@@ -53,7 +67,7 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
     fetchActivities();
 
     const channel = supabase
-      .channel(`activity-${householdId}`)
+      .channel(`activity-${householdId}-${instanceId.current}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activity_log", filter: `household_id=eq.${householdId}` },
