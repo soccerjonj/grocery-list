@@ -638,6 +638,13 @@ export default function PantryList({
     }
   }
 
+  // Desktop master-detail: at lg+, cards delegate editing to a single
+  // docked rail instead of each opening its own bottom sheet. isDesktop is
+  // false on SSR + first paint (useMediaQuery), so mobile/SSR is unchanged.
+  // MUST be called before the `loading` early-return below — otherwise a
+  // loading→loaded transition changes the hook count (React error #310).
+  const isDesktop = useIsDesktop();
+
   if (loading) {
     return (
       <div className="flex flex-col gap-4">
@@ -729,10 +736,6 @@ export default function PantryList({
     bathroom: "Bathroom", laundry: "Laundry", kitchen: "Kitchen", garage: "Garage", other: "Other",
   };
 
-  // Desktop master-detail: at lg+, cards delegate editing to a single
-  // docked rail instead of each opening its own bottom sheet. isDesktop is
-  // false on SSR + first paint (useMediaQuery), so mobile/SSR is unchanged.
-  const isDesktop = useIsDesktop();
   const selectedItem = expandedId ? items.find((i) => i.id === expandedId) ?? null : null;
 
   const sectionProps = {
