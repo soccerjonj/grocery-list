@@ -32,8 +32,16 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes that don't require auth
-  const publicPaths = ["/auth/login", "/auth/signup", "/auth/callback", "/auth/confirmed"];
+  // Public routes that don't require a session cookie. /api/v1/* is the
+  // external dashboard API — it does its own Bearer-token auth, so the
+  // cookie-based middleware must not redirect it to the login page.
+  const publicPaths = [
+    "/auth/login",
+    "/auth/signup",
+    "/auth/callback",
+    "/auth/confirmed",
+    "/api/v1",
+  ];
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
 
   if (!user && !isPublicPath && pathname !== "/") {
