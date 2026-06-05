@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { getAnthropic, extractJson, MODEL_SONNET } from "@/lib/anthropic";
+import { guardLlmRoute } from "@/lib/apiGuard";
+
+// ~6 MB decoded per image cap.
+const MAX_IMAGE_BASE64 = 8_000_000;
 
 /**
  * POST /api/extract-receipt
@@ -80,12 +83,10 @@ function coerce(raw: LlmItem): ReceiptItem | null {
 }
 
 export async function POST(req: Request) {
-  // Auth-gate
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  // Auth + household-membership + rate limit (vision is the most expensive
+  // route, so the tightest bucket).
+  const guard = await guardLlmRoute({ bucket: "extract-receipt", limit: 10, windowSeconds: 60 });
+  if (guard.error) return guard.error;
 
   const body = (await req.json().catch(() => null)) as Body | null;
   if (!body || !Array.isArray(body.images) || body.images.length === 0) {
@@ -97,6 +98,9 @@ export async function POST(req: Request) {
   for (const img of body.images) {
     if (typeof img.imageBase64 !== "string" || typeof img.mediaType !== "string") {
       return NextResponse.json({ error: "Invalid image format" }, { status: 400 });
+    }
+    if (img.imageBase64.length > MAX_IMAGE_BASE64) {
+      return NextResponse.json({ error: "One of the images is too large" }, { status: 413 });
     }
   }
 

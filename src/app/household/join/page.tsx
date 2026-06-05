@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import ColorPicker from "@/components/ui/ColorPicker";
 import { getErrorMessage } from "@/lib/utils";
+import { lookupInvite, joinHouseholdWithCode } from "@/lib/inviteRpcs";
 import { Suspense } from "react";
 
 type Step = "code" | "color";
@@ -55,45 +56,14 @@ function JoinForm() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Look up household by invite code
-      const { data: hh, error: lookupError } = await supabase
-        .from("households")
-        .select("id, name")
-        .eq("invite_code", code.trim().toLowerCase())
-        .single();
+      // Resolve the household via the SECURITY DEFINER lookup_invite RPC.
+      // Non-members can't (and shouldn't) read the households table directly
+      // — the RPC validates the invite code and returns only the household
+      // name + taken colors, nothing sensitive.
+      const ctx = await lookupInvite(code);
+      if (!ctx) throw new Error("Invalid invite code. Please check and try again.");
 
-      if (lookupError || !hh) throw new Error("Invalid invite code. Please check and try again.");
-
-      // Already a member — just navigate
-      const { data: existing } = await supabase
-        .from("household_members")
-        .select("id")
-        .eq("household_id", hh.id)
-        .eq("user_id", user.id)
-        .single();
-
-      if (existing) {
-        router.push(`/household/${hh.id}/pantry`);
-        return;
-      }
-
-      // Fetch colors already taken by existing members
-      const { data: memberRows } = await supabase
-        .from("household_members")
-        .select("user_id")
-        .eq("household_id", hh.id);
-
-      const memberIds = (memberRows ?? []).map((m: { user_id: string }) => m.user_id);
-      let taken: string[] = [];
-      if (memberIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("color")
-          .in("id", memberIds);
-        taken = (profiles ?? [])
-          .map((p: { color: string | null }) => p.color)
-          .filter((c): c is string => !!c);
-      }
+      const taken = ctx.takenColors;
       setTakenColors(taken);
 
       // Pre-select user's current color if not taken
@@ -105,7 +75,7 @@ function JoinForm() {
       const myColor = myProfile?.color ?? null;
       setSelectedColor(myColor && !taken.includes(myColor) ? myColor : null);
 
-      setHousehold(hh);
+      setHousehold({ id: ctx.householdId, name: ctx.householdName });
       setStep("color");
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -130,13 +100,11 @@ function JoinForm() {
         user.email?.split("@")[0] ||
         "";
 
-      // Insert membership FIRST. If this fails (RLS, dup, etc.) we don't
-      // want to have already overwritten the user's profile color — which
-      // is shared across all their households.
-      const { error: joinError } = await supabase
-        .from("household_members")
-        .insert({ household_id: household.id, user_id: user.id, role: "member" });
-      if (joinError) throw joinError;
+      // Join via the SECURITY DEFINER RPC, which validates the invite code
+      // server-side and inserts the membership row as role='member'. Direct
+      // client INSERT into household_members is revoked (migration 022) so
+      // this is the only join path. Idempotent if already a member.
+      await joinHouseholdWithCode(code);
 
       // Now safe to update the profile with the chosen color + name.
       await supabase.from("profiles").upsert(

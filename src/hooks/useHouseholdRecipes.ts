@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { HouseholdRecipe } from "@/types/database";
 import type { ExtractedIngredient } from "@/lib/recipeExtract";
+import { safeHttpUrl } from "@/lib/utils";
 
 /**
  * Saved recipes for the household. Backed by the `household_recipes` table
@@ -87,7 +88,9 @@ export function useHouseholdRecipes(householdId: string) {
         name: input.name.trim(),
         // Cast since the JSONB column is typed as Json in our generated types.
         ingredients: input.ingredients as unknown as never,
-        source_url: input.sourceUrl ?? null,
+        // Only persist safe http(s) URLs — never a javascript:/data: URI that
+        // would execute when rendered as a "View source" link.
+        source_url: safeHttpUrl(input.sourceUrl) ?? null,
         source_kind: input.sourceKind ?? "manual",
         added_by: user?.id ?? null,
       })

@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { getAnthropic, extractJson, MODEL_HAIKU, MODEL_SONNET } from "@/lib/anthropic";
 import { extractRecipesFromHtml, parseIngredientLine, type ExtractedIngredient } from "@/lib/recipeExtract";
+import { guardLlmRoute } from "@/lib/apiGuard";
+import { safeFetchText, SsrfBlockedError } from "@/lib/ssrfGuard";
+
+// Cap the fetched HTML and the inbound image so a huge body can't OOM the
+// function or balloon Anthropic token cost.
+const MAX_FETCH_BYTES = 3_000_000;       // 3 MB of HTML
+const MAX_IMAGE_BASE64 = 8_000_000;      // ~6 MB decoded
 
 /**
  * POST /api/extract-recipe
@@ -147,12 +153,9 @@ async function llmExtractFromImage(imageBase64: string, mediaType: string): Prom
 }
 
 export async function POST(req: Request) {
-  // Auth-gate — only signed-in users.
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  // Auth + household-membership + rate limit.
+  const guard = await guardLlmRoute({ bucket: "extract-recipe", limit: 15, windowSeconds: 60 });
+  if (guard.error) return guard.error;
 
   const body = (await req.json().catch(() => null)) as Body | null;
   if (!body || (body.type !== "url" && body.type !== "image")) {
@@ -167,22 +170,27 @@ export async function POST(req: Request) {
 
       let html: string;
       try {
-        const res = await fetch(body.url, {
+        // SSRF-guarded fetch: blocks internal/metadata addresses, validates
+        // every redirect hop, and caps the response size.
+        const res = await safeFetchText(body.url, {
+          maxBytes: MAX_FETCH_BYTES,
+          timeoutMs: 10_000,
           headers: {
             // Pretend to be a normal browser; some sites gate on user-agent.
             "User-Agent": "Mozilla/5.0 (compatible; OurPantryBot/1.0; +https://example.com)",
             "Accept": "text/html",
           },
-          // Don't follow redirects forever.
-          redirect: "follow",
-          // 10s timeout via AbortSignal
-          signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) {
-          return NextResponse.json({ error: `Couldn't fetch page (HTTP ${res.status})` }, { status: 502 });
+          // Generic 502 — don't echo the upstream status, which would turn
+          // this into an internal-reachability oracle.
+          return NextResponse.json({ error: "Couldn't fetch that page" }, { status: 502 });
         }
-        html = await res.text();
-      } catch {
+        html = res.text;
+      } catch (err) {
+        if (err instanceof SsrfBlockedError) {
+          return NextResponse.json({ error: "That URL isn't allowed" }, { status: 400 });
+        }
         return NextResponse.json({ error: "Couldn't fetch page" }, { status: 502 });
       }
 
@@ -217,6 +225,9 @@ export async function POST(req: Request) {
     // image flow
     if (typeof body.imageBase64 !== "string" || typeof body.mediaType !== "string") {
       return NextResponse.json({ error: "Invalid image body" }, { status: 400 });
+    }
+    if (body.imageBase64.length > MAX_IMAGE_BASE64) {
+      return NextResponse.json({ error: "Image is too large" }, { status: 413 });
     }
     const items = await llmExtractFromImage(body.imageBase64, body.mediaType);
     if (items.length === 0) {

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { ExtractedIngredient } from "@/lib/recipeExtract";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
 import { recipeIngredients } from "@/hooks/useHouseholdRecipes";
+import { safeHttpUrl } from "@/lib/utils";
 import type { HouseholdRecipe } from "@/types/database";
 
 /**
@@ -533,9 +534,9 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                                 </button>
                                 {/* Tiny secondary actions row */}
                                 <div className="flex items-center gap-3 px-3.5 pb-2.5 -mt-1">
-                                  {r.source_url && (
+                                  {safeHttpUrl(r.source_url) && (
                                     <a
-                                      href={r.source_url}
+                                      href={safeHttpUrl(r.source_url)!}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       onClick={(e) => e.stopPropagation()}

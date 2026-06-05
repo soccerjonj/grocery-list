@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { getAnthropic, extractJson, MODEL_HAIKU } from "@/lib/anthropic";
+import { guardLlmRoute } from "@/lib/apiGuard";
 
 /**
  * POST /api/classify-item
@@ -48,12 +48,11 @@ interface ClassifyBody {
 }
 
 export async function POST(req: Request) {
-  // Auth gate — only household members should hit the LLM.
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  // Auth + household-membership + rate limit (generous — fires as the user
+  // adds items, but unique novel names each force a fresh Haiku call).
+  const guard = await guardLlmRoute({ bucket: "classify-item", limit: 40, windowSeconds: 60 });
+  if (guard.error) return guard.error;
+  const supabase = guard.supabase;
 
   const body = (await req.json().catch(() => ({}))) as ClassifyBody;
   const rawName = typeof body.name === "string" ? body.name : "";

