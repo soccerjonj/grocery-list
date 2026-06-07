@@ -9,6 +9,7 @@ import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { getPantryDuplicates, increasePantryQty } from "@/lib/checkPantryDuplicate";
+import { normalizeItemName } from "@/lib/normalizeItemName";
 import { getPantryHint } from "@/lib/pantryHints";
 import AmountField from "@/components/ui/AmountField";
 
@@ -95,24 +96,37 @@ function DraftCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
       transition={{ duration: 0.18 }}
-      className={`bg-white dark:bg-zinc-900 border rounded-2xl px-4 py-3.5 flex flex-col gap-3 ${item.conflict ? "border-amber-200 dark:border-amber-800/50" : "border-gray-100 dark:border-zinc-800"}`}
+      className={`bg-white dark:bg-zinc-900 border rounded-2xl px-4 py-3.5 flex flex-col gap-3 ${item.conflict ? "border-emerald-200 dark:border-emerald-800/50" : "border-gray-100 dark:border-zinc-800"}`}
     >
-      {/* Conflict banner */}
-      {item.conflict && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 rounded-xl px-3 py-2 flex flex-col gap-1.5">
-          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Already in pantry (×{item.conflict.existingQty})</p>
-          <div className="flex gap-1.5">
-            <button type="button"
-              onClick={() => onChange({ conflictAction: "merge" })}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.97] ${(item.conflictAction ?? "merge") === "merge" ? "bg-amber-500 text-white" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400"}`}
-            >Add to existing</button>
-            <button type="button"
-              onClick={() => onChange({ conflictAction: "add" })}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.97] ${item.conflictAction === "add" ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400"}`}
-            >Add as new entry</button>
+      {/* Restock banner — this item is already in the pantry. Default is to
+          bump the existing row's quantity (a satisfying restock), not warn. */}
+      {item.conflict && (() => {
+        const merging = (item.conflictAction ?? "merge") === "merge";
+        const result = item.conflict.existingQty + (item.quantity || 0);
+        return (
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 rounded-xl px-3 py-2 flex items-center gap-2 flex-wrap">
+            <svg className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7M4 7l1.5-3h13L20 7M4 7h16M9 11h6" />
+            </svg>
+            {merging ? (
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex-1">
+                In pantry: {item.conflict.existingQty} <span aria-hidden>→</span> {result}
+              </p>
+            ) : (
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 flex-1">
+                Adding as a separate entry
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange({ conflictAction: merging ? "add" : "merge" })}
+              className="flex-shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 underline-offset-2 hover:underline transition-colors active:opacity-60"
+            >
+              {merging ? "Keep separate" : "Add to existing"}
+            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Row 1: name + skip/delete actions */}
       <div className="flex items-center gap-2">
@@ -356,7 +370,7 @@ export default function ImportToPantrySheet({
       if (cancelled) return;
       setDrafts(
         raw.map((item) => {
-          const c = conflicts.get(item.name.toLowerCase());
+          const c = conflicts.get(normalizeItemName(item.name));
           return c
             ? { ...item, conflict: { existingId: c.id, existingQty: c.quantity }, conflictAction: "merge" as const }
             : item;
@@ -402,7 +416,7 @@ export default function ImportToPantrySheet({
       if (!cancelled) {
         setDrafts(
           raw.map((item) => {
-            const c = conflicts.get(item.name.toLowerCase());
+            const c = conflicts.get(normalizeItemName(item.name));
             return c
               ? { ...item, conflict: { existingId: c.id, existingQty: c.quantity }, conflictAction: "merge" as const }
               : item;
@@ -490,6 +504,10 @@ export default function ImportToPantrySheet({
             storageLocation: draft.storageLocation,
             fridgeZone: draft.kind === "food" ? draft.fridgeZone : null,
             foodCategory: draft.foodCategory,
+            // Previously dropped on merge — now carried into the existing row.
+            unit: draft.unit || null,
+            expiresAt: draft.kind === "food" ? draft.expiresAt : null,
+            assignedTo: draft.assignedTo,
           }
         );
       } else {
@@ -714,6 +732,14 @@ export default function ImportToPantrySheet({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                           {(() => {
+                            // Honest outcome: how many existing rows we'll
+                            // restock vs how many brand-new rows we'll create.
+                            const updates = drafts.filter(
+                              (d) => d.conflict && (d.conflictAction ?? "merge") === "merge"
+                            ).length;
+                            const news = drafts.length - updates;
+                            if (updates > 0 && news > 0) return `Update ${updates} · Add ${news} new`;
+                            if (updates > 0) return `Update ${updates} in pantry`;
                             const f = drafts.filter((d) => d.kind === "food").length;
                             const s = drafts.filter((d) => d.kind === "supplies").length;
                             if (f > 0 && s > 0) return `Add ${f} to pantry, ${s} to supplies`;
