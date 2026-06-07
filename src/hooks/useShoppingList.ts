@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem } from "@/types/database";
 import { getPantryHint } from "@/lib/pantryHints";
+import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 
 export function useShoppingList(householdId: string, listId: string) {
   const [items, setItems] = useState<ShoppingItem[]>([]);
@@ -131,6 +132,19 @@ export function useShoppingList(householdId: string, listId: string) {
 
     if (insertError) {
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
+      // Backstop: DB unique index rejected a duplicate active row — heal
+      // into an increment instead of dropping the add.
+      if ((insertError as { code?: string }).code === "23505") {
+        const existing = await checkShoppingDuplicate(householdId, name, listId);
+        if (existing) {
+          await increaseShoppingQty(existing.id, existing.quantity, quantity ?? 1);
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === existing.id ? { ...i, quantity: existing.quantity + (quantity ?? 1) } : i
+            )
+          );
+        }
+      }
     } else if (data) {
       selfInsertedIds.current.add(data.id);
       setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);

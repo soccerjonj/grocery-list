@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem, ShoppingList } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
 import { getPantryHint } from "@/lib/pantryHints";
+import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 import { useToast } from "@/context/ToastContext";
 
 function tripName() {
@@ -173,6 +174,20 @@ export function useShoppingFlow(householdId: string) {
     if (error) {
       console.error("shopping addItem failed:", error.message, error.details);
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
+      // Backstop: the DB unique index (migration 024) rejected a duplicate
+      // active row (e.g. a two-device race). Heal into an increment.
+      if ((error as { code?: string }).code === "23505") {
+        const existing = await checkShoppingDuplicate(householdId, name, activeListId);
+        if (existing) {
+          await increaseShoppingQty(existing.id, existing.quantity, quantity ?? 1);
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === existing.id ? { ...i, quantity: (existing.quantity) + (quantity ?? 1) } : i
+            )
+          );
+          logActivity(householdId, "shopping_add", name);
+        }
+      }
     } else if (data) {
       selfInsertedIds.current.add(data.id);
       setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);

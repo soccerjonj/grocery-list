@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PantryItem } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
+import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
 import { useToast } from "@/context/ToastContext";
 
 export interface AddPantryOptions {
@@ -144,6 +145,30 @@ export function usePantry(householdId: string) {
 
     if (insertError) {
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
+      // Backstop: the DB unique index (migration 024) rejected a duplicate
+      // that slipped past the component-level checks — e.g. a two-device
+      // race. Heal it into an increment instead of silently dropping the
+      // user's add.
+      if ((insertError as { code?: string }).code === "23505") {
+        const existing = await checkPantryDuplicate(householdId, name);
+        if (existing) {
+          await increasePantryQty(existing.id, existing.quantity, quantity, {
+            kind: options?.kind ?? null,
+            storageLocation: options?.storageLocation ?? null,
+            fridgeZone: options?.fridgeZone ?? null,
+            foodCategory: options?.foodCategory ?? null,
+            unit: unit ?? null,
+            expiresAt: options?.expiresAt ?? null,
+            assignedTo: options?.assignedTo ?? null,
+          });
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === existing.id ? { ...i, quantity: existing.quantity + quantity } : i
+            )
+          );
+          logActivity(householdId, "pantry_add", name);
+        }
+      }
     } else if (data) {
       selfInsertedIds.current.add(data.id);
       setTimeout(() => selfInsertedIds.current.delete(data.id), 5000);
