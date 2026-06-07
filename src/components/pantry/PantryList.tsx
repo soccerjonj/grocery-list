@@ -14,6 +14,7 @@ import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import AddToListModal from "./AddToListModal";
 import SortFilterSheet, { type SortKey as SortFilterKey, type ViewLayout } from "./SortFilterSheet";
 import { getPantryHint } from "@/lib/pantryHints";
+import { normalizeItemName } from "@/lib/normalizeItemName";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useToast } from "@/context/ToastContext";
 
@@ -876,13 +877,23 @@ export default function PantryList({
                 key={name}
                 type="button"
                 onClick={() => {
-                  const hint = getPantryHint(name);
-                  onAdd(name, 1, undefined, {
-                    kind: hint?.kind ?? kind,
-                    storageLocation: hint?.storage_location ?? null,
-                    fridgeZone: hint?.fridge_zone ?? null,
-                    foodCategory: hint?.food_category ?? null,
-                  });
+                  // Guard against double-tap / already-present duplicates:
+                  // if a matching item already exists, bump its quantity
+                  // instead of inserting a second row.
+                  const existing = items.find(
+                    (i) => normalizeItemName(i.name) === normalizeItemName(name)
+                  );
+                  if (existing) {
+                    onUpdateQuantity(existing.id, existing.quantity + 1);
+                  } else {
+                    const hint = getPantryHint(name);
+                    onAdd(name, 1, undefined, {
+                      kind: hint?.kind ?? kind,
+                      storageLocation: hint?.storage_location ?? null,
+                      fridgeZone: hint?.fridge_zone ?? null,
+                      foodCategory: hint?.food_category ?? null,
+                    });
+                  }
                   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
                     try { navigator.vibrate(8); } catch { /* ignore */ }
                   }

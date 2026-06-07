@@ -5,7 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
-import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import { checkShoppingDuplicate, increaseShoppingQty, getShoppingDuplicates } from "@/lib/checkShoppingDuplicate";
+import { normalizeItemName } from "@/lib/normalizeItemName";
 import AmountField from "@/components/ui/AmountField";
 import { getPantryHint } from "@/lib/pantryHints";
 import RecipeImportSheet from "@/components/shopping/RecipeImportSheet";
@@ -264,22 +265,29 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   }
 
   /**
-   * Bulk-add: split the name input by commas/newlines, fire onAdd for
-   * each name with the shared metadata (qty / unit / store / assignedTo).
-   * Skips duplicate detection — the user clearly intends bulk-add. (T1-E)
+   * Bulk-add: split the name input by commas/newlines, add each with the
+   * shared metadata (qty / unit / store / assignedTo). Items already on the
+   * list get their quantity bumped instead of duplicated (one bulk dedup
+   * fetch, not a per-item warning). (T1-E)
    */
-  function doBulkAdd() {
+  async function doBulkAdd() {
     const qtyNum = quantity ? parseFloat(quantity) : undefined;
     const qtyToUse = qtyNum && qtyNum > 0 ? qtyNum : undefined;
+    const dupes = await getShoppingDuplicates(householdId, bulkNames);
     for (const itemName of bulkNames) {
-      onAdd(
-        itemName,
-        qtyToUse,
-        unit || undefined,
-        store.trim() || undefined,
-        assignedTo,
-        undefined, // notes intentionally not duplicated across bulk items
-      );
+      const existing = dupes.get(normalizeItemName(itemName));
+      if (existing) {
+        await increaseShoppingQty(existing.id, existing.quantity, qtyToUse ?? 1);
+      } else {
+        onAdd(
+          itemName,
+          qtyToUse,
+          unit || undefined,
+          store.trim() || undefined,
+          assignedTo,
+          undefined, // notes intentionally not duplicated across bulk items
+        );
+      }
     }
     if (customStoreMode && store.trim()) saveStore(store.trim());
     rememberStore();

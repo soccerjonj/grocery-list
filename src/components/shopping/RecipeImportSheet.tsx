@@ -5,7 +5,10 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import type { ExtractedIngredient } from "@/lib/recipeExtract";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
+import { useHouseholdContext } from "@/context/HouseholdContext";
 import { recipeIngredients } from "@/hooks/useHouseholdRecipes";
+import { getShoppingDuplicates, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import { normalizeItemName } from "@/lib/normalizeItemName";
 import { safeHttpUrl } from "@/lib/utils";
 import type { HouseholdRecipe } from "@/types/database";
 
@@ -54,6 +57,7 @@ function asDrafts(items: ExtractedIngredient[]): Draft[] {
 
 export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
   const { recipes: { recipes, saveRecipe, updateRecipe, deleteRecipe } } = useHouseholdData();
+  const { householdId } = useHouseholdContext();
 
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<Tab>("new");
@@ -270,8 +274,19 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
     if (keepers.length === 0) return;
     setAdding(true);
     try {
+      // Bump the quantity of ingredients already on the list instead of
+      // adding a second "2 cups flour" line.
+      const dupes = await getShoppingDuplicates(
+        householdId,
+        keepers.map((d) => d.name.trim()),
+      );
       for (const d of keepers) {
-        await onAdd(d.name.trim(), d.quantity, d.unit);
+        const existing = dupes.get(normalizeItemName(d.name));
+        if (existing) {
+          await increaseShoppingQty(existing.id, existing.quantity, d.quantity ?? 1);
+        } else {
+          await onAdd(d.name.trim(), d.quantity, d.unit);
+        }
       }
     } finally {
       setAdding(false);
