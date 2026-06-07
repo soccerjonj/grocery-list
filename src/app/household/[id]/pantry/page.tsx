@@ -12,6 +12,8 @@ import ImportToPantrySheet from "@/components/pantry/ImportToPantrySheet";
 import ActivityBellButton from "@/components/household/ActivityBellFloat";
 import { createClient } from "@/lib/supabase/client";
 import { getPantryHint } from "@/lib/pantryHints";
+import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import { getPendingImport, clearPendingImport, type PendingImport } from "@/lib/pendingImport";
 import type { Kind } from "@/types/database";
 
 function PantryPageInner() {
@@ -106,10 +108,29 @@ function PantryPageInner() {
       added_by: user?.id ?? null,
       kind: resolvedKind,
     });
-    return !error;
+    if (!error) return true;
+    // Already on the list (DB unique index, migration 024) — bump it.
+    if ((error as { code?: string }).code === "23505") {
+      const existing = await checkShoppingDuplicate(householdId, name, activeShoppingListId);
+      if (existing) {
+        await increaseShoppingQty(existing.id, existing.quantity, quantity ?? 1);
+        return true;
+      }
+    }
+    return false;
   }
 
+  // Pending finish-trip import (durable marker). Resurfaced as a dismissible
+  // banner so a finished trip waiting to be stocked isn't lost on refresh/nav.
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  useEffect(() => {
+    if (!importListId) setPendingImport(getPendingImport(householdId));
+  }, [householdId, importListId]);
+
   function handleImportClose() {
+    // Going through the import sheet resolves the pending marker.
+    clearPendingImport(householdId);
+    setPendingImport(null);
     router.replace(`/household/${householdId}/pantry`);
   }
 
@@ -241,6 +262,39 @@ function PantryPageInner() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Finish-trip "ready to stock" banner — durable across refresh/nav. */}
+      {pendingImport && !importListId && (
+        <div className="w-full mb-3 flex items-center gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => router.push(`/household/${householdId}/pantry?import=${pendingImport.listId}`)}
+            className="flex-1 min-w-0 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+          >
+            <span className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7M4 7l1.5-3h13L20 7M4 7h16M9 11h6" />
+              </svg>
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                {pendingImport.count} item{pendingImport.count !== 1 ? "s" : ""} from your last trip
+              </span>
+              <span className="block text-xs text-emerald-600 dark:text-emerald-400">Tap to stock them into your pantry</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { clearPendingImport(householdId); setPendingImport(null); }}
+            aria-label="Dismiss"
+            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-emerald-500/70 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       <PantryList
         items={items}

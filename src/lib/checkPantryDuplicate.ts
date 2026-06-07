@@ -28,27 +28,27 @@ export async function checkPantryDuplicate(
   return match ? { id: match.id, quantity: match.quantity ?? 1 } : null;
 }
 
-/** Bulk check — returns a map of normalized name → { id, quantity }. */
+/** Bulk check — returns a map of normalized name → { id, quantity, unit }. */
 export async function getPantryDuplicates(
   householdId: string,
   names: string[]
-): Promise<Map<string, { id: string; quantity: number }>> {
+): Promise<Map<string, { id: string; quantity: number; unit: string | null }>> {
   if (names.length === 0) return new Map();
   const supabase = createClient();
   const { data } = await supabase
     .from("pantry_items")
-    .select("id, name, quantity, created_at")
+    .select("id, name, quantity, unit, created_at")
     .eq("household_id", householdId)
     .order("created_at", { ascending: true });
 
   const wanted = new Set(names.map(normalizeItemName).filter(Boolean));
-  const map = new Map<string, { id: string; quantity: number }>();
+  const map = new Map<string, { id: string; quantity: number; unit: string | null }>();
   for (const row of data ?? []) {
     const key = normalizeItemName(row.name);
     // First (oldest) row wins; later duplicate rows are ignored so we always
     // merge into a single canonical row.
     if (wanted.has(key) && !map.has(key)) {
-      map.set(key, { id: row.id, quantity: row.quantity ?? 1 });
+      map.set(key, { id: row.id, quantity: row.quantity ?? 1, unit: row.unit ?? null });
     }
   }
   return map;

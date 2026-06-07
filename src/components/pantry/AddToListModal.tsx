@@ -23,7 +23,12 @@ export default function AddToListModal({ itemName, householdId, members, current
   // and the most common case is "I want one of these".
   const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
-  const [store, setStore] = useState("");
+  // Seed the store from the same session-sticky key AddShoppingItem uses, so
+  // restocking 8 items in a row doesn't re-pick "Target" every time.
+  const [store, setStore] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.sessionStorage.getItem(`last_store_${householdId}`) ?? "";
+  });
   const [assignedTo, setAssignedTo] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -45,10 +50,17 @@ export default function AddToListModal({ itemName, householdId, members, current
     });
   }
 
+  function rememberStore() {
+    if (typeof window === "undefined") return;
+    const trimmed = store.trim();
+    if (trimmed) window.sessionStorage.setItem(`last_store_${householdId}`, trimmed);
+  }
+
   async function handleConfirm() {
     setSaving(true);
     await onConfirm(qty ? parseFloat(qty) : null, unit.trim() || null, store.trim() || null, assignedTo);
     if (customStoreMode && store.trim()) saveStore(store.trim());
+    rememberStore();
     setSaving(false);
     onClose();
   }
@@ -92,20 +104,20 @@ export default function AddToListModal({ itemName, householdId, members, current
             </button>
           </div>
 
-          {/* Duplicate warning */}
+          {/* Already-on-the-list restock. Duplicates can't coexist (DB unique
+              index), so the only sensible action is to bump the quantity. */}
           {duplicate && (
-            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-3 flex flex-col gap-2">
-              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Already on the list (×{duplicate.quantity})</p>
-              <p className="text-xs text-amber-600 dark:text-amber-500">Would you like to increase the quantity or add it again separately?</p>
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl p-3 flex flex-col gap-2">
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                On the list: {duplicate.quantity} <span aria-hidden>→</span> {duplicate.quantity + (qty ? parseFloat(qty) || 1 : 1)}
+              </p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400">It&apos;s already on your shopping list — add more to bump the quantity.</p>
               <div className="flex gap-2 mt-1">
                 <button type="button" onClick={handleIncreaseQty} disabled={saving}
-                  className="flex-1 py-2 bg-amber-500 text-white text-xs font-medium rounded-xl active:scale-[0.97] disabled:opacity-40"
-                >Increase qty</button>
-                <button type="button" onClick={() => setDuplicate(null)} disabled={saving}
-                  className="flex-1 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-xs font-medium rounded-xl active:scale-[0.97] disabled:opacity-40"
-                >Add anyway</button>
-                <button type="button" onClick={() => setDuplicate(null)}
-                  className="px-3 py-2 text-gray-400 dark:text-gray-500 text-xs active:opacity-60"
+                  className="flex-1 py-2 bg-emerald-600 text-white text-xs font-medium rounded-xl active:scale-[0.97] disabled:opacity-40"
+                >{saving ? "Adding…" : "Increase quantity"}</button>
+                <button type="button" onClick={onClose} disabled={saving}
+                  className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-xs font-medium rounded-xl active:scale-[0.97] disabled:opacity-40"
                 >Cancel</button>
               </div>
             </div>

@@ -9,7 +9,7 @@ import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { getPantryDuplicates, increasePantryQty } from "@/lib/checkPantryDuplicate";
-import { normalizeItemName } from "@/lib/normalizeItemName";
+import { normalizeItemName, normalizeUnit } from "@/lib/normalizeItemName";
 import { getPantryHint } from "@/lib/pantryHints";
 import AmountField from "@/components/ui/AmountField";
 
@@ -60,6 +60,27 @@ interface ImportToPantrySheetProps {
 
 // Quantity controls now use the shared `AmountField` from
 // @/components/ui/AmountField — see DraftCard.
+
+/**
+ * Attach an existing-pantry conflict to a draft. Defaults to "merge"
+ * (restock), but when the existing item and the incoming draft have
+ * DIFFERENT units (2 cans vs 1 bottle), default to "add" so we don't
+ * silently sum incompatible amounts — the user can still choose to merge.
+ */
+function applyConflict(
+  item: DraftItem,
+  conflicts: Map<string, { id: string; quantity: number; unit: string | null }>,
+): DraftItem {
+  const c = conflicts.get(normalizeItemName(item.name));
+  if (!c) return item;
+  const unitConflict =
+    !!item.unit && !!c.unit && normalizeUnit(item.unit) !== normalizeUnit(c.unit);
+  return {
+    ...item,
+    conflict: { existingId: c.id, existingQty: c.quantity },
+    conflictAction: unitConflict ? "add" : "merge",
+  };
+}
 
 // ── Single draft item card ─────────────────────────────────────────
 function DraftCard({
@@ -380,14 +401,7 @@ export default function ImportToPantrySheet({
       );
       const conflicts = await getPantryDuplicates(householdId, raw.map((r) => r.name));
       if (cancelled) return;
-      setDrafts(
-        raw.map((item) => {
-          const c = conflicts.get(normalizeItemName(item.name));
-          return c
-            ? { ...item, conflict: { existingId: c.id, existingQty: c.quantity }, conflictAction: "merge" as const }
-            : item;
-        }),
-      );
+      setDrafts(raw.map((item) => applyConflict(item, conflicts)));
       setLoadingItems(false);
     }
 
@@ -426,14 +440,7 @@ export default function ImportToPantrySheet({
       const conflicts = await getPantryDuplicates(householdId, raw.map((r) => r.name));
 
       if (!cancelled) {
-        setDrafts(
-          raw.map((item) => {
-            const c = conflicts.get(normalizeItemName(item.name));
-            return c
-              ? { ...item, conflict: { existingId: c.id, existingQty: c.quantity }, conflictAction: "merge" as const }
-              : item;
-          })
-        );
+        setDrafts(raw.map((item) => applyConflict(item, conflicts)));
         setLoadingItems(false);
       }
     }
@@ -499,6 +506,13 @@ export default function ImportToPantrySheet({
   function applyExpiryToAllFood(date: string | null) {
     setDrafts((prev) =>
       prev.map((d) => (d.kind === "food" ? { ...d, expiresAt: date } : d))
+    );
+  }
+
+  /** Set merge/add for every already-in-pantry row at once. */
+  function setAllConflictAction(action: "merge" | "add") {
+    setDrafts((prev) =>
+      prev.map((d) => (d.conflict ? { ...d, conflictAction: action } : d))
     );
   }
 
@@ -629,6 +643,12 @@ export default function ImportToPantrySheet({
                 // drafts — for a single item it's faster to just tap that
                 // row's date input.
                 const showBulkExpiry = foodDrafts.length >= 2;
+                // Bulk merge/separate control when 2+ items are already in
+                // the pantry, so the user doesn't toggle each one.
+                const conflictCount = drafts.filter((d) => d.conflict).length;
+                const allMerging = drafts
+                  .filter((d) => d.conflict)
+                  .every((d) => (d.conflictAction ?? "merge") === "merge");
                 // If every food draft already shares one expiry, prefill it.
                 const sharedExpiry = (() => {
                   const dates = new Set(foodDrafts.map((d) => d.expiresAt ?? ""));
@@ -651,6 +671,31 @@ export default function ImportToPantrySheet({
 
                 return (
                   <AnimatePresence mode="popLayout">
+                    {conflictCount >= 2 && (
+                      <div
+                        key="bulk-merge"
+                        className="flex items-center gap-2 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2.5"
+                      >
+                        <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7M4 7l1.5-3h13L20 7M4 7h16M9 11h6" />
+                        </svg>
+                        <p className="flex-1 text-xs text-gray-700 dark:text-gray-300 min-w-0">
+                          {conflictCount} already in your pantry
+                        </p>
+                        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white dark:bg-zinc-900 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setAllConflictAction("merge")}
+                            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${allMerging ? "bg-emerald-600 text-white" : "text-gray-500 dark:text-gray-400"}`}
+                          >Restock all</button>
+                          <button
+                            type="button"
+                            onClick={() => setAllConflictAction("add")}
+                            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${!allMerging ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "text-gray-500 dark:text-gray-400"}`}
+                          >Add as new</button>
+                        </div>
+                      </div>
+                    )}
                     {showBulkExpiry && (
                       <div
                         key="bulk-expiry"

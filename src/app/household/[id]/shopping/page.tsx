@@ -9,6 +9,7 @@ import { useHouseholdData } from "@/context/HouseholdDataContext";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import Spinner from "@/components/ui/Spinner";
 import ActivityBellButton from "@/components/household/ActivityBellFloat";
+import { setPendingImport } from "@/lib/pendingImport";
 import type { ShoppingList as ShoppingListType } from "@/types/database";
 
 function formatDate(iso: string) {
@@ -161,6 +162,9 @@ export default function ShoppingPage() {
       setCelebrating(true);
       setLastTripId(archivedId);
       setLastTripCount(count);
+      // Durable marker so the Pantry tab can resurface "ready to stock" even
+      // if the user taps "Later", refreshes, or navigates away.
+      if (count > 0) setPendingImport(householdId, archivedId, count);
     }
   }
 

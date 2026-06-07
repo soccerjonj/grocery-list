@@ -53,6 +53,9 @@ export default function AddPantryItem({
   const [notes, setNotes] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [autoDetected, setAutoDetected] = useState(false);
+  // True while the async AI classifier is resolving (after the instant
+  // keyword pass missed) so we can show a quiet "detecting…" hint.
+  const [classifying, setClassifying] = useState(false);
   // Resolved kind for this draft. Defaults to the active tab; pantryHints can
   // override (e.g. user is on Food but types "toothpaste"). When kind flips
   // due to detection, we set kindAutoDetected so we can show a small chip the
@@ -129,9 +132,12 @@ export default function AddPantryItem({
       // current input as the cancellation token — if the user has
       // typed more by the time the network call resolves, ignore it.
       const tokenAtRequest = val.trim();
+      setClassifying(true);
       const ai = await getOrClassify(val);
+      setClassifying(false);
       // Stale-response guard: bail if the user has edited the name in
-      // the meantime, or if they've already opened the sheet.
+      // the meantime. If the sheet is already open, applyHint still flows
+      // the late result into the open form (storage/category fill in).
       if (!ai) {
         setAutoDetected(false);
         return;
@@ -348,6 +354,12 @@ export default function AddPantryItem({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">{name}</h2>
+                      {classifying && !autoDetected && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-[10px] font-medium text-gray-400 dark:text-gray-500 flex-shrink-0">
+                          <span className="w-2.5 h-2.5 border-[1.5px] border-gray-300 dark:border-zinc-600 border-t-gray-500 dark:border-t-zinc-300 rounded-full animate-spin" />
+                          Detecting…
+                        </span>
+                      )}
                       {autoDetected && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950/30 text-[10px] font-medium text-violet-500 dark:text-violet-400 flex-shrink-0">
                           <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor">

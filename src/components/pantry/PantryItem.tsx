@@ -169,11 +169,17 @@ export default function PantryItem({
   }
 
   async function handleAddModalConfirm(qty: number | null, unit: string | null, store: string | null, assignedTo: string[] | null) {
-    if (onAddToShoppingList) await onAddToShoppingList(item.name, qty, unit, store, assignedTo, item.kind ?? "food");
+    // Capture success so "Add to list & remove" never removes the pantry
+    // item when the shopping insert actually failed (previously the delete
+    // ran unconditionally — a failed add silently destroyed the item).
+    const ok = onAddToShoppingList
+      ? await onAddToShoppingList(item.name, qty, unit, store, assignedTo, item.kind ?? "food")
+      : false;
     setShowAddModal(false);
     if (addModalIsDelete) {
-      triggerExit("consume");
-    } else {
+      if (ok) triggerExit("consume");
+      // If the add failed, keep the pantry item — nothing is lost.
+    } else if (ok) {
       setAddedToList(true);
       setTimeout(() => setAddedToList(false), 1500);
     }

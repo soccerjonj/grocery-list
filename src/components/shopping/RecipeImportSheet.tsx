@@ -9,6 +9,7 @@ import { useHouseholdContext } from "@/context/HouseholdContext";
 import { recipeIngredients } from "@/hooks/useHouseholdRecipes";
 import { getShoppingDuplicates, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
 import { normalizeItemName } from "@/lib/normalizeItemName";
+import { getPantryHint } from "@/lib/pantryHints";
 import { safeHttpUrl } from "@/lib/utils";
 import type { HouseholdRecipe } from "@/types/database";
 
@@ -650,14 +651,46 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                           </button>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
-                        {(d.quantity !== undefined || d.unit) && (
-                          <span className="tabular-nums">
-                            {d.quantity !== undefined ? d.quantity : "?"}
-                            {d.unit ? ` ${d.unit}` : ""}
-                          </span>
-                        )}
-                        <span className="truncate flex-1 italic opacity-70">{d.raw}</span>
+                      <div className="flex items-center gap-2">
+                        {/* Editable qty + unit (compact, to keep long lists
+                            scannable) + a "where it lands" kind tag. */}
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="any"
+                          value={d.quantity ?? ""}
+                          onChange={(e) =>
+                            setDrafts((prev) =>
+                              prev!.map((x) => (x.key === d.key
+                                ? { ...x, quantity: e.target.value ? parseFloat(e.target.value) : undefined }
+                                : x)),
+                            )
+                          }
+                          placeholder="qty"
+                          className="w-12 text-xs text-center tabular-nums text-gray-700 dark:text-gray-300 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg px-1.5 py-1 outline-none focus:border-gray-400 dark:focus:border-zinc-500"
+                        />
+                        <input
+                          type="text"
+                          value={d.unit ?? ""}
+                          onChange={(e) =>
+                            setDrafts((prev) =>
+                              prev!.map((x) => (x.key === d.key ? { ...x, unit: e.target.value || undefined } : x)),
+                            )
+                          }
+                          placeholder="unit"
+                          className="w-16 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1 outline-none focus:border-gray-400 dark:focus:border-zinc-500"
+                        />
+                        {(() => {
+                          const hint = getPantryHint(d.name);
+                          if (!hint) return null;
+                          return (
+                            <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400">
+                              {hint.kind === "supplies" ? "Supplies" : "Food"}
+                            </span>
+                          );
+                        })()}
+                        <span className="truncate flex-1 text-[11px] italic text-gray-400 dark:text-gray-500 opacity-70">{d.raw}</span>
                       </div>
                     </motion.div>
                   ))}
