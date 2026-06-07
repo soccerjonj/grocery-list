@@ -89,6 +89,11 @@ function DraftCard({
     else setNameVal(item.name);
   }
 
+  // A merging (restock) row is compact: the existing pantry item already
+  // owns its tags, so we only show quantity + expiry. Switching to
+  // "Keep separate" expands the full editor again.
+  const isMerging = !!item.conflict && (item.conflictAction ?? "merge") === "merge";
+
   return (
     <motion.div
       layout
@@ -176,6 +181,10 @@ function DraftCard({
         size="sm"
       />
 
+      {/* Classification editors — hidden on a restock (merge) row; the
+          existing pantry item already owns these. */}
+      {!isMerging && (
+      <>
       {/* Row 2.5: Food / Supplies toggle */}
       <div className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-zinc-800 self-start">
         {(["food", "supplies"] as const).map((k) => (
@@ -274,8 +283,11 @@ function DraftCard({
           })}
         </div>
       )}
+      </>
+      )}
 
-      {/* Row 4: expiry date — food only */}
+      {/* Row 4: expiry date — food only. Shown on restock rows too: new
+          stock has a new date, and the merge keeps the earlier of the two. */}
       {item.kind === "food" && (
         <div className="flex items-center gap-2">
           <input

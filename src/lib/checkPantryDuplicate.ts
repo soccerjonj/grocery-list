@@ -82,10 +82,10 @@ export async function increasePantryQty(
 ) {
   const supabase = createClient();
 
-  // Read the fields we need to merge intelligently (expiry/assignee/unit).
+  // Read what we need to merge non-destructively.
   const { data: existing } = await supabase
     .from("pantry_items")
-    .select("expires_at, assigned_to, unit")
+    .select("expires_at, assigned_to, unit, kind, storage_location, fridge_zone, food_category")
     .eq("id", id)
     .maybeSingle();
 
@@ -94,11 +94,12 @@ export async function increasePantryQty(
     updated_at: new Date().toISOString(),
   };
 
-  // Classification: only overwrite fields the caller explicitly selected.
-  if (meta?.kind != null)            patch.kind             = meta.kind;
-  if (meta?.storageLocation != null) patch.storage_location = meta.storageLocation;
-  if (meta?.fridgeZone != null)      patch.fridge_zone      = meta.fridgeZone;
-  if (meta?.foodCategory != null)    patch.food_category    = meta.foodCategory;
+  // Classification: FILL GAPS ONLY. A restock must never overwrite the tags
+  // the existing item already has — we only populate fields it left blank.
+  if (meta?.kind != null            && !existing?.kind)             patch.kind             = meta.kind;
+  if (meta?.storageLocation != null && !existing?.storage_location) patch.storage_location = meta.storageLocation;
+  if (meta?.fridgeZone != null      && !existing?.fridge_zone)      patch.fridge_zone      = meta.fridgeZone;
+  if (meta?.foodCategory != null    && !existing?.food_category)    patch.food_category    = meta.foodCategory;
 
   // Unit: fill the gap, never clobber an existing unit.
   if (meta?.unit && !existing?.unit) patch.unit = meta.unit;
