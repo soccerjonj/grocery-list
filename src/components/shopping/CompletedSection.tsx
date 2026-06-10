@@ -106,7 +106,7 @@ export default function CompletedSection({
                         </svg>
                       </button>
 
-                      <p className="flex-1 text-sm text-gray-400 dark:text-gray-500 line-through truncate">
+                      <p className="flex-1 min-w-0 text-sm text-gray-400 dark:text-gray-500 line-through leading-snug line-clamp-2">
                         {item.name}
                         {item.quantity && item.quantity !== 1 && (
                           <span className="ml-1.5 text-gray-300">

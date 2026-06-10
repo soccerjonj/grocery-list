@@ -61,7 +61,7 @@ function WidgetCard({
 function ItemLine({ name, trailing, trailingClass }: { name: string; trailing?: string; trailingClass?: string }) {
   return (
     <div className="flex items-center justify-between gap-2 text-sm">
-      <span className="truncate text-gray-700 dark:text-gray-300">{name}</span>
+      <span className="min-w-0 line-clamp-2 leading-snug text-gray-700 dark:text-gray-300">{name}</span>
       {trailing && (
         <span className={`flex-shrink-0 text-xs font-medium ${trailingClass ?? "text-gray-400 dark:text-gray-500"}`}>
           {trailing}

@@ -324,7 +324,7 @@ export default function ShoppingItem({
             <motion.p
               animate={{ opacity: isChecked ? 0.38 : 1 }}
               transition={{ duration: 0.2, delay: isChecked ? 0.12 : 0 }}
-              className="text-sm font-medium text-gray-900 dark:text-gray-50 truncate"
+              className="text-sm font-medium text-gray-900 dark:text-gray-50 leading-snug line-clamp-2"
             >
               {item.name}
               {item.quantity && item.quantity !== 1 && (
