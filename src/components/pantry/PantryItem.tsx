@@ -99,7 +99,12 @@ function getExpiryBadge(expiresAt: string | null) {
     const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}` };
   }
-  // > 90 days: shelf-stable / long-life. Don't badge at glance.
+  // A year or more out: summarize as "1yr+" rather than leaving it blank
+  // (a blank badge looks identical to no-date-set). Quiet gray so it reads
+  // as "long shelf life," not a freshness alert.
+  if (diff >= 365)
+    return { label: "1yr+", text: "text-gray-400 dark:text-gray-500", detail: "Expires in over a year" };
+  // 91–364 days: still unbadged at a glance (shelf-stable, low signal).
   return null;
 }
 
