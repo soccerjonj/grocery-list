@@ -93,8 +93,9 @@ function DraftCard({
 }: {
   item: DraftItem;
   onChange: (patch: Partial<DraftItem>) => void;
-  onDelete: () => void;
-  /** Send this item back to the active shopping list as uncompleted. Optional. */
+  /** Discard an extracted (receipt) draft. Optional — shown on seed rows. */
+  onDelete?: () => void;
+  /** Skip importing this one to the pantry; it stays bought. Optional. */
   onSkip?: () => void;
   members?: MemberProfile[];
   currentUserId?: string | null;
@@ -165,32 +166,35 @@ function DraftCard({
           className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           placeholder="Item name"
         />
-        {/* "Skip" — sends this back to the active shopping list rather than
-            adding it to the pantry. For "actually didn't buy it" cases (T2-C). */}
+        {/* "Skip" — don't add this one to the pantry. It stays marked bought
+            on the trip and won't come back to your shopping list. Handy when
+            you already have it and just want to bump the quantity yourself. */}
         {onSkip && (
           <button
             type="button"
             onClick={onSkip}
-            className="flex-shrink-0 px-2 h-7 flex items-center gap-1 rounded-lg text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors active:scale-95"
-            aria-label="Send back to list"
-            title="Didn't buy this — send back to your shopping list"
+            className="flex-shrink-0 px-2 h-7 flex items-center gap-1 rounded-lg text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors active:scale-95"
+            aria-label="Skip adding to pantry"
+            title="Already have it — skip adding to pantry. Stays bought; won't come back to your list."
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
             </svg>
             Skip
           </button>
         )}
-        <button
-          type="button"
-          onClick={onDelete}
-          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-200 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors active:scale-90"
-          aria-label="Remove item"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-200 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors active:scale-90"
+            aria-label="Remove item"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Amount — shared stepper + unit chips (T1-A unification) */}
@@ -467,36 +471,16 @@ export default function ImportToPantrySheet({
   }
 
   /**
-   * "Skip" — the user checked this off at the store but didn't actually
-   * buy it. Move the underlying shopping_items row back to the active
-   * list as uncompleted, so it reappears on the Shopping tab. (T2-C)
+   * "Skip" — don't add this one to the pantry (e.g. "I already have it; I'll
+   * bump the quantity myself"). The item STAYS bought: its shopping_items row
+   * is left as completed on the archived trip, so it does NOT reappear on the
+   * active shopping list. We only drop it from this import view.
    *
-   * We use the same race-safe RPC the rest of the app uses to find the
-   * active list, so this works correctly even if a parallel finishTrip
-   * was running.
+   * (Previously Skip re-homed the row back to the active list as uncompleted
+   * — which is why bought-and-skipped items kept resurfacing days later.)
    */
-  async function skipDraft(key: string) {
-    const draft = drafts.find((d) => d.key === key);
-    if (!draft) return;
+  function skipDraft(key: string) {
     setDrafts((prev) => prev.filter((d) => d.key !== key));
-
-    // Receipt-OCR drafts have synthetic keys ("seed-…"), no shopping_items
-    // row to send back. Just remove from the import and we're done.
-    if (draft.key.startsWith("seed-")) return;
-
-    const { data: activeListId, error: rpcErr } = await supabase
-      .rpc("get_or_create_active_shopping_list", { p_household_id: householdId });
-    if (rpcErr || !activeListId) {
-      // Best-effort: re-add the draft so user can retry. The shopping
-      // item row is still on the archived list and not lost.
-      console.error("skipDraft: couldn't find active list", rpcErr?.message);
-      setDrafts((prev) => [...prev, draft]);
-      return;
-    }
-    await supabase
-      .from("shopping_items")
-      .update({ list_id: activeListId, completed: false, completed_by: null, completed_at: null })
-      .eq("id", draft.key);
   }
 
   /**
@@ -656,17 +640,23 @@ export default function ImportToPantrySheet({
                 })();
 
                 function renderCards(group: typeof drafts) {
-                  return group.map((draft) => (
-                    <DraftCard
-                      key={draft.key}
-                      item={draft}
-                      onChange={(patch) => updateDraft(draft.key, patch)}
-                      onDelete={() => deleteDraft(draft.key)}
-                      onSkip={() => skipDraft(draft.key)}
-                      members={members}
-                      currentUserId={currentUserId}
-                    />
-                  ));
+                  return group.map((draft) => {
+                    // Trip rows (real shopping_items) get "Skip" — keep it
+                    // bought, don't import. Receipt-OCR seed rows have no
+                    // bought row to preserve, so they get a plain "discard ×".
+                    const isSeed = draft.key.startsWith("seed-");
+                    return (
+                      <DraftCard
+                        key={draft.key}
+                        item={draft}
+                        onChange={(patch) => updateDraft(draft.key, patch)}
+                        onDelete={isSeed ? () => deleteDraft(draft.key) : undefined}
+                        onSkip={isSeed ? undefined : () => skipDraft(draft.key)}
+                        members={members}
+                        currentUserId={currentUserId}
+                      />
+                    );
+                  });
                 }
 
                 return (
