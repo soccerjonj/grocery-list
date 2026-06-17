@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 import { usePantry } from "@/hooks/usePantry";
 import { useShoppingFlow } from "@/hooks/useShoppingFlow";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
@@ -45,6 +45,33 @@ export function HouseholdDataProvider({
   const shopping = useShoppingFlow(householdId);
   const members = useHouseholdMembers(householdId);
   const recipes = useHouseholdRecipes(householdId);
+
+  // Resync when the app returns to the foreground or regains connectivity.
+  // Mobile browsers freeze/close the realtime websocket while backgrounded
+  // (screen lock between aisles), and even with the reconnect-refetch in each
+  // hook, this is the belt-and-suspenders that guarantees the list is current
+  // the instant you look at your phone again — no manual pull-to-refresh.
+  const lastResync = useRef(0);
+  useEffect(() => {
+    function resync() {
+      const now = Date.now();
+      if (now - lastResync.current < 2000) return; // debounce double-fires
+      lastResync.current = now;
+      shopping.retry();
+      pantry.refetch();
+    }
+    function onVisible() {
+      if (document.visibilityState === "visible") resync();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", resync);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", resync);
+    };
+    // shopping.retry / pantry.refetch are stable useCallbacks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [householdId]);
 
   return (
     <HouseholdDataContext.Provider value={{ pantry, shopping, members, recipes }}>

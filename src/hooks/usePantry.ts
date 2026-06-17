@@ -54,6 +54,9 @@ export function usePantry(householdId: string) {
   useEffect(() => {
     fetchItems();
 
+    // See useShoppingFlow: refetch on reconnect, skip the initial subscribe.
+    let hasSubscribed = false;
+
     const channel = supabase
       .channel(`pantry-${householdId}`)
       .on(
@@ -84,7 +87,14 @@ export function usePantry(householdId: string) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[realtime] pantry channel ${status}`);
+        } else if (status === "SUBSCRIBED") {
+          if (hasSubscribed) fetchItems();
+          hasSubscribed = true;
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -291,5 +301,5 @@ export function usePantry(householdId: string) {
     );
   }
 
-  return { items, loading, error, addItem, updateQuantity, updateItem, deleteItem };
+  return { items, loading, error, refetch: fetchItems, addItem, updateQuantity, updateItem, deleteItem };
 }

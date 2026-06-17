@@ -39,6 +39,9 @@ export function useShoppingList(householdId: string, listId: string) {
 
     fetchItems();
 
+    // Refetch on reconnect, skip the initial subscribe (see useShoppingFlow).
+    let hasSubscribed = false;
+
     const channel = supabase
       .channel(`shopping-${listId}`)
       .on(
@@ -73,7 +76,14 @@ export function useShoppingList(householdId: string, listId: string) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[realtime] shopping-list channel ${status}`);
+        } else if (status === "SUBSCRIBED") {
+          if (hasSubscribed) fetchItems();
+          hasSubscribed = true;
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

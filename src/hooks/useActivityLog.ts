@@ -66,6 +66,9 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
   useEffect(() => {
     fetchActivities();
 
+    // Refetch on reconnect, skip the initial subscribe (see useShoppingFlow).
+    let hasSubscribed = false;
+
     const channel = supabase
       .channel(`activity-${householdId}-${instanceId.current}`)
       .on(
@@ -81,7 +84,14 @@ export function useActivityLog(householdId: string, currentUserId?: string | nul
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[realtime] activity channel ${status}`);
+        } else if (status === "SUBSCRIBED") {
+          if (hasSubscribed) fetchActivities();
+          hasSubscribed = true;
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [householdId, fetchActivities, supabase, computeUnread]);

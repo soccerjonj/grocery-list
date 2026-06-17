@@ -172,6 +172,11 @@ CREATE POLICY "shopping_all" ON public.shopping_items
 ALTER PUBLICATION supabase_realtime ADD TABLE public.pantry_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shopping_items;
 
+-- REPLICA IDENTITY FULL so Realtime can run RLS on UPDATE/DELETE events and
+-- actually deliver check-offs/edits/deletes (see migration 025).
+ALTER TABLE public.pantry_items   REPLICA IDENTITY FULL;
+ALTER TABLE public.shopping_items REPLICA IDENTITY FULL;
+
 -- ─── Back-fill profile for any existing auth users ────────────
 -- Handles accounts created before the trigger existed.
 

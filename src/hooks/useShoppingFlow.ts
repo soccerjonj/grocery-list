@@ -85,6 +85,11 @@ export function useShoppingFlow(householdId: string) {
   useEffect(() => {
     if (!activeListId) return;
 
+    // Per-channel flag: skip the first SUBSCRIBED (init already fetched), but
+    // on any later SUBSCRIBED (an auto-reconnect after the socket dropped)
+    // refetch to catch changes missed while disconnected.
+    let hasSubscribed = false;
+
     const channel = supabase
       .channel(`shopping-flow-${activeListId}`)
       .on(
@@ -111,10 +116,17 @@ export function useShoppingFlow(householdId: string) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[realtime] shopping channel ${status}`);
+        } else if (status === "SUBSCRIBED") {
+          if (hasSubscribed) init();
+          hasSubscribed = true;
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
-  }, [activeListId, supabase]);
+  }, [activeListId, supabase, init]);
 
   // ── Item actions ──────────────────────────────────────────────
   async function addItem(
