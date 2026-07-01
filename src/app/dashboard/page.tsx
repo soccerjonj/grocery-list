@@ -70,7 +70,7 @@ export default async function DashboardPage() {
           </div>
           <p className="text-xs font-semibold tracking-widest uppercase text-gray-400 dark:text-gray-500 mb-2">Our Pantry</p>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-            Hi, {firstName} 👋
+            Hi, {firstName}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {hasHouseholds
