@@ -221,53 +221,6 @@ export default function AddPantryItem({
   }
 
   /**
-   * Quick-add (opt-in shortcut, #10): commit the item immediately with
-   * auto-detected kind/storage/category and an auto-applied suggested
-   * expiry, skipping the detail sheet. The → button still opens the sheet
-   * for deliberate adds; this is the fast 80% path. Duplicates heal into a
-   * quantity bump via the add hook, so re-adding just restocks.
-   */
-  function handleQuickAdd() {
-    const n = name.trim();
-    if (!n || submitted) return;
-    if (autoDetectTimer.current) {
-      clearTimeout(autoDetectTimer.current);
-      autoDetectTimer.current = null;
-    }
-    const hint = getPantryHint(n);
-    const resolvedKind: Kind = hint?.kind ?? kind;
-    const sl = hint?.storage_location ?? null;
-    const fc = hint?.food_category ?? null;
-    const fz = resolvedKind === "food" ? (hint?.fridge_zone ?? null) : null;
-    // Auto-apply the suggested shelf-life expiry (food only) so quick-added
-    // items still feed Use-Soon — the whole reason to track expiry.
-    let exp: string | null = null;
-    if (resolvedKind === "food") {
-      const days = getSuggestedExpiryDays(sl ?? "", fc ?? "");
-      if (days) {
-        const d = new Date();
-        d.setDate(d.getDate() + days);
-        exp = d.toISOString().split("T")[0];
-      }
-    }
-    onAdd(n, 1, undefined, {
-      kind: resolvedKind,
-      storageLocation: sl,
-      fridgeZone: fz,
-      foodCategory: fc,
-      expiresAt: exp,
-      assignedTo: null,
-    });
-    setName("");
-    setShowSuggestions(false);
-    setAutoDetected(false);
-    setKindAutoDetected(false);
-    setClassifying(false);
-    setSubmitted(true);
-    setTimeout(() => { setSubmitted(false); nameRef.current?.focus(); }, 700);
-  }
-
-  /**
    * Called when the barcode scanner detects a code (T3-C). We:
    *   1. Look up the barcode against OpenFoodFacts (free, public).
    *   2. Pre-fill name, qty, unit from the response.
@@ -680,24 +633,6 @@ export default function AddPantryItem({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 8v8M10 8v8M13 8v8M17 8v8" />
                 </svg>
               )}
-            </motion.button>
-          )}
-
-          {/* ⚡ Quick-add (opt-in): commit instantly with smart defaults +
-              auto expiry, skipping the detail sheet. Only when typing. */}
-          {name.trim() && (
-            <motion.button
-              type="button"
-              onClick={handleQuickAdd}
-              disabled={submitted}
-              whileTap={{ scale: 0.88 }}
-              className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 disabled:opacity-30 flex-shrink-0"
-              aria-label="Quick add with smart defaults"
-              title="Quick add"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
-              </svg>
             </motion.button>
           )}
 
