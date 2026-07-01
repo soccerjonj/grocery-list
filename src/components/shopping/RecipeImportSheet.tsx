@@ -461,7 +461,6 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                             ref={fileInputRef}
                             type="file"
                             accept={ACCEPTED_MEDIA.join(",")}
-                            capture="environment"
                             className="hidden"
                             onChange={(e) => {
                               const f = e.target.files?.[0] ?? null;
