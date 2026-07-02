@@ -8,6 +8,10 @@ import { useHouseholdContext } from "@/context/HouseholdContext";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import { createClient } from "@/lib/supabase/client";
 import { MEMBER_COLORS, DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/context/ToastContext";
+import { getErrorMessage } from "@/lib/utils";
+import { renameHousehold, regenerateInviteCode, deleteHousehold } from "@/lib/householdAdmin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -236,8 +240,12 @@ function HouseholdSection({
   displayName,
   color,
   initials,
+  regenerating,
   onCopyLink,
   onRemove,
+  onRename,
+  onRegenerate,
+  onTransfer,
 }: {
   householdName: string;
   inviteCode: string;
@@ -249,16 +257,51 @@ function HouseholdSection({
   displayName: string;
   color: string | null;
   initials: string;
+  regenerating: boolean;
   onCopyLink: () => void;
   onRemove: (id: string) => void;
+  onRename: (name: string) => void;
+  onRegenerate: () => void;
+  onTransfer: (id: string, name: string) => void;
 }) {
   const isOwner = currentUserRole === "owner";
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(householdName);
+  useEffect(() => { if (!editingName) setNameDraft(householdName); }, [householdName, editingName]);
+
+  function commitName() {
+    setEditingName(false);
+    onRename(nameDraft);
+  }
 
   return (
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Household</h2>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">{householdName}</p>
+        {editingName ? (
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") commitName(); if (e.key === "Escape") { setNameDraft(householdName); setEditingName(false); } }}
+              className="flex-1 text-sm text-gray-900 dark:text-gray-50 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400"
+            />
+            <button onClick={commitName} className="text-sm font-medium text-gray-900 dark:text-gray-50 px-2">Save</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-sm text-gray-400 dark:text-gray-500">{householdName}</p>
+            {isOwner && (
+              <button onClick={() => { setNameDraft(householdName); setEditingName(true); }} aria-label="Rename household" className="text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Invite */}
@@ -299,6 +342,15 @@ function HouseholdSection({
             )}
           </AnimatePresence>
         </motion.button>
+        {isOwner && (
+          <button
+            onClick={onRegenerate}
+            disabled={regenerating}
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors self-center disabled:opacity-50"
+          >
+            {regenerating ? "Regenerating…" : "Regenerate code"}
+          </button>
+        )}
       </div>
 
       {/* Members */}
@@ -340,6 +392,18 @@ function HouseholdSection({
                       {member.role === "owner" ? "Owner" : "Member"}
                     </p>
                   </div>
+                  {canRemove && (
+                    <button
+                      onClick={() => onTransfer(member.user_id, member.display_name)}
+                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-300 dark:text-gray-600 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors active:scale-90"
+                      aria-label={`Make ${member.display_name} the owner`}
+                      title="Make owner"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 5l3.5 4L12 4l3.5 5L19 5l-1.5 12h-11L5 5z" />
+                      </svg>
+                    </button>
+                  )}
                   {canRemove && (
                     <button
                       onClick={() => onRemove(member.user_id)}
@@ -409,24 +473,41 @@ function PreferencesSection() {
 function AccountSection({
   householdName,
   canLeave,
+  isOwner,
   confirmLeave,
   setConfirmLeave,
   onSignOut,
   onLeave,
+  onDeleteHousehold,
 }: {
   householdName: string;
   canLeave: boolean;
+  isOwner: boolean;
   confirmLeave: boolean;
   setConfirmLeave: (v: boolean) => void;
   onSignOut: () => void;
   onLeave: () => void;
+  onDeleteHousehold: () => void;
 }) {
   return (
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Account</h2>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Sign out or leave your household</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Your profile, appearance, and password live in Account settings.</p>
       </div>
+
+      <Link
+        href="/settings"
+        className="flex items-center justify-between bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 px-4 py-4 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors active:opacity-60"
+      >
+        <span className="flex items-center gap-3">
+          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0" />
+          </svg>
+          Account settings
+        </span>
+        <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+      </Link>
 
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 overflow-hidden">
         <button
@@ -448,6 +529,18 @@ function AccountSection({
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
             </svg>
             Leave {householdName}
+          </button>
+        )}
+
+        {isOwner && (
+          <button
+            onClick={onDeleteHousehold}
+            className="w-full flex items-center gap-3 px-4 py-4 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-t border-gray-50 dark:border-zinc-800 transition-colors active:opacity-60 text-left"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete household
           </button>
         )}
       </div>
@@ -487,8 +580,9 @@ function AccountSection({
 
 export default function SettingsPage() {
   const { householdId, householdName } = useHouseholdContext();
-  const { members, currentUserId, currentUserRole, loading, removeMember, leave } =
+  const { members, currentUserId, currentUserRole, loading, removeMember, transferOwnership, leave } =
     useHouseholdMembers(householdId);
+  const { success, error: toastError } = useToast();
 
   // Section nav — null means "show list" on mobile; defaults to "profile" on desktop
   const [activeSection, setActiveSection] = useState<Section | null>(null);
@@ -507,6 +601,12 @@ export default function SettingsPage() {
 
   // Account state
   const [confirmLeave, setConfirmLeave] = useState(false);
+
+  // Owner controls (migration 026 RPCs)
+  const [hhName, setHhName] = useState(householdName);
+  const [regenerating, setRegenerating] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDeleteHh, setConfirmDeleteHh] = useState(false);
 
   const supabase = createClient();
   const me = members.find((m) => m.user_id === currentUserId);
@@ -584,6 +684,52 @@ export default function SettingsPage() {
     window.location.href = "/auth/login";
   }
 
+  async function handleRename(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === hhName) return;
+    try {
+      await renameHousehold(householdId, trimmed);
+      setHhName(trimmed);
+      success("Household renamed");
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    }
+  }
+
+  async function handleRegenerate() {
+    setRegenerating(true);
+    try {
+      const code = await regenerateInviteCode(householdId);
+      setInviteCode(code);
+      success("New invite code — old links stopped working");
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleTransfer() {
+    if (!transferTarget) return;
+    try {
+      await transferOwnership(transferTarget.id);
+      success(`${transferTarget.name} is now the owner`);
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setTransferTarget(null);
+    }
+  }
+
+  async function handleDeleteHousehold() {
+    try {
+      await deleteHousehold(householdId);
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    }
+  }
+
   // Render active section content
   const displaySection = activeSection ?? "profile";
 
@@ -618,7 +764,7 @@ export default function SettingsPage() {
       case "household":
         return (
           <HouseholdSection
-            householdName={householdName}
+            householdName={hhName}
             inviteCode={inviteCode}
             copied={copied}
             members={members}
@@ -628,8 +774,12 @@ export default function SettingsPage() {
             displayName={displayName}
             color={color}
             initials={initials}
+            regenerating={regenerating}
             onCopyLink={handleCopyLink}
             onRemove={handleRemove}
+            onRename={handleRename}
+            onRegenerate={handleRegenerate}
+            onTransfer={(id, name) => setTransferTarget({ id, name })}
           />
         );
       case "preferences":
@@ -637,12 +787,14 @@ export default function SettingsPage() {
       case "account":
         return (
           <AccountSection
-            householdName={householdName}
+            householdName={hhName}
             canLeave={canLeave}
+            isOwner={isOwner}
             confirmLeave={confirmLeave}
             setConfirmLeave={setConfirmLeave}
             onSignOut={handleSignOut}
             onLeave={handleLeave}
+            onDeleteHousehold={() => setConfirmDeleteHh(true)}
           />
         );
     }
@@ -680,7 +832,7 @@ export default function SettingsPage() {
           </svg>
         </Link>
         <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{householdName}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{hhName}</p>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
             {activeSection !== null
               ? NAV_ITEMS.find((n) => n.id === activeSection)?.label ?? "Settings"
@@ -763,6 +915,27 @@ export default function SettingsPage() {
         </div>
 
       </div>
+
+      <ConfirmDialog
+        open={!!transferTarget}
+        onClose={() => setTransferTarget(null)}
+        title="Make owner?"
+        confirmLabel="Transfer ownership"
+        requireTyped={hhName}
+        body={<>Ownership of <span className="font-semibold">{hhName}</span> moves to {transferTarget?.name}, and you become a regular member. Type the household name to confirm.</>}
+        onConfirm={handleTransfer}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteHh}
+        onClose={() => setConfirmDeleteHh(false)}
+        title="Delete this household?"
+        danger
+        confirmLabel="Delete household"
+        requireTyped={hhName}
+        body={<>This permanently deletes <span className="font-semibold">{hhName}</span> and all of its pantry, shopping lists, and recipes for everyone in it. This can&apos;t be undone. Type the household name to confirm.</>}
+        onConfirm={handleDeleteHousehold}
+      />
     </div>
   );
 }
