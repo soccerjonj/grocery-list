@@ -6,10 +6,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { AddPantryOptions } from "@/hooks/usePantry";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { useItemSuggestions, type ItemSuggestion } from "@/hooks/useItemSuggestions";
-import { STORAGE_LOCATIONS, FRIDGE_ZONES, FOOD_CATEGORIES, SUPPLIES_LOCATIONS, SUPPLIES_CATEGORIES, type Kind } from "@/types/database";
+import { STORAGE_LOCATIONS, type Kind } from "@/types/database";
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
-import { getPantryHint, getOrClassify, getSuggestedExpiryDays, formatSuggestedDays } from "@/lib/pantryHints";
-import AmountField from "@/components/ui/AmountField";
+import { getPantryHint, getOrClassify, getSuggestedExpiryDays } from "@/lib/pantryHints";
+import PantryDetailFields from "@/components/pantry/PantryDetailFields";
 import BarcodeScanner from "@/components/pantry/BarcodeScanner";
 import { lookupBarcode } from "@/lib/openFoodFacts";
 import ReceiptImportButton from "@/components/pantry/ReceiptImportButton";
@@ -84,8 +84,6 @@ export default function AddPantryItem({
 
   const { getSuggestions } = useItemSuggestions(householdId);
   const suggestions = getSuggestions(name, 5);
-  const today = new Date().toISOString().split("T")[0];
-  const showMemberPicker = members.length >= 2;
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -313,12 +311,6 @@ export default function AddPantryItem({
     }, 700);
   }
 
-  function toggleMember(userId: string) {
-    setAssignedTo((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
-  }
-
   // ── Detail sheet (portal)
   const sheet = mounted
     ? createPortal(
@@ -426,151 +418,28 @@ export default function AddPantryItem({
                     </div>
                   )}
 
-                  {/* Amount — shared stepper + chips (T1-A) */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Amount</p>
-                    <AmountField quantity={quantity} unit={unit} onQuantityChange={setQuantity} onUnitChange={setUnit} size="md" />
-                  </div>
-
-                  {/* Storage / Location */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                      {kind === "supplies" ? "Location" : "Storage"}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(kind === "supplies" ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS).map(({ value, label }) => (
-                        <button key={value} type="button"
-                          onClick={() => {
-                            setStorageLocation(storageLocation === value ? "" : value);
-                            if (value !== "fridge") setFridgeZone("");
-                            setAutoDetected(false);
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${storageLocation === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                        >{label}</button>
-                      ))}
-                    </div>
-                    {kind === "food" && (
-                      <AnimatePresence initial={false}>
-                        {storageLocation === "fridge" && (
-                          <motion.div
-                            key="fridge-zone"
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.18 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="flex gap-1.5 pt-1">
-                              {FRIDGE_ZONES.map(({ value, label }) => (
-                                <button key={value} type="button"
-                                  onClick={() => setFridgeZone(fridgeZone === value ? "" : value)}
-                                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${fridgeZone === value ? "bg-blue-600 text-white" : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"}`}
-                                >{label}</button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    )}
-                  </div>
-
-                  {/* Category */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Category</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES).map(({ value, label }) => (
-                        <button key={value} type="button"
-                          onClick={() => { setFoodCategory(foodCategory === value ? "" : value); setAutoDetected(false); }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${foodCategory === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                        >{label}</button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Expiry — food only */}
-                  {kind === "food" && (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Expires</p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={expiresAt}
-                        min={today}
-                        onChange={(e) => setExpiresAt(e.target.value)}
-                        className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
-                      />
-                      <AnimatePresence mode="wait">
-                        {expiresAt ? (
-                          <motion.button key="clear" type="button"
-                            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.12 }}
-                            onClick={() => setExpiresAt("")}
-                            className="flex-shrink-0 px-3 py-2 text-xs font-medium text-red-400 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-xl active:scale-[0.96] transition-colors"
-                          >Clear</motion.button>
-                        ) : (() => {
-                          const sugDays = getSuggestedExpiryDays(storageLocation, foodCategory);
-                          if (!sugDays) return null;
-                          return (
-                            <motion.button key={`sug-${storageLocation}-${foodCategory}`} type="button"
-                              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                              transition={{ duration: 0.12 }}
-                              onClick={() => {
-                                const d = new Date();
-                                d.setDate(d.getDate() + sugDays);
-                                setExpiresAt(d.toISOString().split("T")[0]);
-                              }}
-                              className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 active:scale-[0.96] transition-colors"
-                            >
-                              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                              </svg>
-                              {formatSuggestedDays(sugDays)}
-                            </motion.button>
-                          );
-                        })()}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Notes */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                      Note <span className="font-normal normal-case">(optional)</span>
-                    </p>
-                    <textarea
-                      placeholder="Brand, location, anything useful…"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value.slice(0, 150))}
-                      rows={2}
-                      className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
-                    />
-                    {notes.length >= 100 && (
-                      <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">{150 - notes.length} left</p>
-                    )}
-                  </div>
-
-                  {/* Assigned to */}
-                  {showMemberPicker && (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">For</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button type="button"
-                          onClick={() => setAssignedTo([])}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${assignedTo.length === 0 ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                        >Everyone</button>
-                        {members.map((m) => {
-                          const selected = assignedTo.includes(m.user_id);
-                          return (
-                            <button key={m.user_id} type="button"
-                              onClick={() => toggleMember(m.user_id)}
-                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${selected ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                            >{m.user_id === currentUserId ? "Me" : m.short_name}</button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  <PantryDetailFields
+                    kind={kind}
+                    quantity={parseFloat(quantity) || 1}
+                    unit={unit || null}
+                    storageLocation={storageLocation || null}
+                    fridgeZone={fridgeZone || null}
+                    foodCategory={foodCategory || null}
+                    expiresAt={expiresAt || null}
+                    assignedTo={assignedTo.length > 0 ? assignedTo : null}
+                    notes={notes || null}
+                    onQuantityChange={(n) => setQuantity(String(n))}
+                    onUnitChange={(u) => setUnit(u ?? "")}
+                    onStorageChange={(loc) => { setStorageLocation(loc ?? ""); if (loc !== "fridge") setFridgeZone(""); setAutoDetected(false); }}
+                    onFridgeZoneChange={(z) => setFridgeZone(z ?? "")}
+                    onCategoryChange={(c) => { setFoodCategory(c ?? ""); setAutoDetected(false); }}
+                    onExpiresChange={(d) => setExpiresAt(d ?? "")}
+                    onAssignedChange={(a) => setAssignedTo(a ?? [])}
+                    onNotesChange={(n) => setNotes(n)}
+                    members={members}
+                    currentUserId={currentUserId ?? null}
+                    suggestedExpiryDays={kind === "food" ? getSuggestedExpiryDays(storageLocation, foodCategory) : null}
+                  />
 
                 </div>
 

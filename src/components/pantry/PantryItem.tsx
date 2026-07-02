@@ -4,28 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PantryItem as PantryItemType } from "@/types/database";
-import { FOOD_CATEGORIES, STORAGE_LOCATIONS, FRIDGE_ZONES, SUPPLIES_CATEGORIES, SUPPLIES_LOCATIONS } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import { getExpiryDisplay } from "@/lib/expiry";
 import AddToListModal from "./AddToListModal";
-import AmountField from "@/components/ui/AmountField";
 import ItemSheet, { ItemSheetHeader } from "@/components/ui/ItemSheet";
-
-// Expiry preset offsets — chips that one-tap an "expires in N" date.
-// (Audit M5.) Same idea as the suggested-expiry chip in AddPantryItem
-// but with a small ladder of common windows for quick correction.
-const EXPIRY_PRESETS: { label: string; days: number }[] = [
-  { label: "+3 days",   days: 3 },
-  { label: "+1 week",   days: 7 },
-  { label: "+1 month",  days: 30 },
-  { label: "+3 months", days: 90 },
-];
-
-function isoDateOffsetDays(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
+import PantryDetailFields from "./PantryDetailFields";
 
 interface PantryItemProps {
   item: PantryItemType;
@@ -71,43 +55,14 @@ interface PantryItemProps {
 // ── Helpers ───────────────────────────────────────────────────────
 
 /**
- * Returns a badge object suitable for at-a-glance display (card + sheet header).
- *
- * Audit M10: items expiring more than 90 days out are deliberately
- * unbadged — a green "1yr+" pill suggests freshness but is mostly noise
- * (shelf-stable items will permanently show it). Callers that want the
- * raw date for far-future items should read `item.expires_at` directly.
+ * At-a-glance badge for the card + sheet header. Delegates to the shared
+ * expiry ladder (`getExpiryDisplay`) so the badge, header meta, and the
+ * freshness ring can't drift. Returns null when no date is set.
  */
 function getExpiryBadge(expiresAt: string | null) {
-  if (!expiresAt) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiresAt + "T00:00:00");
-  const diff = Math.round((expiry.getTime() - today.getTime()) / 86_400_000);
-
-  if (diff < 0)
-    return { label: diff === -1 ? "Yesterday" : `${Math.abs(diff)}d ago`, text: "text-red-500", detail: diff === -1 ? "Expired yesterday" : `Expired ${Math.abs(diff)} days ago` };
-  if (diff === 0)
-    return { label: "Today", text: "text-red-500", detail: "Expires today" };
-  if (diff === 1)
-    return { label: "Tmw", text: "text-red-500", detail: "Expires tomorrow" };
-  if (diff <= 7)
-    return { label: `${diff}d`, text: "text-red-500", detail: `Expires in ${diff} days` };
-  if (diff <= 28)
-    return { label: `${diff}d`, text: "text-yellow-600", detail: `Expires in ${diff} days` };
-  if (diff <= 90) {
-    const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}` };
-  }
-  // A year or more out: "1yr+". Quiet gray — so much shelf life left it's not
-  // worth a color signal, and (since many staples are 1yr+) keeping it neutral
-  // stops green from becoming noise that drowns out the genuinely-fresh items.
-  if (diff >= 365)
-    return { label: "1yr+", text: "text-gray-400 dark:text-gray-500", detail: "Expires in over a year" };
-  // 91–364 days: still months out, so quiet gray like 1yr+. Green is reserved
-  // for the ≤90-day "use it while it's good" window where it's actionable.
-  const monthYear = expiry.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-  return { label: monthYear, text: "text-gray-400 dark:text-gray-500", detail: `Expires ${monthYear}` };
+  const d = getExpiryDisplay(expiresAt);
+  if (d.tone === "none") return null;
+  return { label: d.label, text: d.textClass, detail: d.detail };
 }
 
 /** Returns member objects for assigned users, empty when assigned to everyone. */
@@ -237,8 +192,6 @@ export default function PantryItem({
   const expiry = isSupplies ? null : getExpiryBadge(item.expires_at);
   const assignedMembers = getAssignedMembers(item.assigned_to, members);
   const qtyDisplay = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(1);
-  const locationOptions = isSupplies ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS;
-  const categoryOptions = isSupplies ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
 
   function increment() { onUpdateQuantity(item.id, item.quantity + 1); }
 
@@ -387,26 +340,30 @@ export default function PantryItem({
         />
       }
     >
-      {/* Quantity (P3) — shared AmountField. Decrement at quantity 1
-          opens the confirm-delete modal via onUnderflow. */}
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Quantity</p>
-        <AmountField
-          quantity={String(item.quantity)}
-          unit={item.unit ?? ""}
-          onQuantityChange={(q) => {
-            const num = parseFloat(q);
-            if (!isNaN(num) && num >= 1) onUpdateQuantity(item.id, num);
-          }}
-          onUnitChange={(u) => onUpdateItem(item.id, { unit: u || null })}
-          size="md"
-          min={1}
-          onUnderflow={() => setConfirmDelete(true)}
-        />
-      </div>
+      <PantryDetailFields
+        kind={item.kind ?? "food"}
+        quantity={item.quantity}
+        unit={item.unit}
+        storageLocation={item.storage_location}
+        fridgeZone={item.fridge_zone}
+        foodCategory={item.food_category}
+        expiresAt={item.expires_at}
+        assignedTo={item.assigned_to}
+        notes={item.notes}
+        onQuantityChange={(n) => onUpdateQuantity(item.id, n)}
+        onUnitChange={(u) => onUpdateItem(item.id, { unit: u })}
+        onStorageChange={(loc) => onUpdateItem(item.id, { storage_location: loc, fridge_zone: loc !== "fridge" ? null : item.fridge_zone })}
+        onFridgeZoneChange={(z) => onUpdateItem(item.id, { fridge_zone: z })}
+        onCategoryChange={(c) => onUpdateItem(item.id, { food_category: c })}
+        onExpiresChange={(d) => onUpdateItem(item.id, { expires_at: d })}
+        onAssignedChange={(a) => onUpdateItem(item.id, { assigned_to: a })}
+        onNotesChange={handleNotesChange}
+        onUnderflow={() => setConfirmDelete(true)}
+        members={members}
+        currentUserId={currentUserId}
+      />
 
-      {/* Add to list (audit M1) — now a single full-width primary CTA
-          since Mark low + Sealed/Opened moved to the header. */}
+      {/* Add to shopping list */}
       {onAddToShoppingList && (
         <motion.button
           type="button"
@@ -434,171 +391,6 @@ export default function PantryItem({
           </AnimatePresence>
         </motion.button>
       )}
-
-      {/* Expiry — food only */}
-      {!isSupplies && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Expires</p>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={item.expires_at ?? ""}
-              onChange={(e) => onUpdateItem(item.id, { expires_at: e.target.value || null })}
-              className="flex-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors min-w-0"
-            />
-            {item.expires_at && (
-              <button
-                type="button"
-                onClick={() => onUpdateItem(item.id, { expires_at: null })}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-950/30 text-red-400 text-xs font-medium rounded-xl hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors active:scale-[0.96]"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Clear
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {EXPIRY_PRESETS.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => onUpdateItem(item.id, { expires_at: isoDateOffsetDays(p.days) })}
-                className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-[0.94] transition-colors"
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Storage + Fridge zone grouped — they're conceptually related
-          so we use a tighter gap-3 internal cluster. (Section rhythm.) */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
-            {isSupplies ? "Location" : "Storage"}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {locationOptions.map(({ value, label }) => (
-              <button key={value} type="button"
-                onClick={() => onUpdateItem(item.id, { storage_location: item.storage_location === value ? null : value, fridge_zone: value !== "fridge" ? null : item.fridge_zone })}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.storage_location === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-              >{label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Fridge zone — food only, only when fridge is selected (M2:
-            re-colored to match every other chip — was the only blue
-            accent in the form). */}
-        {!isSupplies && (
-          <AnimatePresence initial={false}>
-            {item.storage_location === "fridge" && (
-              <motion.div key="fridge-zone" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden flex flex-col gap-2">
-                <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Fridge zone</p>
-                <div className="flex gap-1.5">
-                  {FRIDGE_ZONES.map(({ value, label }) => (
-                    <button key={value} type="button"
-                      onClick={() => onUpdateItem(item.id, { fridge_zone: item.fridge_zone === value ? null : value })}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.fridge_zone === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-                    >{label}</button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
-      </div>
-
-      {/* Category */}
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Category</p>
-        <div className="flex flex-wrap gap-1.5">
-          {categoryOptions.map(({ value, label }) => (
-            <button key={value} type="button"
-              onClick={() => onUpdateItem(item.id, { food_category: item.food_category === value ? null : value })}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${item.food_category === value ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"}`}
-            >{label}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Assigned to */}
-      {members.length > 1 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Assigned to</p>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => onUpdateItem(item.id, { assigned_to: null })}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
-                !item.assigned_to || item.assigned_to.length === 0
-                  ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                  : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
-              }`}
-            >
-              Everyone
-            </button>
-            {members.map((member) => {
-              const selected = !!item.assigned_to?.includes(member.user_id);
-              const color = member.color ?? DEFAULT_COLOR;
-              function toggleMember() {
-                const current = item.assigned_to ?? [];
-                const next = selected
-                  ? current.filter((id) => id !== member.user_id)
-                  : [...current, member.user_id];
-                onUpdateItem(item.id, { assigned_to: next.length === 0 ? null : next });
-              }
-              return (
-                <button
-                  key={member.user_id}
-                  type="button"
-                  onClick={toggleMember}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.94]"
-                  style={
-                    selected
-                      ? { backgroundColor: color, color: "#fff" }
-                      : { backgroundColor: hexAlpha(color, 0.1), color }
-                  }
-                >
-                  <span
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                    style={selected ? { backgroundColor: "rgba(255,255,255,0.25)", color: "#fff" } : { backgroundColor: hexAlpha(color, 0.2), color }}
-                  >
-                    {member.initials}
-                  </span>
-                  {member.user_id === currentUserId ? "Me" : member.short_name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Note */}
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
-          Note <span className="font-normal">(optional)</span>
-        </p>
-        <textarea
-          placeholder="Brand, location, anything useful…"
-          value={notesDraft}
-          onChange={(e) => handleNotesChange(e.target.value)}
-          rows={2}
-          maxLength={150}
-          className="w-full text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors resize-none"
-        />
-        {/* Audit M9: only show the char counter when it actually matters
-            (last 20 of 150) instead of jumping in halfway through. */}
-        {notesDraft.length >= 130 && (
-          <p className="text-[10px] text-right text-gray-400 dark:text-gray-500">
-            {150 - notesDraft.length} left
-          </p>
-        )}
-      </div>
 
       {/* Remove */}
       <button type="button"
