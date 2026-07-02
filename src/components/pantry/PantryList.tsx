@@ -17,6 +17,7 @@ import { getPantryHint } from "@/lib/pantryHints";
 import { normalizeItemName } from "@/lib/normalizeItemName";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useToast } from "@/context/ToastContext";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 
 // Quick-add starter items shown on the empty state (audit M4). Picked
 // to cover the most common household goods so a new user can populate
@@ -410,6 +411,7 @@ export default function PantryList({
   onDelete,
   onAddToShoppingList,
 }: PantryListProps) {
+  const { taxonomy } = useHouseholdData();
   // Default sort is now "name" (predictable). Items needing attention
   // surface in the Use Soon and Running Low strips at the top.
   const [sort, setSort] = useState<SortKey>("name");
@@ -702,10 +704,18 @@ export default function PantryList({
   const pantryItems   = sectionItems.filter((i) => i.storage_location === "pantry");
   const roomTempItems = sectionItems.filter((i) => i.storage_location === "room_temp");
 
+  // Household custom locations (stored verbatim as storage_location) get their
+  // own sections, and count as "known" so they don't fall into Other.
+  const customLocations = taxonomy.listFor("location", kind);
+  const customLocationGroups = customLocations.map((label) => ({
+    label,
+    items: sectionItems.filter((i) => i.storage_location === label),
+  }));
+
   // Supplies section bins, keyed by SUPPLIES_LOCATIONS values.
   // Items with null/unknown storage_location land in the "other" bin so they
   // never get hidden from the user. P5: running-low items already removed.
-  const supplyKnown = new Set(SUPPLIES_LOCATIONS.map((l) => l.value as string));
+  const supplyKnown = new Set<string>([...SUPPLIES_LOCATIONS.map((l) => l.value as string), ...customLocations]);
   const suppliesByLocation = SUPPLIES_LOCATIONS.map((loc) => ({
     value: loc.value,
     label: loc.label,
@@ -723,8 +733,9 @@ export default function PantryList({
       return i.storage_location === loc.value;
     }),
   }));
-  // Food sections use a fixed list above; "unsorted" food = no storage_location set
-  const foodKnown = new Set(["fridge", "freezer", "pantry", "room_temp"]);
+  // Food sections use a fixed list above; "unsorted" food = no storage_location
+  // set and not one of the household's custom locations.
+  const foodKnown = new Set<string>(["fridge", "freezer", "pantry", "room_temp", ...customLocations]);
   const unsortedItems = sectionItems.filter(
     (i) => !i.storage_location || !foodKnown.has(i.storage_location)
   );
@@ -732,8 +743,8 @@ export default function PantryList({
   // All section labels for the active kind — needed by `isolateSection`
   // to know which other sections to collapse.
   const allSectionLabels = kind === "food"
-    ? ["Fridge", "Freezer", "Pantry", "Counter", "Other"]
-    : SUPPLIES_LOCATIONS.map((l) => l.label);
+    ? ["Fridge", "Freezer", "Pantry", "Counter", ...customLocations, "Other"]
+    : [...SUPPLIES_LOCATIONS.map((l) => l.label), ...customLocations];
 
   const hasItems = filtered.length > 0;
 
@@ -1007,7 +1018,7 @@ export default function PantryList({
                       : d === 0 ? "Expires today"
                       : d === 1 ? "Expires tomorrow"
                       : `${d} days left`;
-                    const locationLabel = LOCATION_LABEL[item.storage_location ?? ""] ?? null;
+                    const locationLabel = LOCATION_LABEL[item.storage_location ?? ""] ?? item.storage_location ?? null;
                     // The item also renders as a full card in its storage
                     // section (which owns the edit sheet / desktop rail). This
                     // row is just a shortcut — tapping it sets expandedId and
@@ -1094,7 +1105,7 @@ export default function PantryList({
                       >
                         <RunningLowRow
                           item={item}
-                          locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? null}
+                          locationLabel={LOCATION_LABEL[item.storage_location ?? ""] ?? item.storage_location ?? null}
                           isFlashing={flashingIds.has(item.id)}
                           isDark={isDark}
                           onIgnore={() => dismissItem(item.id, "dismiss")}
@@ -1124,6 +1135,9 @@ export default function PantryList({
               <StorageSection label="Freezer" items={freezerItems}  {...sectionProps} {...sectionControl("Freezer")} />
               <StorageSection label="Pantry"  items={pantryItems}   {...sectionProps} {...sectionControl("Pantry")} />
               <StorageSection label="Counter" items={roomTempItems} {...sectionProps} {...sectionControl("Counter")} />
+              {customLocationGroups.map((g) => (
+                <StorageSection key={g.label} label={g.label} items={g.items} {...sectionProps} {...sectionControl(g.label)} />
+              ))}
               {unsortedItems.length > 0 && (
                 <StorageSection label="Other" items={unsortedItems} {...sectionProps} {...sectionControl("Other")} />
               )}
@@ -1132,6 +1146,9 @@ export default function PantryList({
             <>
               {suppliesByLocation.map((bin) => (
                 <StorageSection key={bin.value} label={bin.label} items={bin.items} {...sectionProps} {...sectionControl(bin.label)} />
+              ))}
+              {customLocationGroups.map((g) => (
+                <StorageSection key={g.label} label={g.label} items={g.items} {...sectionProps} {...sectionControl(g.label)} />
               ))}
             </>
           )}

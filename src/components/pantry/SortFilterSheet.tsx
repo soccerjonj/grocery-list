@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Kind } from "@/types/database";
 import { FOOD_CATEGORIES, SUPPLIES_CATEGORIES } from "@/types/database";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 
 /**
  * Sort & filter & view sheet (audit P3 + P6).
@@ -50,6 +51,7 @@ export default function SortFilterSheet({
   onViewChange,
   availableSorts,
 }: Props) {
+  const { taxonomy } = useHouseholdData();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -60,7 +62,11 @@ export default function SortFilterSheet({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const categories = kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
+  // Built-in categories for this kind, plus the household's custom ones (which
+  // store their label as the value), so custom categories are filterable too.
+  const builtinCategories = kind === "supplies" ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
+  const customCategories = taxonomy.listFor("category", kind).map((label) => ({ value: label, label }));
+  const categories = [...builtinCategories, ...customCategories];
   // Default sort is "name" for both kinds now — urgent items surface in the
   // Use Soon / Running Low strips at the top of the list (audit P2).
   const defaultSort: SortKey = "name";

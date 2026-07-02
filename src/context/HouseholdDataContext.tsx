@@ -5,6 +5,7 @@ import { usePantry } from "@/hooks/usePantry";
 import { useShoppingFlow } from "@/hooks/useShoppingFlow";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import { useHouseholdRecipes } from "@/hooks/useHouseholdRecipes";
+import { useHouseholdTaxonomy } from "@/hooks/useHouseholdTaxonomy";
 
 /**
  * Lifts the three big household-scoped data hooks into the household layout
@@ -21,12 +22,14 @@ type PantryData = ReturnType<typeof usePantry>;
 type ShoppingData = ReturnType<typeof useShoppingFlow>;
 type MembersData = ReturnType<typeof useHouseholdMembers>;
 type RecipesData = ReturnType<typeof useHouseholdRecipes>;
+type TaxonomyData = ReturnType<typeof useHouseholdTaxonomy>;
 
 interface HouseholdDataValue {
   pantry: PantryData;
   shopping: ShoppingData;
   members: MembersData;
   recipes: RecipesData;
+  taxonomy: TaxonomyData;
 }
 
 const HouseholdDataContext = createContext<HouseholdDataValue | null>(null);
@@ -45,6 +48,7 @@ export function HouseholdDataProvider({
   const shopping = useShoppingFlow(householdId);
   const members = useHouseholdMembers(householdId);
   const recipes = useHouseholdRecipes(householdId);
+  const taxonomy = useHouseholdTaxonomy(householdId);
 
   // Resync when the app returns to the foreground or regains connectivity.
   // Mobile browsers freeze/close the realtime websocket while backgrounded
@@ -74,7 +78,7 @@ export function HouseholdDataProvider({
   }, [householdId]);
 
   return (
-    <HouseholdDataContext.Provider value={{ pantry, shopping, members, recipes }}>
+    <HouseholdDataContext.Provider value={{ pantry, shopping, members, recipes, taxonomy }}>
       {children}
     </HouseholdDataContext.Provider>
   );

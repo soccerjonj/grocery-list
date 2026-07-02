@@ -9,6 +9,7 @@ import {
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { getExpiryDisplay, EXPIRY_PRESETS, isoDateOffsetDays } from "@/lib/expiry";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 import AmountField from "@/components/ui/AmountField";
 import AttributeTile from "./AttributeTile";
 import FreshnessRing from "./FreshnessRing";
@@ -50,11 +51,85 @@ const chip = (active: boolean) =>
       : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
   }`;
 
+// Display label: a built-in's label, else the raw stored value (which for a
+// household custom IS the label). null only when nothing is set.
 function labelFor(list: readonly { value: string; label: string }[], value: string | null) {
-  return list.find((o) => o.value === value)?.label ?? null;
+  if (!value) return null;
+  return list.find((o) => o.value === value)?.label ?? value;
+}
+
+/**
+ * A chip selector combining built-in options with the household's custom
+ * ones, an inline "+ New" to add a custom pill (which persists + gets
+ * selected), and an Edit toggle to delete customs — mirrors the custom-store
+ * pattern. Built-ins store their slug value; customs store their label.
+ */
+function CustomPillGroup({
+  options, custom, value, onSelect, onAddCustom, onRemoveCustom,
+}: {
+  options: readonly { value: string; label: string }[];
+  custom: string[];
+  value: string | null;
+  onSelect: (v: string | null) => void;
+  onAddCustom: (label: string) => Promise<string | null> | void;
+  onRemoveCustom: (label: string) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState(false);
+
+  async function commit() {
+    const label = draft.trim();
+    setDraft("");
+    setAdding(false);
+    if (!label) return;
+    const saved = await onAddCustom(label);
+    onSelect(typeof saved === "string" ? saved : label);
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {options.map(({ value: v, label }) => (
+        <button key={v} type="button" onClick={() => onSelect(value === v ? null : v)} className={chip(value === v)}>{label}</button>
+      ))}
+      {custom.map((label) => {
+        const active = value === label;
+        return (
+          <span key={label} className={`inline-flex items-center gap-1 rounded-full ${active ? "bg-gray-900 dark:bg-zinc-100" : "bg-gray-100 dark:bg-zinc-800"} ${editing ? "pr-1" : ""}`}>
+            <button type="button" onClick={() => onSelect(active ? null : label)}
+              className={`pl-2.5 py-1 text-xs font-medium ${editing ? "" : "pr-2.5"} rounded-full ${active ? "text-white dark:text-zinc-900" : "text-gray-600 dark:text-gray-400"}`}>{label}</button>
+            {editing && (
+              <button type="button" onClick={() => onRemoveCustom(label)} aria-label={`Delete ${label}`}
+                className={`w-4 h-4 flex items-center justify-center rounded-full ${active ? "text-white/70 hover:text-white" : "text-gray-400 hover:text-red-500"}`}>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            )}
+          </span>
+        );
+      })}
+      {adding ? (
+        <input
+          autoFocus value={draft}
+          onChange={(e) => setDraft(e.target.value.slice(0, 30))}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } if (e.key === "Escape") { setDraft(""); setAdding(false); } }}
+          placeholder="New…"
+          className="w-24 px-2.5 py-1 rounded-full text-xs bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-600 text-gray-900 dark:text-gray-100 outline-none focus:border-gray-500"
+        />
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-gray-300 dark:border-zinc-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500 active:scale-[0.94] transition-colors">+ New</button>
+      )}
+      {custom.length > 0 && (
+        <button type="button" onClick={() => setEditing((v) => !v)} className="px-2 py-1 rounded-full text-[11px] font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+          {editing ? "Done" : "Edit"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function PantryDetailFields(p: PantryDetailFieldsProps) {
+  const { taxonomy } = useHouseholdData();
   const isSupplies = (p.kind ?? "food") === "supplies";
   const locationOptions = isSupplies ? SUPPLIES_LOCATIONS : STORAGE_LOCATIONS;
   const categoryOptions = isSupplies ? SUPPLIES_CATEGORIES : FOOD_CATEGORIES;
@@ -216,11 +291,14 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
 
               {openAttr === "storage" && (
                 <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {locationOptions.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => p.onStorageChange(p.storageLocation === value ? null : value)} className={chip(p.storageLocation === value)}>{label}</button>
-                    ))}
-                  </div>
+                  <CustomPillGroup
+                    options={locationOptions}
+                    custom={taxonomy.listFor("location", p.kind)}
+                    value={p.storageLocation}
+                    onSelect={(v) => p.onStorageChange(v)}
+                    onAddCustom={(label) => taxonomy.add("location", p.kind, label)}
+                    onRemoveCustom={(label) => { taxonomy.remove("location", p.kind, label); if (p.storageLocation === label) p.onStorageChange(null); }}
+                  />
                   {!isSupplies && p.storageLocation === "fridge" && (
                     <div className="flex flex-col gap-1.5 pt-1 border-t border-gray-100 dark:border-zinc-800">
                       <span className={LABEL}>Fridge zone</span>
@@ -235,11 +313,14 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
               )}
 
               {openAttr === "category" && (
-                <div className="flex flex-wrap gap-1.5">
-                  {categoryOptions.map(({ value, label }) => (
-                    <button key={value} type="button" onClick={() => p.onCategoryChange(p.foodCategory === value ? null : value)} className={chip(p.foodCategory === value)}>{label}</button>
-                  ))}
-                </div>
+                <CustomPillGroup
+                  options={categoryOptions}
+                  custom={taxonomy.listFor("category", p.kind)}
+                  value={p.foodCategory}
+                  onSelect={(v) => p.onCategoryChange(v)}
+                  onAddCustom={(label) => taxonomy.add("category", p.kind, label)}
+                  onRemoveCustom={(label) => { taxonomy.remove("category", p.kind, label); if (p.foodCategory === label) p.onCategoryChange(null); }}
+                />
               )}
 
               {openAttr === "assigned" && (

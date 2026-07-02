@@ -273,6 +273,35 @@ export interface Database {
           updated_at?: string;
         };
       };
+      household_taxonomy: {
+        Row: {
+          id: string;
+          household_id: string;
+          type: string; // 'category' | 'location'
+          kind: string; // 'food' | 'supplies'
+          label: string;
+          added_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          type: string;
+          kind: string;
+          label: string;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          type?: string;
+          kind?: string;
+          label?: string;
+          added_by?: string | null;
+          created_at?: string;
+        };
+      };
     };
   };
 }
@@ -285,6 +314,7 @@ export type ShoppingList = Database["public"]["Tables"]["shopping_lists"]["Row"]
 export type PantryItem = Database["public"]["Tables"]["pantry_items"]["Row"];
 export type ShoppingItem = Database["public"]["Tables"]["shopping_items"]["Row"];
 export type HouseholdRecipe = Database["public"]["Tables"]["household_recipes"]["Row"];
+export type HouseholdTaxonomy = Database["public"]["Tables"]["household_taxonomy"]["Row"];
 
 // ── Derived display types ─────────────────────────────────────────
 
