@@ -497,6 +497,11 @@ export default function PantryList({
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // The two attention strips (Use Soon + Running Low) collapse into a single
+  // summary bar by default so they don't eat the top third of the screen;
+  // tap to expand the detail. Collapsed by default to reclaim space.
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
+
   // Multi-select (audit M1). Entered via the "Select" button next to the
   // sort/filter pill. Cards show a check overlay; the action bar at the
   // top lets the user delete or mark running-low in bulk.
@@ -686,9 +691,9 @@ export default function PantryList({
     : [];
   const useSoonIds = new Set(useSoonItems.map((i) => i.id));
 
-  // P5 + P2: items already shown in either attention strip should NOT
-  // duplicate in their storage section. The strips are the canonical
-  // "needs action" views; sections are inventory.
+  // P5 + P2: items shown in an attention strip don't duplicate in their
+  // storage section. The strips (now collapsible behind the summary bar) are
+  // the canonical "needs action" view; sections are the rest of the inventory.
   const sectionItems = filtered.filter((i) => !runningLowIds.has(i.id) && !useSoonIds.has(i.id));
 
   // Food sections (only used when kind === 'food')
@@ -920,10 +925,61 @@ export default function PantryList({
       ) : (
         <div className="flex flex-col gap-4">
 
-          {/* ── Use Soon (audit P2) ─────────────────────────────
-              Items expiring within 7 days (or already expired) get a
-              dedicated strip at the top of the list. Replaces the
-              old "Freshness" sort whose ordering was invisible logic. */}
+          {/* ── Attention summary ───────────────────────────────
+              One tappable bar collapses the Use Soon + Running Low strips
+              (which together used to eat the top third of the screen). Tap
+              to expand the full detail below. Red-tinted when anything is
+              expiring, else amber. */}
+          {(useSoonItems.length > 0 || runningLowItems.length > 0) && (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setAlertsExpanded((v) => !v)}
+                aria-expanded={alertsExpanded}
+                className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors active:scale-[0.99] ${
+                  useSoonItems.length > 0
+                    ? "bg-red-50/70 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50"
+                    : "bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50"
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${useSoonItems.length > 0 ? "bg-red-100 dark:bg-red-950/40" : "bg-amber-100 dark:bg-amber-950/40"}`}>
+                  <svg className={`w-2.5 h-2.5 ${useSoonItems.length > 0 ? "text-red-500" : "text-amber-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                  </svg>
+                </span>
+                <span className="text-xs flex-1 min-w-0">
+                  {useSoonItems.length > 0 && (
+                    <span className="text-red-600 dark:text-red-400 font-semibold">{useSoonItems.length} expiring soon</span>
+                  )}
+                  {useSoonItems.length > 0 && runningLowItems.length > 0 && (
+                    <span className="text-gray-400 dark:text-gray-500"> · </span>
+                  )}
+                  {runningLowItems.length > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold">{runningLowItems.length} running low</span>
+                  )}
+                </span>
+                <motion.svg
+                  animate={{ rotate: alertsExpanded ? 180 : 0 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </motion.svg>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {alertsExpanded && (
+                  <motion.div
+                    key="alerts-detail"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="overflow-hidden flex flex-col gap-4"
+                  >
+
+          {/* ── Use Soon (audit P2) — items expiring within 7 days ── */}
           <AnimatePresence>
             {useSoonItems.length > 0 && (
               <motion.div
@@ -1071,6 +1127,12 @@ export default function PantryList({
               </motion.div>
             )}
           </AnimatePresence>
+
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {kind === "food" ? (
             <>

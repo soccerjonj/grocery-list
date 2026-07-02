@@ -99,15 +99,14 @@ function getExpiryBadge(expiresAt: string | null) {
     const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}` };
   }
-  // A year or more out: summarize as "1yr+" rather than leaving it blank
-  // (a blank badge looks identical to no-date-set). Quiet gray so it reads
-  // as "long shelf life," not a freshness alert.
+  // A year or more out: "1yr+". Green (not grey) — lots of shelf life left
+  // is a good, reassuring thing, so it should read as healthy at a glance.
   if (diff >= 365)
-    return { label: "1yr+", text: "text-gray-400 dark:text-gray-500", detail: "Expires in over a year" };
-  // 91–364 days: month-level precision is enough this far out. Quiet gray,
-  // same as the 1yr+ treatment — distinguishable from no-date, low noise.
+    return { label: "1yr+", text: "text-green-600", detail: "Expires in over a year" };
+  // 91–364 days: month-level precision is enough this far out. Green too, so
+  // the whole "plenty of time" range is consistent rather than half-grey.
   const monthYear = expiry.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-  return { label: monthYear, text: "text-gray-400 dark:text-gray-500", detail: `Expires ${monthYear}` };
+  return { label: monthYear, text: "text-green-600", detail: `Expires ${monthYear}` };
 }
 
 /** Returns member objects for assigned users, empty when assigned to everyone. */
@@ -733,9 +732,11 @@ export default function PantryItem({
               )}
             </div>
             <div className="flex items-center justify-between mt-auto">
+              {/* No expiry badge when there's no date — an empty slot reads
+                  cleaner than a placeholder "—" (which looked like an error). */}
               {expiry
                 ? <span className={`text-xs font-medium ${expiry.text}`}>{expiry.label}</span>
-                : <span className="text-xs text-gray-300 dark:text-zinc-600">—</span>
+                : <span />
               }
               {/* Tap-to-+1 (audit M2). The rest of the card still opens
                   the sheet; this is the "just bought another" shortcut. */}
