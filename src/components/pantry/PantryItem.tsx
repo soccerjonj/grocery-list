@@ -99,12 +99,13 @@ function getExpiryBadge(expiresAt: string | null) {
     const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     return { label: formatted, text: "text-green-600", detail: `Expires ${formatted}` };
   }
-  // A year or more out: "1yr+". Green (not grey) — lots of shelf life left
-  // is a good, reassuring thing, so it should read as healthy at a glance.
+  // A year or more out: "1yr+". Quiet gray — so much shelf life left it's not
+  // worth a color signal, and (since many staples are 1yr+) keeping it neutral
+  // stops green from becoming noise that drowns out the genuinely-fresh items.
   if (diff >= 365)
-    return { label: "1yr+", text: "text-green-600", detail: "Expires in over a year" };
-  // 91–364 days: month-level precision is enough this far out. Green too, so
-  // the whole "plenty of time" range is consistent rather than half-grey.
+    return { label: "1yr+", text: "text-gray-400 dark:text-gray-500", detail: "Expires in over a year" };
+  // 91–364 days: still within the year, month precision is enough. Green —
+  // "plenty of time but on the radar."
   const monthYear = expiry.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   return { label: monthYear, text: "text-green-600", detail: `Expires ${monthYear}` };
 }
