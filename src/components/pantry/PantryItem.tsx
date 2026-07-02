@@ -104,10 +104,10 @@ function getExpiryBadge(expiresAt: string | null) {
   // stops green from becoming noise that drowns out the genuinely-fresh items.
   if (diff >= 365)
     return { label: "1yr+", text: "text-gray-400 dark:text-gray-500", detail: "Expires in over a year" };
-  // 91–364 days: still within the year, month precision is enough. Green —
-  // "plenty of time but on the radar."
+  // 91–364 days: still months out, so quiet gray like 1yr+. Green is reserved
+  // for the ≤90-day "use it while it's good" window where it's actionable.
   const monthYear = expiry.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-  return { label: monthYear, text: "text-green-600", detail: `Expires ${monthYear}` };
+  return { label: monthYear, text: "text-gray-400 dark:text-gray-500", detail: `Expires ${monthYear}` };
 }
 
 /** Returns member objects for assigned users, empty when assigned to everyone. */
