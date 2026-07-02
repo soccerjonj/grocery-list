@@ -381,8 +381,8 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3" style={{ overscrollBehavior: "contain" }}>
               {!drafts && (
                 <>
-                  {/* Top-level New / Saved tabs */}
-                  <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-zinc-800">
+                  {/* Top-level New / Saved tabs — compact pill group */}
+                  <div className="inline-flex items-center gap-0.5 p-0.5 rounded-xl bg-gray-100 dark:bg-zinc-800 self-start">
                     {(["new", "saved"] as const).map((t) => {
                       const label = t === "new" ? "New" : "Saved";
                       const count = t === "saved" ? savedList.length : null;
@@ -391,7 +391,7 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                           key={t}
                           type="button"
                           onClick={() => { setTab(t); setError(null); }}
-                          className={`py-2 rounded-xl text-sm font-medium transition-colors active:scale-[0.98] ${
+                          className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:scale-[0.97] ${
                             tab === t
                               ? "bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-50 shadow-sm"
                               : "text-gray-500 dark:text-gray-400"
@@ -399,7 +399,7 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
                         >
                           {label}
                           {count !== null && count > 0 && (
-                            <span className={`ml-1.5 text-xs tabular-nums ${tab === t ? "text-gray-400 dark:text-gray-500" : "text-gray-300 dark:text-zinc-600"}`}>
+                            <span className={`ml-1 text-xs tabular-nums ${tab === t ? "text-gray-400 dark:text-gray-500" : "text-gray-300 dark:text-zinc-600"}`}>
                               {count}
                             </span>
                           )}
@@ -410,14 +410,14 @@ export default function RecipeImportSheet({ open, onClose, onAdd }: Props) {
 
                   {tab === "new" && (
                     <>
-                      {/* Mode (URL / Photo) */}
-                      <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-zinc-800">
+                      {/* Mode (URL / Photo) — compact pill group */}
+                      <div className="inline-flex items-center gap-0.5 p-0.5 rounded-xl bg-gray-100 dark:bg-zinc-800 self-start">
                         {(["url", "photo"] as const).map((m) => (
                           <button
                             key={m}
                             type="button"
                             onClick={() => { setMode(m); setError(null); }}
-                            className={`py-2 rounded-xl text-sm font-medium transition-colors active:scale-[0.98] ${
+                            className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:scale-[0.97] ${
                               mode === m
                                 ? "bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-50 shadow-sm"
                                 : "text-gray-500 dark:text-gray-400"

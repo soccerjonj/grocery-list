@@ -7,6 +7,9 @@ import { useHouseholdContext } from "@/context/HouseholdContext";
 import { useHouseholdMembers } from "@/hooks/useHouseholdMembers";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
+import ColorPicker from "@/components/ui/ColorPicker";
+import Input from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/context/ToastContext";
 import { getErrorMessage } from "@/lib/utils";
@@ -43,6 +46,55 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode; descriptio
   },
 ];
 
+// Your name + color, editable here in the household (as well as in the
+// account hub) — it's the identity your household members see. Writes the
+// global profile; keyed on the member row so it seeds once loaded.
+function YourProfileCard({
+  currentUserId,
+  seedName,
+  seedColor,
+  takenColors,
+}: {
+  currentUserId: string | null;
+  seedName: string;
+  seedColor: string | null;
+  takenColors: string[];
+}) {
+  const supabase = createClient();
+  const { success, error: toastError } = useToast();
+  const [name, setName] = useState(seedName);
+  const [color, setColor] = useState<string | null>(seedColor);
+  const [saving, setSaving] = useState(false);
+  const changed = name.trim() !== seedName || color !== seedColor;
+
+  async function save() {
+    if (!currentUserId || !name.trim()) return;
+    setSaving(true);
+    try {
+      await supabase.auth.updateUser({ data: { display_name: name.trim() } });
+      const { error } = await supabase.from("profiles").update({ display_name: name.trim(), color }).eq("id", currentUserId);
+      if (error) throw error;
+      success("Profile saved");
+    } catch (e) {
+      toastError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm p-4 flex flex-col gap-3">
+      <p className="text-xs font-medium text-gray-400 dark:text-gray-500">You in this household</p>
+      <Input id="hh-display-name" label="Display name" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Your color</span>
+        <ColorPicker value={color} onChange={setColor} takenColors={takenColors} />
+      </div>
+      <Button onClick={save} loading={saving} disabled={!changed} className="self-start">Save</Button>
+    </div>
+  );
+}
+
 function HouseholdSection({
   householdName,
   inviteCode,
@@ -77,6 +129,11 @@ function HouseholdSection({
   const [nameDraft, setNameDraft] = useState(householdName);
   useEffect(() => { if (!editingName) setNameDraft(householdName); }, [householdName, editingName]);
 
+  const me = members.find((m) => m.user_id === currentUserId);
+  const takenColors = members
+    .filter((m) => m.user_id !== currentUserId && m.color)
+    .map((m) => m.color!);
+
   function commitName() {
     setEditingName(false);
     onRename(nameDraft);
@@ -84,6 +141,16 @@ function HouseholdSection({
 
   return (
     <div className="flex flex-col gap-5">
+      {me && (
+        <YourProfileCard
+          key={me.user_id}
+          currentUserId={currentUserId}
+          seedName={me.display_name}
+          seedColor={me.color ?? null}
+          takenColors={takenColors}
+        />
+      )}
+
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Household</h2>
         {editingName ? (

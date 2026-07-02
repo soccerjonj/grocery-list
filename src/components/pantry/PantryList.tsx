@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
@@ -689,12 +689,12 @@ export default function PantryList({
         // Most urgent first
         .sort((a, b) => (a.expires_at ?? "").localeCompare(b.expires_at ?? ""))
     : [];
-  const useSoonIds = new Set(useSoonItems.map((i) => i.id));
-
-  // P5 + P2: items shown in an attention strip don't duplicate in their
-  // storage section. The strips (now collapsible behind the summary bar) are
-  // the canonical "needs action" view; sections are the rest of the inventory.
-  const sectionItems = filtered.filter((i) => !runningLowIds.has(i.id) && !useSoonIds.has(i.id));
+  // Expiring items STAY in their storage sections (they carry a red expiry
+  // badge there). The Use Soon bar is a collapsible shortcut on top, not the
+  // only place they appear — collapsing it must never hide an item. Running
+  // Low items are still hoisted out (that strip has its own row actions and
+  // the card keeps an amber edge in-section would double them up).
+  const sectionItems = filtered.filter((i) => !runningLowIds.has(i.id));
 
   // Food sections (only used when kind === 'food')
   const fridgeItems   = sectionItems.filter((i) => i.storage_location === "fridge");
@@ -1008,48 +1008,32 @@ export default function PantryList({
                       : d === 1 ? "Expires tomorrow"
                       : `${d} days left`;
                     const locationLabel = LOCATION_LABEL[item.storage_location ?? ""] ?? null;
+                    // The item also renders as a full card in its storage
+                    // section (which owns the edit sheet / desktop rail). This
+                    // row is just a shortcut — tapping it sets expandedId and
+                    // that section instance opens the editor. No hidden sheet
+                    // instance here (it would double-open).
                     return (
-                      <Fragment key={item.id}>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleExpand(item.id)}
-                          className="flex items-center gap-2 border border-red-200 dark:border-red-900/50 border-l-[3px] border-l-red-500 rounded-xl px-3 py-2 bg-red-50/50 dark:bg-red-950/20 text-left active:scale-[0.99] transition-transform"
-                        >
-                          <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                            <p className="text-xs font-semibold truncate text-gray-800 dark:text-gray-200">
-                              {item.name}
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleToggleExpand(item.id)}
+                        className="flex items-center gap-2 border border-red-200 dark:border-red-900/50 border-l-[3px] border-l-red-500 rounded-xl px-3 py-2 bg-red-50/50 dark:bg-red-950/20 text-left active:scale-[0.99] transition-transform"
+                      >
+                        <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                          <p className="text-xs font-semibold truncate text-gray-800 dark:text-gray-200">
+                            {item.name}
+                          </p>
+                          {locationLabel && (
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                              {locationLabel}
                             </p>
-                            {locationLabel && (
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
-                                {locationLabel}
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-[11px] font-medium text-red-600 dark:text-red-400 flex-shrink-0">
-                            {urgencyLabel}
-                          </span>
-                        </button>
-                        {/* Hidden PantryItem instance: card suppressed, but
-                            its bottom-sheet still attaches to expandedId so
-                            tapping the row above opens the editor like
-                            normal pantry items. On desktop the shared rail
-                            owns editing, so this emits nothing (renderSheet
-                            false) and the rail reads the selected item. */}
-                        <PantryItem
-                          item={item}
-                          hideCard
-                          renderSheet={!isDesktop}
-                          expanded={expandedId === item.id}
-                          onToggleExpand={() => handleToggleExpand(item.id)}
-                          onUpdateQuantity={onUpdateQuantity}
-                          onUpdateItem={onUpdateItem}
-                          onDelete={onDelete}
-                          onAddToShoppingList={onAddToShoppingList}
-                          members={members}
-                          currentUserId={currentUserId}
-                          householdId={householdId}
-                        />
-                      </Fragment>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-medium text-red-600 dark:text-red-400 flex-shrink-0">
+                          {urgencyLabel}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
