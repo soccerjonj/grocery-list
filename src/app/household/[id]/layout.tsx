@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { HouseholdProvider } from "@/context/HouseholdContext";
 import { HouseholdDataProvider } from "@/context/HouseholdDataContext";
-import { ToastProvider } from "@/context/ToastContext";
 import BottomNav from "@/components/ui/BottomNav";
 import Sidebar from "@/components/ui/Sidebar";
 import PageTransition from "@/components/ui/PageTransition";
@@ -45,19 +44,19 @@ export default async function HouseholdLayout({
   if (!membership || !household) redirect("/dashboard");
 
   return (
-    <ToastProvider>
-      <HouseholdProvider householdId={household.id} householdName={household.name}>
-        <HouseholdDataProvider householdId={household.id}>
-          <RouteScrollReset />
-          <Sidebar householdId={household.id} />
-          <PullToRefresh>
-            <div className="min-h-dvh bg-gray-50 dark:bg-zinc-950 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-60">
-              <PageTransition>{children}</PageTransition>
-            </div>
-          </PullToRefresh>
-          <BottomNav householdId={household.id} />
-        </HouseholdDataProvider>
-      </HouseholdProvider>
-    </ToastProvider>
+    // ToastProvider now lives in the root layout (app-wide), so it's not
+    // wrapped here.
+    <HouseholdProvider householdId={household.id} householdName={household.name}>
+      <HouseholdDataProvider householdId={household.id}>
+        <RouteScrollReset />
+        <Sidebar householdId={household.id} />
+        <PullToRefresh>
+          <div className="min-h-dvh bg-gray-50 dark:bg-zinc-950 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-60">
+            <PageTransition>{children}</PageTransition>
+          </div>
+        </PullToRefresh>
+        <BottomNav householdId={household.id} />
+      </HouseholdDataProvider>
+    </HouseholdProvider>
   );
 }

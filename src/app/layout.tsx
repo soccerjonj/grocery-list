@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
+import { ToastProvider } from "@/context/ToastContext";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -73,7 +74,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geist.variable} h-full`} suppressHydrationWarning>
       <body className="min-h-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-50 antialiased font-sans pt-safe">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><ToastProvider>{children}</ToastProvider></ThemeProvider>
       </body>
     </html>
   );
