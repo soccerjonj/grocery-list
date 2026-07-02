@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  removeHouseholdMember,
+  transferHouseholdOwnership,
+  leaveHousehold,
+} from "@/lib/householdAdmin";
 
 export interface MemberProfile {
   user_id: string;
@@ -98,26 +103,65 @@ export function useHouseholdMembers(householdId: string) {
     fetchMembers();
   }, [householdId, supabase]);
 
+  /**
+   * Owner removes another member. Goes through the owner-checked
+   * remove_household_member RPC (the old direct DELETE was silently rejected
+   * by RLS — self-delete only). Optimistic with rollback + rethrow so the
+   * caller can toast the real error.
+   */
   async function removeMember(userId: string) {
     const idx = members.findIndex((m) => m.user_id === userId);
     if (idx < 0) return;
     const snapshot = members[idx];
     setMembers((prev) => prev.filter((m) => m.user_id !== userId));
-    const { error } = await supabase
-      .from("household_members")
-      .delete()
-      .eq("household_id", householdId)
-      .eq("user_id", userId);
-    if (error) {
-      console.error("removeMember failed:", error.message);
+    try {
+      await removeHouseholdMember(householdId, userId);
+    } catch (err) {
       setMembers((prev) => {
         if (prev.some((m) => m.user_id === userId)) return prev;
         const next = [...prev];
         next.splice(Math.min(idx, next.length), 0, snapshot);
         return next;
       });
+      throw err;
     }
   }
 
-  return { members, currentUserId, currentUserRole, loading, loadError, removeMember };
+  /** Hand ownership to a member; current user becomes a regular member. */
+  async function transferOwnership(newOwnerId: string) {
+    const prev = members;
+    setMembers((all) =>
+      all.map((m) =>
+        m.user_id === newOwnerId
+          ? { ...m, role: "owner" }
+          : m.user_id === currentUserId
+          ? { ...m, role: "member" }
+          : m
+      )
+    );
+    setCurrentUserRole("member");
+    try {
+      await transferHouseholdOwnership(householdId, newOwnerId);
+    } catch (err) {
+      setMembers(prev);
+      setCurrentUserRole("owner");
+      throw err;
+    }
+  }
+
+  /** Leave this household. Throws if the caller is the sole owner. */
+  async function leave() {
+    await leaveHousehold(householdId);
+  }
+
+  return {
+    members,
+    currentUserId,
+    currentUserRole,
+    loading,
+    loadError,
+    removeMember,
+    transferOwnership,
+    leave,
+  };
 }

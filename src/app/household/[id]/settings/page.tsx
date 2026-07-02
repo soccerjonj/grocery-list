@@ -487,7 +487,7 @@ function AccountSection({
 
 export default function SettingsPage() {
   const { householdId, householdName } = useHouseholdContext();
-  const { members, currentUserId, currentUserRole, loading, removeMember } =
+  const { members, currentUserId, currentUserRole, loading, removeMember, leave } =
     useHouseholdMembers(householdId);
 
   // Section nav — null means "show list" on mobile; defaults to "profile" on desktop
@@ -571,8 +571,12 @@ export default function SettingsPage() {
 
   async function handleLeave() {
     if (!currentUserId) return;
-    await removeMember(currentUserId);
-    window.location.href = "/dashboard";
+    try {
+      await leave();
+      window.location.href = "/dashboard";
+    } catch (err) {
+      console.error("leave household failed:", err);
+    }
   }
 
   async function handleSignOut() {
