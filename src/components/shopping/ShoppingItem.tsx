@@ -6,7 +6,6 @@ import { useTheme } from "next-themes";
 import type { ShoppingItem as ShoppingItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
-import { useItemSuggestions } from "@/hooks/useItemSuggestions";
 import AmountField from "@/components/ui/AmountField";
 import ItemSheet, { ItemSheetHeader } from "@/components/ui/ItemSheet";
 
@@ -27,6 +26,8 @@ interface ShoppingItemProps {
   onOpenChange?: (open: boolean) => void;
   /** Render only the edit surface, no row (used by the desktop rail instance). */
   hideRow?: boolean;
+  /** Known store names, fetched once by the parent list (not per-row). */
+  knownStores?: string[];
 }
 
 function getAssignedMembers(assignedTo: string[] | null, members: MemberProfile[]): MemberProfile[] {
@@ -50,6 +51,7 @@ export default function ShoppingItem({
   controlledOpen,
   onOpenChange,
   hideRow = false,
+  knownStores = [],
 }: ShoppingItemProps) {
   const [checking, setChecking] = useState(false);
   const [localSheetOpen, setLocalSheetOpen] = useState(false);
@@ -66,8 +68,9 @@ export default function ShoppingItem({
   const [notesDraft, setNotesDraft] = useState(item.notes ?? "");
   const notesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { getStores } = useItemSuggestions(item.household_id);
-  const knownStores = getStores();
+  // `knownStores` is supplied by the parent list (fetched once per household)
+  // instead of each row running its own useItemSuggestions — see
+  // complexity-audit WIN 1.
   const [customStoreMode, setCustomStoreMode] = useState(false);
 
   // Keep nameDraft in sync if the item updates externally while we

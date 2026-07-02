@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ShoppingItem from "./ShoppingItem";
 import CompletedSection from "./CompletedSection";
@@ -10,6 +10,7 @@ import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { FOOD_CATEGORIES, SUPPLIES_CATEGORIES } from "@/types/database";
 import { getPantryHint } from "@/lib/pantryHints";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
+import { useItemSuggestions } from "@/hooks/useItemSuggestions";
 
 interface ShoppingListProps {
   activeItems: ShoppingItemType[];
@@ -116,6 +117,7 @@ function StoreGroup({
   isDesktop = false,
   selectedId = null,
   onSelect,
+  knownStores,
 }: {
   store: string;
   items: ShoppingItemType[];
@@ -129,6 +131,7 @@ function StoreGroup({
   isDesktop?: boolean;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
+  knownStores: string[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -176,6 +179,7 @@ function StoreGroup({
                     onUpdate={onUpdate}
                     members={members}
                     currentUserId={currentUserId}
+                    knownStores={knownStores}
                     renderSheet={!isDesktop}
                     onOpenChange={isDesktop && onSelect ? (o) => onSelect(o ? item.id : null) : undefined}
                   />
@@ -227,6 +231,15 @@ export default function ShoppingList({
   const selectedItem = selectedId
     ? activeItems.find((i) => i.id === selectedId) ?? null
     : null;
+
+  // Store suggestions are fetched ONCE here (3 queries per household) and the
+  // store list is passed down to every row. Previously each ShoppingItem row
+  // ran its own useItemSuggestions, so a 50-item list fired ~150 identical
+  // Supabase queries on load (complexity-audit WIN 1). Memoized on the
+  // underlying data so row effects don't churn on unrelated re-renders.
+  const { getStores, suggestions, savedStores } = useItemSuggestions(householdId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const knownStores = useMemo(() => getStores(), [suggestions, savedStores]);
 
   // Loading guard placed AFTER all hooks so a loading true→false transition
   // doesn't change hook count between renders (rules of hooks).
@@ -322,6 +335,7 @@ export default function ShoppingList({
                         isDesktop={desktopSplit}
                         selectedId={selectedId}
                         onSelect={setSelectedId}
+                        knownStores={knownStores}
                       />
                     );
                   })}
@@ -338,6 +352,7 @@ export default function ShoppingList({
                         onUpdate={onUpdate}
                         members={members}
                         currentUserId={currentUserId}
+                        knownStores={knownStores}
                         renderSheet={!desktopSplit}
                         onOpenChange={desktopSplit ? (o) => setSelectedId(o ? item.id : null) : undefined}
                       />
@@ -375,6 +390,7 @@ export default function ShoppingList({
                   onUpdate={onUpdate}
                   members={members}
                   currentUserId={currentUserId}
+                  knownStores={knownStores}
                   onOpenChange={(o) => { if (!o) setSelectedId(null); }}
                 />
               ) : (
