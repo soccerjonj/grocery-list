@@ -1,0 +1,60 @@
+name: Supabase Keepalive
+
+# Supabase pauses free-tier projects after 7 days with no activity. This
+# workflow makes a tiny authenticated REST request on a schedule, which
+# counts as project activity and keeps the database awake.
+#
+# Runs every 2 days — comfortably inside the 7-day window, so even if GitHub
+# delays or skips a scheduled run under load, the next one still lands in time.
+# `workflow_dispatch` lets you trigger it manually to test.
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL       e.g. https://iuebkghznqbodiovklix.supabase.co
+#   SUPABASE_ANON_KEY  the project's anon/public key (already public — it ships
+#                      in the web client — but kept as a secret for easy rotation)
+
+on:
+  schedule:
+    - cron: "0 7 */2 * *" # 07:00 UTC, every 2 days
+  workflow_dispatch: {}
+
+# If a run is already in progress, don't stack another.
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase REST (keeps the project from pausing)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_ANON_KEY repository secrets are required."
+            exit 1
+          fi
+
+          # A trivial, RLS-safe SELECT. It returns no rows for the anon role,
+          # but PostgREST still executes a query against Postgres — real
+          # database activity, which is what resets the inactivity timer.
+          url="${SUPABASE_URL%/}/rest/v1/households?select=id&limit=1"
+
+          code=$(curl -sS -o /tmp/body.txt -w "%{http_code}" \
+            --retry 3 --retry-delay 10 --max-time 30 \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "$url")
+
+          echo "HTTP $code"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 400 ]; then
+            echo "::error::Keepalive request failed (HTTP $code)"
+            cat /tmp/body.txt || true
+            exit 1
+          fi
+          echo "Supabase keepalive succeeded."
