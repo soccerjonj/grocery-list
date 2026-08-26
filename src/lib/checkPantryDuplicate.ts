@@ -28,11 +28,43 @@ export async function checkPantryDuplicate(
   return match ? { id: match.id, quantity: match.quantity ?? 1 } : null;
 }
 
+export interface PantryIndexEntry {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string | null;
+}
+
+/**
+ * Build the normalized-name → pantry-row index.
+ *
+ * Exported so recipe availability can index the in-memory (realtime-synced)
+ * pantry from context instead of issuing one SELECT per recipe — checking 200
+ * recipes on the discovery screen would otherwise be 200 round-trips. Sharing
+ * this exact loop is also what guarantees availability and the dedup users
+ * already see can never disagree.
+ *
+ * Rows are sorted oldest-first so the canonical (first-created) row always
+ * wins, matching how duplicate merging behaves everywhere else.
+ */
+export function indexPantryRows(
+  rows: { id: string; name: string; quantity: number | null; unit: string | null; created_at?: string }[]
+): Map<string, PantryIndexEntry> {
+  const sorted = [...rows].sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+  const map = new Map<string, PantryIndexEntry>();
+  for (const row of sorted) {
+    const key = normalizeItemName(row.name);
+    if (!key || map.has(key)) continue;
+    map.set(key, { id: row.id, name: row.name, quantity: row.quantity ?? 1, unit: row.unit ?? null });
+  }
+  return map;
+}
+
 /** Bulk check — returns a map of normalized name → { id, quantity, unit }. */
 export async function getPantryDuplicates(
   householdId: string,
   names: string[]
-): Promise<Map<string, { id: string; quantity: number; unit: string | null }>> {
+): Promise<Map<string, PantryIndexEntry>> {
   if (names.length === 0) return new Map();
   const supabase = createClient();
   const { data } = await supabase
@@ -42,14 +74,10 @@ export async function getPantryDuplicates(
     .order("created_at", { ascending: true });
 
   const wanted = new Set(names.map(normalizeItemName).filter(Boolean));
-  const map = new Map<string, { id: string; quantity: number; unit: string | null }>();
-  for (const row of data ?? []) {
-    const key = normalizeItemName(row.name);
-    // First (oldest) row wins; later duplicate rows are ignored so we always
-    // merge into a single canonical row.
-    if (wanted.has(key) && !map.has(key)) {
-      map.set(key, { id: row.id, quantity: row.quantity ?? 1, unit: row.unit ?? null });
-    }
+  const full = indexPantryRows(data ?? []);
+  const map = new Map<string, PantryIndexEntry>();
+  for (const [key, entry] of full) {
+    if (wanted.has(key)) map.set(key, entry);
   }
   return map;
 }

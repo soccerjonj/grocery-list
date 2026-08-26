@@ -13,6 +13,8 @@ import type { HouseholdRecipe } from "@/types/database";
 export interface RecipeIngredient extends ExtractedIngredient {
   /** Optional section heading, e.g. "For the sauce". */
   group?: string;
+  /** Nice-to-have (garnish) — excluded from the "you have N of M" denominator. */
+  optional?: boolean;
 }
 
 /** One ordered cooking step. */

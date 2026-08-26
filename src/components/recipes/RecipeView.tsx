@@ -7,7 +7,23 @@ import {
   totalMinutes, formatMinutes, formatRelativeDay,
 } from "@/lib/recipeTypes";
 import { scaleQuantity, formatAmount, servingsFactor } from "@/lib/recipeScale";
+import { useRecipeAvailability } from "@/hooks/useRecipeAvailability";
+import type { IngredientState } from "@/lib/recipeAvailability";
 import { safeHttpUrl } from "@/lib/utils";
+
+/** Colour for each availability state. `unknown` stays grey on purpose. */
+const STATE_DOT: Record<IngredientState, string> = {
+  have: "bg-green-500",
+  low: "bg-amber-400",
+  unknown: "bg-gray-300 dark:bg-zinc-600",
+  missing: "bg-red-400",
+};
+const STATE_TITLE: Record<IngredientState, string> = {
+  have: "In your pantry",
+  low: "Running short",
+  unknown: "In your pantry (different units)",
+  missing: "Not in your pantry",
+};
 
 /**
  * The readable recipe page: hero, meta, scalable ingredients, steps, notes.
@@ -28,9 +44,17 @@ export default function RecipeView({
   const [target, setTarget] = useState<number | null>(base);
   const factor = servingsFactor(base, target);
 
+  const { availabilityFor } = useRecipeAvailability();
+
   const ingredients = recipeIngredientList(recipe);
   const steps = recipeStepList(recipe);
   const ingredientGroups = groupSections(ingredients);
+  // Availability follows the servings you're looking at — doubling a recipe
+  // can legitimately turn "have" into "running short".
+  const availability = availabilityFor(ingredients, factor);
+  const stateByName = new Map(
+    availability.rows.map((r) => [r.ingredient, r.state] as const),
+  );
   const stepGroups = groupSections(steps);
   const time = formatMinutes(totalMinutes(recipe));
   const sourceUrl = safeHttpUrl(recipe.source_url);
@@ -110,6 +134,30 @@ export default function RecipeView({
           )}
         </div>
 
+        {/* What you already have. Presence-based: we count an ingredient as
+            "have" if it's in your kitchen at all, since comparing 2 cups to
+            1 bag isn't answerable. */}
+        {ingredients.length > 0 && (
+          <div className="flex items-center gap-2.5 rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2.5">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              availability.missing.length === 0 ? "bg-green-500" : "bg-amber-400"
+            }`} />
+            <p className="flex-1 text-xs text-gray-600 dark:text-gray-300">
+              {availability.missing.length === 0 ? (
+                <>You have everything for this</>
+              ) : (
+                <>
+                  You have{" "}
+                  <span className="font-semibold text-gray-900 dark:text-gray-50">
+                    {availability.haveCount} of {availability.totalCount}
+                  </span>{" "}
+                  ingredients
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
         {ingredients.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">No ingredients yet.</p>
         ) : (
@@ -125,8 +173,14 @@ export default function RecipeView({
                   {g.rows.map((ing, i) => {
                     const qty = scaleQuantity(ing.quantity, factor, ing.unit);
                     const amount = formatAmount(qty, ing.unit);
+                    const state = stateByName.get(ing) ?? "missing";
                     return (
                       <li key={`${ing.name}-${i}`} className="flex items-baseline gap-3 py-2.5">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 self-center ${STATE_DOT[state]}`}
+                          title={STATE_TITLE[state]}
+                          aria-label={STATE_TITLE[state]}
+                        />
                         <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{ing.name}</span>
                         {amount && (
                           <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 flex-shrink-0">
@@ -151,7 +205,9 @@ export default function RecipeView({
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z" />
           </svg>
-          Add ingredients to shopping list
+          {availability.missing.length > 0
+            ? `Add ${availability.missing.length} missing to shopping list`
+            : "Add ingredients to shopping list"}
         </button>
       </section>
 

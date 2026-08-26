@@ -9,6 +9,7 @@ import { recipeIngredientList } from "@/lib/recipeTypes";
 import { scaleQuantity, formatAmount, servingsFactor } from "@/lib/recipeScale";
 import { normalizeItemName } from "@/lib/normalizeItemName";
 import { getShoppingDuplicates, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import { useRecipeAvailability } from "@/hooks/useRecipeAvailability";
 import { getErrorMessage } from "@/lib/utils";
 
 /**
@@ -32,19 +33,30 @@ export default function RecipeAddToListSheet({
 }) {
   const { shopping } = useHouseholdData();
   const { success, error: toastError } = useToast();
+  const { availabilityFor } = useRecipeAvailability();
 
   const base = recipe.servings ?? null;
   const [target, setTarget] = useState<number>(base ?? 1);
   const [skipped, setSkipped] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (open) { setTarget(base ?? 1); setSkipped(new Set()); }
-  }, [open, base]);
-
   const ingredients = recipeIngredientList(recipe);
   // Only scale when we know the base — otherwise amounts pass through as-is.
   const factor = base ? servingsFactor(base, target) : 1;
+  const availability = availabilityFor(ingredients, factor);
+  const alreadyHave = availability.rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.state !== "missing")
+    .map(({ i }) => i);
+
+  // Default to adding only what you're actually missing — that's almost always
+  // the intent, and the checkboxes make the rest one tap away.
+  useEffect(() => {
+    if (open) { setTarget(base ?? 1); setSkipped(new Set(alreadyHave)); }
+    // Seeded once per open; re-running on every availability change would
+    // fight the user's own checkbox taps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, base]);
 
   function toggle(i: number) {
     setSkipped((prev) => {
@@ -126,9 +138,21 @@ export default function RecipeAddToListSheet({
 
       {/* Scaled preview — tap any row to leave it off the list */}
       <div className="flex flex-col gap-1.5">
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
-          Adding {addingCount} of {ingredients.length}
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
+            Adding {addingCount} of {ingredients.length}
+            {alreadyHave.length > 0 && ` · ${alreadyHave.length} already in your pantry`}
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              setSkipped((prev) => (prev.size === 0 ? new Set(alreadyHave) : new Set()))
+            }
+            className="flex-shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50 transition-colors"
+          >
+            {skipped.size === 0 ? "Only missing" : "Select all"}
+          </button>
+        </div>
         <ul className="flex flex-col divide-y divide-gray-50 dark:divide-zinc-800 rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3">
           {ingredients.map((ing, i) => {
             const off = skipped.has(i);
