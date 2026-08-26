@@ -63,6 +63,7 @@ export function HouseholdDataProvider({
       lastResync.current = now;
       shopping.retry();
       pantry.refetch();
+      recipes.refetch();
     }
     function onVisible() {
       if (document.visibilityState === "visible") resync();

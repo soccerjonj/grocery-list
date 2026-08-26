@@ -244,8 +244,20 @@ export interface Database {
           household_id: string;
           name: string;
           ingredients: Json;
+          steps: Json; // [{ text: string, group?: string }]
+          servings: number | null;
+          servings_unit: string | null;
+          prep_minutes: number | null;
+          cook_minutes: number | null;
+          image_url: string | null;
+          image_path: string | null;
+          notes: string | null;
+          description: string | null;
+          tags: string[];
+          last_cooked_at: string | null;
+          cook_count: number;
           source_url: string | null;
-          source_kind: string; // 'url' | 'photo' | 'manual'
+          source_kind: string; // 'url' | 'photo' | 'manual' | 'text'
           added_by: string | null;
           created_at: string;
           updated_at: string;
@@ -255,6 +267,18 @@ export interface Database {
           household_id: string;
           name: string;
           ingredients: Json;
+          steps?: Json;
+          servings?: number | null;
+          servings_unit?: string | null;
+          prep_minutes?: number | null;
+          cook_minutes?: number | null;
+          image_url?: string | null;
+          image_path?: string | null;
+          notes?: string | null;
+          description?: string | null;
+          tags?: string[];
+          last_cooked_at?: string | null;
+          cook_count?: number;
           source_url?: string | null;
           source_kind?: string;
           added_by?: string | null;
@@ -266,11 +290,81 @@ export interface Database {
           household_id?: string;
           name?: string;
           ingredients?: Json;
+          steps?: Json;
+          servings?: number | null;
+          servings_unit?: string | null;
+          prep_minutes?: number | null;
+          cook_minutes?: number | null;
+          image_url?: string | null;
+          image_path?: string | null;
+          notes?: string | null;
+          description?: string | null;
+          tags?: string[];
+          last_cooked_at?: string | null;
+          cook_count?: number;
           source_url?: string | null;
           source_kind?: string;
           added_by?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      recipe_ratings: {
+        Row: {
+          recipe_id: string;
+          user_id: string;
+          household_id: string;
+          rating: number;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          recipe_id: string;
+          user_id: string;
+          household_id: string;
+          rating: number;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          recipe_id?: string;
+          user_id?: string;
+          household_id?: string;
+          rating?: number;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      recipe_cooks: {
+        Row: {
+          id: string;
+          household_id: string;
+          recipe_id: string;
+          cooked_by: string | null;
+          servings: number | null;
+          deducted: Json;
+          cooked_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          recipe_id: string;
+          cooked_by?: string | null;
+          servings?: number | null;
+          deducted?: Json;
+          cooked_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          recipe_id?: string;
+          cooked_by?: string | null;
+          servings?: number | null;
+          deducted?: Json;
+          cooked_at?: string;
         };
       };
       household_taxonomy: {
@@ -315,6 +409,8 @@ export type PantryItem = Database["public"]["Tables"]["pantry_items"]["Row"];
 export type ShoppingItem = Database["public"]["Tables"]["shopping_items"]["Row"];
 export type HouseholdRecipe = Database["public"]["Tables"]["household_recipes"]["Row"];
 export type HouseholdTaxonomy = Database["public"]["Tables"]["household_taxonomy"]["Row"];
+export type RecipeRating = Database["public"]["Tables"]["recipe_ratings"]["Row"];
+export type RecipeCook = Database["public"]["Tables"]["recipe_cooks"]["Row"];
 
 // ── Derived display types ─────────────────────────────────────────
 

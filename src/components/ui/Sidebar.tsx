@@ -77,6 +77,25 @@ const tabs = [
       </svg>
     ),
   },
+  {
+    label: "Recipes",
+    href: (id: string) => `/household/${id}/recipes`,
+    icon: (active: boolean) => (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth={active ? 2.1 : 1.6}
+        stroke="currentColor"
+        className="w-[22px] h-[22px] transition-all duration-200"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3-2 2 2 2-2 2 2 2-2 3 2zM9 7h6M9 11h6M9 15h4"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({ householdId }: SidebarProps) {

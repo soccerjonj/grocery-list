@@ -10,7 +10,10 @@ import type { HouseholdTaxonomy } from "@/types/database";
  * fetch + realtime subscription. Entries carry a `label` that is stored
  * verbatim in pantry_items.food_category / storage_location.
  */
-export type TaxonomyType = "category" | "location";
+// "recipe_tag" entries are stored with kind="recipe" (migration 028) so they
+// share this table's household scoping, RLS, realtime, and case-insensitive
+// uniqueness with the pantry's custom categories/locations.
+export type TaxonomyType = "category" | "location" | "recipe_tag";
 
 export function useHouseholdTaxonomy(householdId: string) {
   const [entries, setEntries] = useState<HouseholdTaxonomy[]>([]);

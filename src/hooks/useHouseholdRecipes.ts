@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { HouseholdRecipe } from "@/types/database";
 import type { ExtractedIngredient } from "@/lib/recipeExtract";
+import type { RecipeIngredient, RecipeStep } from "@/lib/recipeTypes";
 import { safeHttpUrl } from "@/lib/utils";
 
 /**
@@ -16,12 +17,30 @@ import { safeHttpUrl } from "@/lib/utils";
  * without any conversion.
  */
 
+/**
+ * Everything a recipe can carry. Only `name` + `ingredients` are required so
+ * the original shopping-import path keeps working unchanged; the cooking
+ * fields (migration 028) are all optional.
+ */
 export interface RecipeInput {
   name: string;
-  ingredients: ExtractedIngredient[];
+  ingredients: RecipeIngredient[];
+  steps?: RecipeStep[];
+  servings?: number | null;
+  servingsUnit?: string | null;
+  prepMinutes?: number | null;
+  cookMinutes?: number | null;
+  imageUrl?: string | null;
+  imagePath?: string | null;
+  notes?: string | null;
+  description?: string | null;
+  tags?: string[];
   sourceUrl?: string | null;
-  sourceKind?: "url" | "photo" | "manual";
+  sourceKind?: "url" | "photo" | "manual" | "text";
 }
+
+/** Fields an existing recipe can be patched with. */
+export type RecipePatch = Partial<Omit<RecipeInput, "sourceKind">>;
 
 export function useHouseholdRecipes(householdId: string) {
   const [recipes, setRecipes] = useState<HouseholdRecipe[]>([]);
@@ -98,6 +117,18 @@ export function useHouseholdRecipes(householdId: string) {
         name: input.name.trim(),
         // Cast since the JSONB column is typed as Json in our generated types.
         ingredients: input.ingredients as unknown as never,
+        steps: (input.steps ?? []) as unknown as never,
+        servings: input.servings ?? null,
+        servings_unit: input.servingsUnit ?? null,
+        prep_minutes: input.prepMinutes ?? null,
+        cook_minutes: input.cookMinutes ?? null,
+        // Same http(s)-only guard as source_url — an image_url is rendered
+        // straight into an <img src>, so never let a javascript:/data: URI in.
+        image_url: safeHttpUrl(input.imageUrl) ?? null,
+        image_path: input.imagePath ?? null,
+        notes: input.notes ?? null,
+        description: input.description ?? null,
+        tags: input.tags ?? [],
         // Only persist safe http(s) URLs — never a javascript:/data: URI that
         // would execute when rendered as a "View source" link.
         source_url: safeHttpUrl(input.sourceUrl) ?? null,
@@ -116,25 +147,44 @@ export function useHouseholdRecipes(householdId: string) {
     return data.id;
   }
 
-  /** Update name / ingredients of an existing recipe. */
-  async function updateRecipe(
-    id: string,
-    patch: { name?: string; ingredients?: ExtractedIngredient[] },
-  ): Promise<boolean> {
-    // Optimistic update with rollback
+  /** Patch any editable field of an existing recipe. Optimistic w/ rollback. */
+  async function updateRecipe(id: string, patch: RecipePatch): Promise<boolean> {
     const snapshot = recipes.find((r) => r.id === id);
     if (!snapshot) return false;
+
     const optimistic: HouseholdRecipe = {
       ...snapshot,
       name: patch.name ?? snapshot.name,
       ingredients: (patch.ingredients ?? snapshot.ingredients) as unknown as HouseholdRecipe["ingredients"],
+      steps: (patch.steps ?? snapshot.steps) as unknown as HouseholdRecipe["steps"],
+      servings: patch.servings !== undefined ? patch.servings : snapshot.servings,
+      servings_unit: patch.servingsUnit !== undefined ? patch.servingsUnit : snapshot.servings_unit,
+      prep_minutes: patch.prepMinutes !== undefined ? patch.prepMinutes : snapshot.prep_minutes,
+      cook_minutes: patch.cookMinutes !== undefined ? patch.cookMinutes : snapshot.cook_minutes,
+      image_url: patch.imageUrl !== undefined ? (safeHttpUrl(patch.imageUrl) ?? null) : snapshot.image_url,
+      image_path: patch.imagePath !== undefined ? patch.imagePath : snapshot.image_path,
+      notes: patch.notes !== undefined ? patch.notes : snapshot.notes,
+      description: patch.description !== undefined ? patch.description : snapshot.description,
+      tags: patch.tags !== undefined ? patch.tags : snapshot.tags,
+      source_url: patch.sourceUrl !== undefined ? (safeHttpUrl(patch.sourceUrl) ?? null) : snapshot.source_url,
       updated_at: new Date().toISOString(),
     };
     setRecipes((prev) => prev.map((r) => (r.id === id ? optimistic : r)));
 
     const updates: Record<string, unknown> = {};
-    if (patch.name !== undefined) updates.name = patch.name.trim();
+    if (patch.name !== undefined)        updates.name = patch.name.trim();
     if (patch.ingredients !== undefined) updates.ingredients = patch.ingredients;
+    if (patch.steps !== undefined)       updates.steps = patch.steps;
+    if (patch.servings !== undefined)     updates.servings = patch.servings;
+    if (patch.servingsUnit !== undefined) updates.servings_unit = patch.servingsUnit;
+    if (patch.prepMinutes !== undefined)  updates.prep_minutes = patch.prepMinutes;
+    if (patch.cookMinutes !== undefined)  updates.cook_minutes = patch.cookMinutes;
+    if (patch.imageUrl !== undefined)     updates.image_url = safeHttpUrl(patch.imageUrl) ?? null;
+    if (patch.imagePath !== undefined)    updates.image_path = patch.imagePath;
+    if (patch.notes !== undefined)        updates.notes = patch.notes;
+    if (patch.description !== undefined)  updates.description = patch.description;
+    if (patch.tags !== undefined)         updates.tags = patch.tags;
+    if (patch.sourceUrl !== undefined)   updates.source_url = safeHttpUrl(patch.sourceUrl) ?? null;
 
     const { error } = await supabase
       .from("household_recipes")
@@ -161,7 +211,7 @@ export function useHouseholdRecipes(householdId: string) {
     return true;
   }
 
-  return { recipes, loading, loadError, saveRecipe, updateRecipe, deleteRecipe };
+  return { recipes, loading, loadError, refetch: fetchRecipes, saveRecipe, updateRecipe, deleteRecipe };
 }
 
 /** Convenience helper: cast the JSONB column to the typed ingredient list. */
