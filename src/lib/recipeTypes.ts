@@ -62,6 +62,22 @@ export function totalMinutes(recipe: HouseholdRecipe): number | null {
   return t > 0 ? t : null;
 }
 
+/** "today" / "yesterday" / "3 days ago" / "Mar 5" — for last-cooked. */
+export function formatRelativeDay(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return null;
+  const a = new Date(then); a.setHours(0, 0, 0, 0);
+  const b = new Date();     b.setHours(0, 0, 0, 0);
+  const days = Math.round((b.getTime() - a.getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return "last week";
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 /** "1 hr 25 min" / "40 min". */
 export function formatMinutes(mins: number | null | undefined): string | null {
   if (!mins || mins <= 0) return null;

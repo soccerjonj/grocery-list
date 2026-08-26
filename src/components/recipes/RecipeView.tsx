@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { HouseholdRecipe } from "@/types/database";
 import {
   recipeIngredientList, recipeStepList, groupSections,
-  totalMinutes, formatMinutes,
+  totalMinutes, formatMinutes, formatRelativeDay,
 } from "@/lib/recipeTypes";
 import { scaleQuantity, formatAmount, servingsFactor } from "@/lib/recipeScale";
 import { safeHttpUrl } from "@/lib/utils";
@@ -72,7 +72,12 @@ export default function RecipeView({
               Serves {recipe.servings}{recipe.servings_unit ? ` ${recipe.servings_unit}` : ""}
             </span>
           )}
-          {recipe.cook_count > 0 && <span>Cooked {recipe.cook_count}×</span>}
+          {recipe.cook_count > 0 && (
+            <span>
+              Cooked {recipe.cook_count}×
+              {formatRelativeDay(recipe.last_cooked_at) && ` · last ${formatRelativeDay(recipe.last_cooked_at)}`}
+            </span>
+          )}
         </div>
       )}
 

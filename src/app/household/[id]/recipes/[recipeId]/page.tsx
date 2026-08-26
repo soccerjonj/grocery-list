@@ -10,6 +10,8 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import RecipeView from "@/components/recipes/RecipeView";
 import RecipeEditor from "@/components/recipes/RecipeEditor";
 import RecipeAddToListSheet from "@/components/recipes/RecipeAddToListSheet";
+import RatingRow from "@/components/recipes/RatingRow";
+import { useRecipeRatings } from "@/hooks/useRecipeRatings";
 import type { RecipePatch } from "@/hooks/useHouseholdRecipes";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -17,10 +19,13 @@ export default function RecipeDetailPage() {
   const params = useParams();
   const recipeId = params.recipeId as string;
   const { householdId } = useHouseholdContext();
-  const { recipes: recipesData } = useHouseholdData();
+  const { recipes: recipesData, members: membersData } = useHouseholdData();
   const { recipes, loading, updateRecipe, deleteRecipe } = recipesData;
   const { success, error: toastError } = useToast();
   const router = useRouter();
+  // Called before the not-found early-return below — a hook count that changes
+  // between renders is React error #310.
+  const { forRecipe, currentUserId, setMyRating } = useRecipeRatings(householdId);
 
   const [editing, setEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -116,7 +121,28 @@ export default function RecipeDetailPage() {
       {editing ? (
         <RecipeEditor recipe={recipe} onSave={handleSave} onCancel={() => setEditing(false)} />
       ) : (
-        <RecipeView recipe={recipe} onAddToList={() => setAddOpen(true)} />
+        <div className="flex flex-col gap-6">
+          {/* Start cooking — the point of the whole section, so it leads. */}
+          <button
+            type="button"
+            onClick={() => router.push(`/household/${householdId}/recipes/${recipeId}/cook`)}
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-green-600 text-white text-base font-semibold active:scale-[0.98] transition-transform"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+            </svg>
+            Start cooking
+          </button>
+
+          <RecipeView recipe={recipe} onAddToList={() => setAddOpen(true)} />
+
+          <RatingRow
+            ratings={forRecipe(recipeId)}
+            currentUserId={currentUserId}
+            members={membersData.members}
+            onRate={(r) => setMyRating(recipeId, r)}
+          />
+        </div>
       )}
 
       <RecipeAddToListSheet
