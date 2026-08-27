@@ -16,9 +16,12 @@ import { recipeIngredientList, totalMinutes, formatMinutes } from "@/lib/recipeT
 export default function RecipeCard({
   recipe,
   householdId,
+  missingCount = null,
 }: {
   recipe: HouseholdRecipe;
   householdId: string;
+  /** Ingredients not in the pantry. null = not evaluated (no ingredients). */
+  missingCount?: number | null;
 }) {
   const ingredientCount = recipeIngredientList(recipe).length;
   const time = formatMinutes(totalMinutes(recipe));
@@ -67,6 +70,18 @@ export default function RecipeCard({
             <span>{ingredientCount} ingredient{ingredientCount === 1 ? "" : "s"}</span>
           )}
         </div>
+        {/* Pantry standing — only when we actually evaluated it. */}
+        {missingCount !== null && ingredientCount > 0 && (
+          <span
+            className={`self-start mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+              missingCount === 0
+                ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400"
+                : "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            {missingCount === 0 ? "Ready to cook" : `Missing ${missingCount}`}
+          </span>
+        )}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-0.5">
             {tags.slice(0, 2).map((t) => (

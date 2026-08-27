@@ -9,7 +9,7 @@ import { checkShoppingDuplicate, increaseShoppingQty, getShoppingDuplicates } fr
 import { normalizeItemName } from "@/lib/normalizeItemName";
 import AmountField from "@/components/ui/AmountField";
 import { getPantryHint } from "@/lib/pantryHints";
-import RecipeImportSheet from "@/components/shopping/RecipeImportSheet";
+import RecipePickerSheet from "@/components/recipes/RecipePickerSheet";
 import {
   STORAGE_LOCATIONS,
   FOOD_CATEGORIES,
@@ -101,13 +101,8 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
   // Landing preview (T2-A): what will pantryHints route this to?
   const landingPreview = buildLandingPreview(name);
 
-  // Recipe import sheet (T3-B)
+  // Recipe picker — the sheet adds to the list itself, so no adapter here.
   const [recipeSheetOpen, setRecipeSheetOpen] = useState(false);
-  async function addFromRecipe(itemName: string, quantity?: number, unit?: string) {
-    // Reuse onAdd — auto-detect kind/store happen inside useShoppingFlow.
-    // Notes / member-assignment intentionally left empty for recipe imports.
-    onAdd(itemName, quantity, unit, undefined, null, undefined);
-  }
 
   // ── Voice input (T2-B) ────────────────────────────────────────────
   // Web Speech API is supported in Safari (iOS/macOS) and Chromium-based
@@ -716,10 +711,11 @@ export default function AddShoppingItem({ onAdd, householdId, members = [], curr
         </button>
       </div>
 
-      <RecipeImportSheet
+      {/* Picker, not importer — creating recipes lives in the Recipes tab. */}
+      <RecipePickerSheet
         open={recipeSheetOpen}
         onClose={() => setRecipeSheetOpen(false)}
-        onAdd={addFromRecipe}
+        householdId={householdId}
       />
     </div>
   );

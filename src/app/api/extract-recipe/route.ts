@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAnthropic, extractJson, MODEL_HAIKU, MODEL_SONNET } from "@/lib/anthropic";
-import { extractRecipesFromHtml, parseIngredientLine, type ExtractedIngredient } from "@/lib/recipeExtract";
+import {
+  extractRecipesFromHtml,
+  parseIngredientLine,
+  type ExtractedIngredient,
+  type ExtractedStep,
+} from "@/lib/recipeExtract";
 import { guardLlmRoute } from "@/lib/apiGuard";
 import { safeFetchText, SsrfBlockedError } from "@/lib/ssrfGuard";
 
@@ -14,8 +19,12 @@ const MAX_IMAGE_BASE64 = 8_000_000;      // ~6 MB decoded
  *
  * Body (URL mode):   { type: "url", url: string }
  * Body (image mode): { type: "image", imageBase64: string, mediaType: string }
+ * Body (paste mode): { type: "text", text: string }
  *
- * Returns: { items: ExtractedIngredient[], source: "json-ld" | "llm" | "vision", title?: string }
+ * Returns: {
+ *   items, steps, title?, servings?, prepMinutes?, cookMinutes?, imageUrl?,
+ *   description?, source: "json-ld" | "llm" | "vision" | "paste"
+ * }
  *
  * URL flow:
  *   1. Server-fetch the page.
@@ -43,26 +52,57 @@ interface ImageBody {
   imageBase64: string;
   mediaType: string;
 }
-type Body = UrlBody | ImageBody;
+interface TextBody {
+  type: "text";
+  text: string;
+}
+type Body = UrlBody | ImageBody | TextBody;
 
-const SYSTEM_PROMPT = `You extract ingredient lists from recipes. Reply with ONLY a JSON object — no markdown, no commentary.
+/** Paste mode cap — generous for a recipe, small enough to bound token cost. */
+const MAX_PASTE_LEN = 12000;
+
+/**
+ * Phase 4 rewrite. This prompt used to say "skip section headings and
+ * instructions" — the whole point then was a shopping list. Now that recipes
+ * are cooked from, steps and groupings are the valuable part, so both are
+ * captured and headings become `group` rather than being discarded.
+ */
+const SYSTEM_PROMPT = `You extract structured recipes. Reply with ONLY a JSON object — no markdown, no commentary.
 
 Schema:
 {
+  "title": "Chocolate chip cookies",
+  "servings": 24,
+  "prepMinutes": 15,
+  "cookMinutes": 12,
   "items": [
-    { "name": "all-purpose flour", "quantity": 2, "unit": "cups", "raw": "2 cups all-purpose flour" }
+    { "name": "all-purpose flour", "quantity": 2, "unit": "cups", "raw": "2 cups all-purpose flour", "group": "For the dough", "optional": false }
+  ],
+  "steps": [
+    { "text": "Cream the butter and sugar until light.", "group": "For the dough" }
   ]
 }
 
-Rules:
+Ingredient rules:
 - "name" is the clean shopping-list name. Strip prep words (sifted, diced, chopped, minced, beaten, melted, softened) — those happen at home, not at the store.
 - Strip parenthetical clarifications like "(about 8 oz)" from the name.
 - "quantity" is the numeric amount, e.g. 2, 1.5, 0.25. Convert fractions ("1/2" → 0.5). Omit if the recipe gives no quantity ("salt to taste").
 - "unit" is the measurement unit if any (cups, tbsp, tsp, oz, lb, g, kg, mL, L, can, pack, etc). Omit if no unit.
 - "raw" preserves the original line verbatim for verification.
-- Skip section headings ("For the sauce:"), instructions, equipment, and garnish-only items ("optional: parsley").
+- "group" is the section heading the ingredient sits under ("For the sauce"), WITHOUT the trailing colon. Omit when the recipe has no sections. Never emit a heading as its own ingredient.
+- "optional": true only for garnishes or lines the recipe itself marks optional.
 - If two ingredients are alternates ("flour or cornstarch") emit only the first.
-- Output every real ingredient — never elide the list.`;
+- Output every real ingredient — never elide the list.
+
+Step rules:
+- "text" is one instruction, verbatim where possible but without a leading step number.
+- "group" is the section heading the step belongs to, when the method is divided into parts.
+- Preserve the recipe's order exactly. Do not merge or summarize steps.
+- Omit "steps" entirely if the source has no instructions (e.g. an ingredients-only photo).
+
+Metadata rules:
+- "title", "servings", "prepMinutes", "cookMinutes" are all optional — omit any the source doesn't state. Never guess times or yields.
+- "servings" is a plain number of servings.`;
 
 const MAX_HTML_LEN = 18000;
 
@@ -91,38 +131,109 @@ interface LlmItem {
   quantity?: unknown;
   unit?: unknown;
   raw?: unknown;
+  group?: unknown;
+  optional?: unknown;
 }
+interface LlmStep {
+  text?: unknown;
+  group?: unknown;
+}
+interface LlmPayload {
+  items?: LlmItem[];
+  steps?: LlmStep[];
+  title?: unknown;
+  servings?: unknown;
+  prepMinutes?: unknown;
+  cookMinutes?: unknown;
+}
+
+/** What every extraction path resolves to, whatever the source. */
+export interface ExtractResult {
+  items: ExtractedIngredient[];
+  steps: ExtractedStep[];
+  title: string | null;
+  servings: number | null;
+  prepMinutes: number | null;
+  cookMinutes: number | null;
+  imageUrl: string | null;
+  description: string | null;
+}
+
+const EMPTY: ExtractResult = {
+  items: [], steps: [], title: null, servings: null,
+  prepMinutes: null, cookMinutes: null, imageUrl: null, description: null,
+};
 
 function coerceItem(raw: LlmItem): ExtractedIngredient | null {
   if (typeof raw.name !== "string" || !raw.name.trim()) return null;
+  const group = typeof raw.group === "string" && raw.group.trim()
+    // Models re-add the colon despite the instruction; strip it here rather
+    // than trusting the prompt.
+    ? raw.group.trim().replace(/:\s*$/, "")
+    : undefined;
   return {
     name: raw.name.trim(),
     quantity: typeof raw.quantity === "number" && Number.isFinite(raw.quantity) ? raw.quantity : undefined,
     unit: typeof raw.unit === "string" && raw.unit.trim() ? raw.unit.trim() : undefined,
     raw: typeof raw.raw === "string" ? raw.raw : raw.name as string,
+    ...(group ? { group } : {}),
+    ...(raw.optional === true ? { optional: true } : {}),
   };
 }
 
-async function llmExtractFromText(text: string, isJsonLdList: boolean): Promise<ExtractedIngredient[]> {
+function coerceStep(raw: LlmStep): ExtractedStep | null {
+  if (typeof raw.text !== "string" || raw.text.trim().length < 2) return null;
+  const group = typeof raw.group === "string" && raw.group.trim()
+    ? raw.group.trim().replace(/:\s*$/, "")
+    : undefined;
+  return { text: raw.text.trim(), ...(group ? { group } : {}) };
+}
+
+function posInt(v: unknown, max: number): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const n = Math.round(v);
+  return n > 0 && n <= max ? n : null;
+}
+
+function coercePayload(parsed: LlmPayload | null): ExtractResult {
+  if (!parsed) return EMPTY;
+  return {
+    items: (parsed.items ?? []).map(coerceItem).filter((i): i is ExtractedIngredient => i !== null),
+    steps: (parsed.steps ?? []).map(coerceStep).filter((s): s is ExtractedStep => s !== null),
+    title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : null,
+    servings: posInt(parsed.servings, 500),
+    prepMinutes: posInt(parsed.prepMinutes, 60 * 24),
+    cookMinutes: posInt(parsed.cookMinutes, 60 * 24 * 7), // slow-cooker/curing recipes
+    imageUrl: null,
+    description: null,
+  };
+}
+
+type TextSource = "json-ld-list" | "html" | "paste";
+
+async function llmExtractFromText(text: string, source: TextSource): Promise<ExtractResult> {
   const anthropic = getAnthropic();
-  const userContent = isJsonLdList
-    ? `Here is a list of ingredient strings from a recipe. Normalize each into the schema described:\n\n${text}`
-    : `Here is HTML content that contains a recipe. Find the ingredient list and normalize it into the schema described:\n\n${text}`;
+  const userContent =
+    source === "json-ld-list"
+      ? `Here is a list of ingredient strings from a recipe. Normalize each into the schema described:\n\n${text}`
+      : source === "paste"
+      ? `Here is recipe text a user pasted. Extract it into the schema described:\n\n${text}`
+      : `Here is HTML content that contains a recipe. Extract it into the schema described:\n\n${text}`;
 
   const resp = await anthropic.messages.create({
     model: MODEL_HAIKU,
-    max_tokens: 1500,
+    // Raised from 1500: steps are far more tokens than an ingredient list, and
+    // a truncated response loses the tail of the method.
+    max_tokens: 4000,
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: userContent }],
   });
   const textBlock = resp.content.find((c) => c.type === "text");
   const responseText = textBlock && "text" in textBlock ? textBlock.text : "";
-  const parsed = extractJson<{ items?: LlmItem[] }>(responseText);
-  if (!parsed?.items) return [];
-  return parsed.items.map(coerceItem).filter((i): i is ExtractedIngredient => i !== null);
+  return coercePayload(extractJson<LlmPayload>(responseText));
 }
 
-async function llmExtractFromImage(imageBase64: string, mediaType: string): Promise<ExtractedIngredient[]> {
+async function llmExtractFromImage(imageBase64: string, mediaType: string): Promise<ExtractResult> {
   const anthropic = getAnthropic();
   // Sanity check the media type — Claude vision accepts image/jpeg, png, gif, webp.
   const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
@@ -133,23 +244,26 @@ async function llmExtractFromImage(imageBase64: string, mediaType: string): Prom
 
   const resp = await anthropic.messages.create({
     model: MODEL_SONNET,
-    max_tokens: 1500,
+    max_tokens: 4000,
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [
       {
         role: "user",
         content: [
           { type: "image", source: { type: "base64", media_type: safeMediaType, data: imageBase64 } },
-          { type: "text", text: "Extract the ingredient list from this recipe image, following the JSON schema in the system prompt." },
+          {
+            type: "text",
+            text:
+              "Extract this recipe — title, ingredients AND the full method — following the JSON schema in the system prompt. " +
+              "If the image shows only an ingredient list with no instructions, omit \"steps\".",
+          },
         ],
       },
     ],
   });
   const textBlock = resp.content.find((c) => c.type === "text");
   const responseText = textBlock && "text" in textBlock ? textBlock.text : "";
-  const parsed = extractJson<{ items?: LlmItem[] }>(responseText);
-  if (!parsed?.items) return [];
-  return parsed.items.map(coerceItem).filter((i): i is ExtractedIngredient => i !== null);
+  return coercePayload(extractJson<LlmPayload>(responseText));
 }
 
 export async function POST(req: Request) {
@@ -158,7 +272,7 @@ export async function POST(req: Request) {
   if (guard.error) return guard.error;
 
   const body = (await req.json().catch(() => null)) as Body | null;
-  if (!body || (body.type !== "url" && body.type !== "image")) {
+  if (!body || (body.type !== "url" && body.type !== "image" && body.type !== "text")) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
@@ -194,32 +308,53 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Couldn't fetch page" }, { status: 502 });
       }
 
-      // 1. Try JSON-LD first.
+      // 1. Try JSON-LD first — it carries steps/times/servings/image for free.
       const jsonLd = extractRecipesFromHtml(html);
       if (jsonLd && jsonLd.ingredients.length > 0) {
+        const meta = {
+          title: jsonLd.name ?? undefined,
+          steps: jsonLd.instructions,
+          servings: jsonLd.servings ?? undefined,
+          prepMinutes: jsonLd.prepMinutes ?? undefined,
+          cookMinutes: jsonLd.cookMinutes ?? undefined,
+          imageUrl: jsonLd.imageUrl ?? undefined,
+          description: jsonLd.description ?? undefined,
+        };
         // Quick regex parse — works for ~70% of lines without an LLM call.
         const cheap = jsonLd.ingredients.map(parseIngredientLine);
-        // If most lines have qty parsed cleanly, return as-is. Otherwise
-        // let the LLM normalize the whole list — better consistency.
         const cleanRatio = cheap.filter((i) => i.quantity !== undefined).length / cheap.length;
         if (cleanRatio >= 0.6) {
-          return NextResponse.json({ items: cheap, source: "json-ld", title: jsonLd.name ?? undefined });
+          return NextResponse.json({ items: cheap, source: "json-ld", ...meta });
         }
-        // Fall through to LLM normalization of the JSON-LD list.
-        const items = await llmExtractFromText(jsonLd.ingredients.join("\n"), true);
-        return NextResponse.json({ items, source: "json-ld", title: jsonLd.name ?? undefined });
+        // Ingredient lines were messy — let the LLM normalize just those. The
+        // structured metadata above is already trustworthy, so we keep it
+        // rather than paying to re-derive it.
+        const llm = await llmExtractFromText(jsonLd.ingredients.join("\n"), "json-ld-list");
+        return NextResponse.json({ items: llm.items, source: "json-ld", ...meta });
       }
 
-      // 2. No JSON-LD — send HTML region to Haiku.
+      // 2. No JSON-LD — send the HTML region to Haiku for the whole recipe.
       const region = extractRecipeRegion(html);
       if (!region) {
         return NextResponse.json({ error: "Couldn't find a recipe on the page" }, { status: 422 });
       }
-      const items = await llmExtractFromText(region, false);
-      if (items.length === 0) {
+      const result = await llmExtractFromText(region, "html");
+      if (result.items.length === 0) {
         return NextResponse.json({ error: "We couldn't find a recipe on that page" }, { status: 422 });
       }
-      return NextResponse.json({ items, source: "llm" });
+      return NextResponse.json({ ...result, source: "llm" });
+    }
+
+    if (body.type === "text") {
+      const text = typeof body.text === "string" ? body.text.trim() : "";
+      if (text.length < 20) {
+        return NextResponse.json({ error: "Paste a bit more recipe text" }, { status: 400 });
+      }
+      const result = await llmExtractFromText(text.slice(0, MAX_PASTE_LEN), "paste");
+      if (result.items.length === 0) {
+        return NextResponse.json({ error: "We couldn't find a recipe in that text" }, { status: 422 });
+      }
+      return NextResponse.json({ ...result, source: "paste" });
     }
 
     // image flow
@@ -229,11 +364,11 @@ export async function POST(req: Request) {
     if (body.imageBase64.length > MAX_IMAGE_BASE64) {
       return NextResponse.json({ error: "Image is too large" }, { status: 413 });
     }
-    const items = await llmExtractFromImage(body.imageBase64, body.mediaType);
-    if (items.length === 0) {
+    const vision = await llmExtractFromImage(body.imageBase64, body.mediaType);
+    if (vision.items.length === 0) {
       return NextResponse.json({ error: "We couldn't read a recipe in that photo" }, { status: 422 });
     }
-    return NextResponse.json({ items, source: "vision" });
+    return NextResponse.json({ ...vision, source: "vision" });
   } catch (e) {
     console.error("extract-recipe failed:", e);
     const msg = e instanceof Error && e.message.includes("ANTHROPIC_API_KEY")

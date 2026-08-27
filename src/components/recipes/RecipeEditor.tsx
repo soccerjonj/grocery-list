@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { HouseholdRecipe } from "@/types/database";
 import type { RecipeIngredient, RecipeStep } from "@/lib/recipeTypes";
 import { recipeIngredientList, recipeStepList } from "@/lib/recipeTypes";
 import type { RecipePatch } from "@/hooks/useHouseholdRecipes";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
+import { uploadRecipeImage, deleteRecipeImage } from "@/lib/uploadRecipeImage";
 
 const LABEL = "text-xs font-medium text-gray-400 dark:text-gray-500";
 const FIELD =
@@ -23,10 +24,12 @@ function numOrNull(v: string): number | null {
  */
 export default function RecipeEditor({
   recipe,
+  householdId,
   onSave,
   onCancel,
 }: {
   recipe: HouseholdRecipe;
+  householdId: string;
   onSave: (patch: RecipePatch) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -46,7 +49,39 @@ export default function RecipeEditor({
   const [newTag, setNewTag] = useState("");
   const [addingTag, setAddingTag] = useState(false);
 
+  // Photo. `imagePath` is set only for images WE host, so replacing one can
+  // clean up the old object while a remote hero URL is just forgotten.
+  const [imageUrl, setImageUrl] = useState(recipe.image_url ?? null);
+  const [imagePath, setImagePath] = useState(recipe.image_path ?? null);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
+
   const knownTags = taxonomy.listFor("recipe_tag", "recipe");
+
+  async function handlePhoto(file: File) {
+    setUploading(true);
+    setImageError(null);
+    const previousPath = imagePath;
+    try {
+      const up = await uploadRecipeImage(householdId, file);
+      setImageUrl(up.url);
+      setImagePath(up.path);
+      // Only remove the old object AFTER the new one is safely stored.
+      if (previousPath) await deleteRecipeImage(previousPath);
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : "Couldn't upload that photo");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function clearPhoto() {
+    // Deleting the stored object waits for Save — cancelling shouldn't have
+    // destroyed the photo.
+    setImageUrl(null);
+    setImagePath(null);
+  }
 
   function patchIng(i: number, p: Partial<RecipeIngredient>) {
     setIngs((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
@@ -59,10 +94,16 @@ export default function RecipeEditor({
     if (busy || !name.trim()) return;
     setBusy(true);
     try {
+      // A photo the user removed is only deleted from storage once the save
+      // that drops it actually succeeds.
+      const droppedPath = recipe.image_path && recipe.image_path !== imagePath ? recipe.image_path : null;
+
       await onSave({
         name: name.trim(),
         description: description.trim() || null,
         notes: notes.trim() || null,
+        imageUrl,
+        imagePath,
         servings: numOrNull(servings),
         servingsUnit: servingsUnit.trim() || null,
         prepMinutes: numOrNull(prep),
@@ -75,6 +116,7 @@ export default function RecipeEditor({
           .map((i) => ({ ...i, name: i.name.trim(), raw: i.raw?.trim() || i.name.trim() })),
         steps: steps.filter((s) => s.text.trim()).map((s) => ({ ...s, text: s.text.trim() })),
       });
+      if (droppedPath) await deleteRecipeImage(droppedPath);
     } finally {
       setBusy(false);
     }
@@ -93,6 +135,62 @@ export default function RecipeEditor({
   return (
     <div className="flex flex-col gap-5">
       {/* Basics */}
+      {/* Photo */}
+      <div className="flex flex-col gap-2">
+        <span className={LABEL}>Photo</span>
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handlePhoto(f);
+            e.target.value = ""; // allow re-picking the same file
+          }}
+        />
+        {imageUrl ? (
+          <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800">
+            {/* Plain <img>: hero URLs can be arbitrary remote hosts and
+                next.config has no remotePatterns — see RecipeCard. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" referrerPolicy="no-referrer" className="w-full h-40 object-cover" />
+            <div className="absolute bottom-2 right-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => photoRef.current?.click()}
+                disabled={uploading}
+                className="px-2.5 py-1.5 rounded-lg bg-black/60 text-white text-[11px] font-medium backdrop-blur active:scale-95 transition-transform"
+              >
+                {uploading ? "Uploading…" : "Replace"}
+              </button>
+              <button
+                type="button"
+                onClick={clearPhoto}
+                className="px-2.5 py-1.5 rounded-lg bg-black/60 text-white text-[11px] font-medium backdrop-blur active:scale-95 transition-transform"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => photoRef.current?.click()}
+            disabled={uploading}
+            className="w-full py-5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500 transition-colors flex flex-col items-center gap-1.5"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9l3-3h12l3 3M3 9v9a2 2 0 002 2h14a2 2 0 002-2V9M9 13a3 3 0 116 0 3 3 0 01-6 0z" />
+            </svg>
+            <span className="text-sm font-medium">{uploading ? "Uploading…" : "Add a photo"}</span>
+          </button>
+        )}
+        {imageError && (
+          <p className="text-[11px] text-red-500">{imageError}</p>
+        )}
+      </div>
+
       <div className="flex flex-col gap-2">
         <label className={LABEL} htmlFor="r-name">Name</label>
         <input id="r-name" className={FIELD} value={name} onChange={(e) => setName(e.target.value)} />

@@ -12,6 +12,8 @@ import RecipeCard from "@/components/recipes/RecipeCard";
 import RecipeCreateSheet from "@/components/recipes/RecipeCreateSheet";
 import { normalizeItemName } from "@/lib/normalizeItemName";
 import { recipeIngredientList } from "@/lib/recipeTypes";
+import { useRecipeAvailability } from "@/hooks/useRecipeAvailability";
+import type { RecipeInput } from "@/hooks/useHouseholdRecipes";
 import { getErrorMessage } from "@/lib/utils";
 
 export default function RecipesPage() {
@@ -19,10 +21,12 @@ export default function RecipesPage() {
   const { recipes: recipesData, taxonomy } = useHouseholdData();
   const { recipes, loading, loadError, saveRecipe } = recipesData;
   const { error: toastError } = useToast();
+  const { availabilityFor } = useRecipeAvailability();
   const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [cookableOnly, setCookableOnly] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const tags = taxonomy.listFor("recipe_tag", "recipe");
@@ -42,9 +46,43 @@ export default function RecipesPage() {
     });
   }, [recipes, query, activeTag]);
 
-  async function handleCreate(name: string) {
+  /**
+   * "What can I cook?" — score every recipe against the pantry and sort by how
+   * little is missing. Reads the in-memory pantry index (one shared build), so
+   * this stays a pure computation with no extra queries no matter how many
+   * recipes there are.
+   */
+  const ranked = useMemo(() => {
+    const withAvail = filtered.map((r) => {
+      const ings = recipeIngredientList(r);
+      const a = ings.length > 0 ? availabilityFor(ings) : null;
+      return { recipe: r, missing: a ? a.missing.length : null, total: a?.totalCount ?? 0, have: a?.haveCount ?? 0 };
+    });
+    if (!cookableOnly) return withAvail;
+    // Only recipes we can actually make — and an empty ingredient list isn't
+    // evidence of anything, so those are excluded rather than counted as ready.
+    return withAvail
+      .filter((x) => x.total > 0 && x.missing === 0)
+      .sort((a, b) => b.total - a.total);
+  }, [filtered, cookableOnly, availabilityFor]);
+
+  const readyCount = useMemo(
+    () => {
+      let n = 0;
+      for (const r of recipes) {
+        const ings = recipeIngredientList(r);
+        if (ings.length === 0) continue;
+        const a = availabilityFor(ings);
+        if (a.totalCount > 0 && a.missing.length === 0) n += 1;
+      }
+      return n;
+    },
+    [recipes, availabilityFor],
+  );
+
+  async function handleCreate(input: RecipeInput) {
     try {
-      const id = await saveRecipe({ name, ingredients: [], sourceKind: "manual" });
+      const id = await saveRecipe(input);
       if (!id) throw new Error("Couldn't create the recipe");
       setCreating(false);
       router.push(`/household/${householdId}/recipes/${id}`);
@@ -107,6 +145,39 @@ export default function RecipesPage() {
         </button>
       </div>
 
+      {/* ── "What can I cook?" ─────────────────────────────── */}
+      {readyCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setCookableOnly((v) => !v)}
+          className={`w-full mb-4 flex items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition-colors active:scale-[0.99] ${
+            cookableOnly
+              ? "border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/30"
+              : "border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+          }`}
+        >
+          <span className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-medium text-gray-900 dark:text-gray-50">
+              {readyCount} ready to cook
+            </span>
+            <span className="block text-[11px] text-gray-400 dark:text-gray-500">
+              {cookableOnly ? "Showing only these — tap to show all" : "You have everything for these right now"}
+            </span>
+          </span>
+          <svg
+            className={`w-4 h-4 flex-shrink-0 transition-colors ${cookableOnly ? "text-green-600 dark:text-green-400" : "text-gray-300 dark:text-zinc-600"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+
       {/* ── Tag filter ─────────────────────────────────────── */}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-4">
@@ -147,7 +218,7 @@ export default function RecipesPage() {
             Your recipes are safe — this is a temporary loading problem. Pull down to refresh.
           </p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : ranked.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-3 text-center">
           <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-zinc-800 flex items-center justify-center">
             <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
@@ -156,13 +227,15 @@ export default function RecipesPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {query ? "No recipes match that" : "No recipes yet"}
+              {cookableOnly ? "Nothing fully in stock" : query ? "No recipes match that" : "No recipes yet"}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              {query ? "Try a different search." : "Add your first recipe to start cooking."}
+              {cookableOnly
+                ? "Tap the banner above to show all recipes."
+                : query ? "Try a different search." : "Add your first recipe to start cooking."}
             </p>
           </div>
-          {!query && (
+          {!query && !cookableOnly && (
             <button
               type="button"
               onClick={() => setCreating(true)}
@@ -175,7 +248,7 @@ export default function RecipesPage() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           <AnimatePresence mode="popLayout">
-            {filtered.map((r) => (
+            {ranked.map(({ recipe: r, missing }) => (
               <motion.div
                 key={r.id}
                 layout
@@ -184,7 +257,7 @@ export default function RecipesPage() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.18 }}
               >
-                <RecipeCard recipe={r} householdId={householdId} />
+                <RecipeCard recipe={r} householdId={householdId} missingCount={missing} />
               </motion.div>
             ))}
           </AnimatePresence>

@@ -119,7 +119,7 @@ export default function RecipeDetailPage() {
       )}
 
       {editing ? (
-        <RecipeEditor recipe={recipe} onSave={handleSave} onCancel={() => setEditing(false)} />
+        <RecipeEditor recipe={recipe} householdId={householdId} onSave={handleSave} onCancel={() => setEditing(false)} />
       ) : (
         <div className="flex flex-col gap-6">
           {/* Start cooking — the point of the whole section, so it leads. */}
