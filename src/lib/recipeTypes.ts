@@ -1,5 +1,6 @@
 import type { ExtractedIngredient } from "@/lib/recipeExtract";
 import type { HouseholdRecipe } from "@/types/database";
+import { titleCaseName, sentenceCase } from "@/lib/normalizeItemName";
 
 /**
  * Domain types for the recipes/cooking feature.
@@ -24,18 +25,28 @@ export interface RecipeStep {
   group?: string;
 }
 
-/** Read the JSONB ingredients column as typed rows (empty when malformed). */
+/**
+ * Read the JSONB ingredients column as typed rows (empty when malformed).
+ *
+ * Casing is normalized HERE rather than only at import, which makes it
+ * self-healing: this is the single read path behind every ingredient display
+ * *including the editor*, so recipes saved before title-casing existed look
+ * right immediately, and what the user sees is exactly what saves back. No
+ * backfill migration, and no editor-vs-storage mismatch.
+ */
 export function recipeIngredientList(recipe: HouseholdRecipe): RecipeIngredient[] {
   if (!Array.isArray(recipe.ingredients)) return [];
-  return recipe.ingredients as unknown as RecipeIngredient[];
+  return (recipe.ingredients as unknown as RecipeIngredient[])
+    .filter((i) => i && typeof i.name === "string")
+    .map((i) => ({ ...i, name: titleCaseName(i.name) }));
 }
 
 /** Read the JSONB steps column as typed rows (empty when absent/malformed). */
 export function recipeStepList(recipe: HouseholdRecipe): RecipeStep[] {
   if (!Array.isArray(recipe.steps)) return [];
-  return (recipe.steps as unknown as RecipeStep[]).filter(
-    (s) => s && typeof s.text === "string",
-  );
+  return (recipe.steps as unknown as RecipeStep[])
+    .filter((s) => s && typeof s.text === "string")
+    .map((s) => ({ ...s, text: sentenceCase(s.text) }));
 }
 
 /**

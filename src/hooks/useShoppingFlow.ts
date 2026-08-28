@@ -6,6 +6,7 @@ import type { ShoppingItem, ShoppingList } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
 import { getPantryHint } from "@/lib/pantryHints";
 import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import { titleCaseName } from "@/lib/normalizeItemName";
 import { useToast } from "@/context/ToastContext";
 
 function tripName() {
@@ -130,7 +131,7 @@ export function useShoppingFlow(householdId: string) {
 
   // ── Item actions ──────────────────────────────────────────────
   async function addItem(
-    name: string,
+    rawName: string,
     quantity?: number,
     unit?: string,
     store?: string,
@@ -139,6 +140,9 @@ export function useShoppingFlow(householdId: string) {
     kind?: string
   ) {
     if (!activeListId) return;
+    // Choke point for every add path (typed, voice, bulk, recipe import), so a
+    // list never mixes "Organic Bananas" with "soy sauce".
+    const name = titleCaseName(rawName);
     const { data: { user } } = await supabase.auth.getUser();
     // Caller can override kind explicitly (e.g. running-low → shopping carries
     // the pantry item's kind through). Otherwise fall back to a name-based hint

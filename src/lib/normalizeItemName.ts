@@ -77,3 +77,58 @@ export function normalizeUnit(unit: string | null | undefined): string {
   if (!u) return "";
   return UNIT_SYNONYMS[u] ?? u;
 }
+
+// ── Display casing ────────────────────────────────────────────────────────
+
+/**
+ * Connecting words that stay lowercase mid-phrase, per standard cookbook
+ * style: "Salt and Pepper to Taste", "Cream of Mushroom Soup".
+ */
+const MINOR_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into",
+  "nor", "of", "on", "onto", "or", "per", "the", "to", "with", "without",
+]);
+
+/**
+ * Title-case an item name for display: "all-purpose flour" → "All-Purpose Flour".
+ *
+ * Safe to apply anywhere — every pantry/shopping match funnels through
+ * `normalizeItemName`, which lowercases internally, so casing can never affect
+ * duplicate detection or availability.
+ *
+ * Deliberately conservative:
+ *  • A token already containing an uppercase letter is left ALONE, so acronyms
+ *    and brands the user typed ("BBQ sauce", "McCormick") survive intact.
+ *  • Hyphenated and slashed compounds capitalize each part ("all-purpose").
+ *  • Minor words lowercase only mid-phrase — never the first or last word.
+ */
+export function titleCaseName(name: string | null | undefined): string {
+  const raw = (name ?? "").trim().replace(/\s+/g, " ");
+  if (!raw) return "";
+
+  const words = raw.split(" ");
+  return words
+    .map((word, i) => {
+      // Respect casing the user (or the source) already chose.
+      if (/[A-Z]/.test(word)) return word;
+
+      const isEdge = i === 0 || i === words.length - 1;
+      if (!isEdge && MINOR_WORDS.has(word.toLowerCase())) return word.toLowerCase();
+
+      // Capitalize each segment of "all-purpose" / "half/half".
+      return word.replace(/[^\s\-/]+/g, (part) =>
+        part.charAt(0).toUpperCase() + part.slice(1).toLowerCase(),
+      );
+    })
+    .join(" ");
+}
+
+/**
+ * Sentence-case a cooking step: capitalize the first letter, leave the rest be.
+ * Steps are prose, so title case would be wrong here.
+ */
+export function sentenceCase(text: string | null | undefined): string {
+  const raw = (text ?? "").trim();
+  if (!raw) return "";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}

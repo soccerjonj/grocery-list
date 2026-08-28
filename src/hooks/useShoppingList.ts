@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { ShoppingItem } from "@/types/database";
 import { getPantryHint } from "@/lib/pantryHints";
 import { checkShoppingDuplicate, increaseShoppingQty } from "@/lib/checkShoppingDuplicate";
+import { titleCaseName } from "@/lib/normalizeItemName";
 
 export function useShoppingList(householdId: string, listId: string) {
   const [items, setItems] = useState<ShoppingItem[]>([]);
@@ -91,13 +92,14 @@ export function useShoppingList(householdId: string, listId: string) {
   }, [householdId, listId, fetchItems, supabase]);
 
   async function addItem(
-    name: string,
+    rawName: string,
     quantity?: number,
     unit?: string,
     store?: string,
     assignedTo?: string[] | null,
     kind?: string
   ) {
+    const name = titleCaseName(rawName);
     const {
       data: { user },
     } = await supabase.auth.getUser();

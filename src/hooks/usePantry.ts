@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { PantryItem } from "@/types/database";
 import { logActivity } from "@/lib/logActivity";
 import { checkPantryDuplicate, increasePantryQty } from "@/lib/checkPantryDuplicate";
+import { titleCaseName } from "@/lib/normalizeItemName";
 import { useToast } from "@/context/ToastContext";
 
 export interface AddPantryOptions {
@@ -102,11 +103,15 @@ export function usePantry(householdId: string) {
   }, [householdId, fetchItems, supabase]);
 
   async function addItem(
-    name: string,
+    rawName: string,
     quantity: number,
     unit?: string,
     options?: AddPantryOptions
   ) {
+    // Single choke point for every way an item enters the pantry (typed add,
+    // barcode, receipt import, recipe ingredient), so casing is consistent
+    // however it arrived. Matching is unaffected — normalizeItemName lowercases.
+    const name = titleCaseName(rawName);
     const {
       data: { user },
     } = await supabase.auth.getUser();

@@ -8,6 +8,11 @@
  * Haiku to extract ingredients.
  */
 
+// NOTE: only `titleCaseName` is imported — this module has its own private
+// `normalizeUnit` (below) with different output ("mL"/"L" capitalized) than the
+// exported one in normalizeItemName.ts. Importing that would shadow it.
+import { titleCaseName } from "@/lib/normalizeItemName";
+
 export interface ExtractedIngredient {
   /** Shopping-list-ready name, e.g. "all-purpose flour". */
   name: string;
@@ -202,12 +207,15 @@ export function parseIngredientLine(raw: string): ExtractedIngredient {
   const m = trimmed.match(
     /^((?:\d+\s+\d\/\d|\d+\/\d|\d+(?:\.\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞]))(?:\s+([a-z]+\.?))?\s+(.+)$/i,
   );
-  if (!m) return { name: trimmed, raw: trimmed };
+  // Title-cased here as well as in the LLM path: this regex fast path is the
+  // most common URL import (JSON-LD sites) and never reaches the model, so
+  // fixing only the prompt would leave those recipes lowercase.
+  if (!m) return { name: titleCaseName(trimmed), raw: trimmed };
   const qtyStr = m[1];
   const unitStr = m[2]?.toLowerCase().replace(/\.$/, "");
   const rest = m[3].trim();
   return {
-    name: rest,
+    name: titleCaseName(rest),
     quantity: parseQty(qtyStr),
     unit: normalizeUnit(unitStr),
     raw: trimmed,

@@ -6,6 +6,8 @@ import {
   type ExtractedIngredient,
   type ExtractedStep,
 } from "@/lib/recipeExtract";
+import type { RecipeIngredient } from "@/lib/recipeTypes";
+import { titleCaseName, sentenceCase } from "@/lib/normalizeItemName";
 import { guardLlmRoute } from "@/lib/apiGuard";
 import { safeFetchText, SsrfBlockedError } from "@/lib/ssrfGuard";
 
@@ -76,7 +78,7 @@ Schema:
   "prepMinutes": 15,
   "cookMinutes": 12,
   "items": [
-    { "name": "all-purpose flour", "quantity": 2, "unit": "cups", "raw": "2 cups all-purpose flour", "group": "For the dough", "optional": false }
+    { "name": "All-Purpose Flour", "quantity": 2, "unit": "cups", "raw": "2 cups all-purpose flour", "group": "For the dough", "optional": false }
   ],
   "steps": [
     { "text": "Cream the butter and sugar until light.", "group": "For the dough" }
@@ -84,7 +86,7 @@ Schema:
 }
 
 Ingredient rules:
-- "name" is the clean shopping-list name. Strip prep words (sifted, diced, chopped, minced, beaten, melted, softened) — those happen at home, not at the store.
+- "name" is the clean shopping-list name. Strip prep words (sifted, diced, chopped, minced, beaten, melted, softened) — those happen at home, not at the store. Title-case it ("All-Purpose Flour", "Salt and Pepper to Taste").
 - Strip parenthetical clarifications like "(about 8 oz)" from the name.
 - "quantity" is the numeric amount, e.g. 2, 1.5, 0.25. Convert fractions ("1/2" → 0.5). Omit if the recipe gives no quantity ("salt to taste").
 - "unit" is the measurement unit if any (cups, tbsp, tsp, oz, lb, g, kg, mL, L, can, pack, etc). Omit if no unit.
@@ -164,15 +166,20 @@ const EMPTY: ExtractResult = {
   prepMinutes: null, cookMinutes: null, imageUrl: null, description: null,
 };
 
-function coerceItem(raw: LlmItem): ExtractedIngredient | null {
+// Returns RecipeIngredient (not ExtractedIngredient) because it emits `group`
+// and `optional`, which only exist on the wider type. The old signature only
+// compiled because object spread skips excess-property checking.
+function coerceItem(raw: LlmItem): RecipeIngredient | null {
   if (typeof raw.name !== "string" || !raw.name.trim()) return null;
   const group = typeof raw.group === "string" && raw.group.trim()
     // Models re-add the colon despite the instruction; strip it here rather
     // than trusting the prompt.
-    ? raw.group.trim().replace(/:\s*$/, "")
+    ? titleCaseName(raw.group.trim().replace(/:\s*$/, ""))
     : undefined;
   return {
-    name: raw.name.trim(),
+    // Cased here AND in parseIngredientLine — this covers the LLM paths, that
+    // one covers the JSON-LD regex path the model never sees.
+    name: titleCaseName(raw.name),
     quantity: typeof raw.quantity === "number" && Number.isFinite(raw.quantity) ? raw.quantity : undefined,
     unit: typeof raw.unit === "string" && raw.unit.trim() ? raw.unit.trim() : undefined,
     raw: typeof raw.raw === "string" ? raw.raw : raw.name as string,
@@ -184,9 +191,9 @@ function coerceItem(raw: LlmItem): ExtractedIngredient | null {
 function coerceStep(raw: LlmStep): ExtractedStep | null {
   if (typeof raw.text !== "string" || raw.text.trim().length < 2) return null;
   const group = typeof raw.group === "string" && raw.group.trim()
-    ? raw.group.trim().replace(/:\s*$/, "")
+    ? titleCaseName(raw.group.trim().replace(/:\s*$/, ""))
     : undefined;
-  return { text: raw.text.trim(), ...(group ? { group } : {}) };
+  return { text: sentenceCase(raw.text), ...(group ? { group } : {}) };
 }
 
 function posInt(v: unknown, max: number): number | null {

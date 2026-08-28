@@ -101,6 +101,27 @@ export default function CookMode({
               transition={{ duration: 0.16 }}
               className="flex flex-col gap-5 max-w-xl mx-auto"
             >
+              {/* The checklist used to appear with no explanation, and ticking
+                  a box did nothing — so it read as a puzzle. Name the task,
+                  say what to do, and show progress so the ticks mean something. */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+                    Gather your ingredients
+                  </h2>
+                  {ingredients.length > 0 && (
+                    <span className="text-xs tabular-nums text-gray-400 dark:text-gray-500 flex-shrink-0">
+                      {checked.size} of {ingredients.length}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {ingredients.length > 0
+                    ? "Check them off as you set each one out — then start cooking."
+                    : "Nothing listed for this one."}
+                </p>
+              </div>
+
               {base && (
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Cooking for</span>
