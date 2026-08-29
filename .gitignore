@@ -24,3 +24,12 @@ public/swe-worker-*.js
 # iCloud/Finder duplicate copies of the generated service worker
 public/sw [0-9]*.js
 public/workbox-* [0-9]*.js
+
+# Claude Code scratch worktrees (a checkout was once committed here as a gitlink)
+.claude/worktrees/
+
+# Supabase CLI scratch
+supabase/.temp/
+
+# TypeScript incremental build cache — a build artifact, dirty after every build
+tsconfig.tsbuildinfo
