@@ -24,6 +24,13 @@ export async function recordCook(opts: {
   recipeId: string;
   servings?: number | null;
   deducted?: DeductedEntry[];
+  /** Wall-clock durations from the cook session (migration 031). */
+  totalSeconds?: number | null;
+  /** Null when "Prep done" was never tapped — we don't invent a boundary. */
+  prepSeconds?: number | null;
+  cookSeconds?: number | null;
+  /** Seconds per page index; skimmed pages are absent rather than zero. */
+  stepSeconds?: Record<string, number>;
 }): Promise<string | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -35,6 +42,10 @@ export async function recordCook(opts: {
       cooked_by: user?.id ?? null,
       servings: opts.servings ?? null,
       deducted: (opts.deducted ?? []) as unknown as never,
+      total_seconds: opts.totalSeconds ?? null,
+      prep_seconds: opts.prepSeconds ?? null,
+      cook_seconds: opts.cookSeconds ?? null,
+      step_seconds: (opts.stepSeconds ?? {}) as unknown as never,
     })
     .select("id")
     .single();

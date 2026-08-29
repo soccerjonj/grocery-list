@@ -11,6 +11,7 @@ import RecipeView from "@/components/recipes/RecipeView";
 import RecipeEditor from "@/components/recipes/RecipeEditor";
 import RecipeAddToListSheet from "@/components/recipes/RecipeAddToListSheet";
 import RatingRow from "@/components/recipes/RatingRow";
+import CookHistory from "@/components/recipes/CookHistory";
 import { useRecipeRatings } from "@/hooks/useRecipeRatings";
 import type { RecipePatch } from "@/hooks/useHouseholdRecipes";
 import { getErrorMessage } from "@/lib/utils";
@@ -142,6 +143,8 @@ export default function RecipeDetailPage() {
             members={membersData.members}
             onRate={(r) => setMyRating(recipeId, r)}
           />
+
+          <CookHistory recipeId={recipeId} members={membersData.members} />
         </div>
       )}
 

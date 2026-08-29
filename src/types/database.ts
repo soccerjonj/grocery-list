@@ -347,6 +347,11 @@ export interface Database {
           servings: number | null;
           deducted: Json;
           cooked_at: string;
+          // Migration 031. prep/cook are null when "Prep done" was never tapped.
+          total_seconds: number | null;
+          prep_seconds: number | null;
+          cook_seconds: number | null;
+          step_seconds: Json;
         };
         Insert: {
           id?: string;
@@ -356,6 +361,10 @@ export interface Database {
           servings?: number | null;
           deducted?: Json;
           cooked_at?: string;
+          total_seconds?: number | null;
+          prep_seconds?: number | null;
+          cook_seconds?: number | null;
+          step_seconds?: Json;
         };
         Update: {
           id?: string;
@@ -365,6 +374,10 @@ export interface Database {
           servings?: number | null;
           deducted?: Json;
           cooked_at?: string;
+          total_seconds?: number | null;
+          prep_seconds?: number | null;
+          cook_seconds?: number | null;
+          step_seconds?: Json;
         };
       };
       household_taxonomy: {

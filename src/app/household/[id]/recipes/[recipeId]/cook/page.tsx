@@ -13,6 +13,13 @@ import { buildDeductionPlan, type DeductionRow } from "@/lib/recipeDeduct";
 import { recipeIngredientList } from "@/lib/recipeTypes";
 import { servingsFactor } from "@/lib/recipeScale";
 
+interface CookDurations {
+  total: number;
+  prep: number | null;
+  cook: number | null;
+  steps: Record<string, number>;
+}
+
 /**
  * Cook mode is a ROUTE, not a modal, so the hardware back button exits it and
  * it can be deep-linked. It stays inside the household layout (rendering as
@@ -32,22 +39,39 @@ export default function CookPage() {
   const [finishing, setFinishing] = useState(false);
   const [plan, setPlan] = useState<DeductionRow[] | null>(null);
   const [cookedServings, setCookedServings] = useState<number | null>(null);
+  /** Durations captured the moment cooking ended, before the deduct step. */
+  const [durations, setDurations] = useState<CookDurations | null>(null);
 
   const recipe = recipes.find((r) => r.id === recipeId) ?? null;
   const recipeHref = `/household/${householdId}/recipes/${recipeId}`;
 
   /** Step 1 — finished cooking: work out what could come out of the pantry. */
-  function handleFinish(servings: number | null) {
+  function handleFinish(d: {
+    servings: number | null;
+    total: number;
+    prep: number | null;
+    cook: number | null;
+    steps: Record<string, number>;
+  }) {
     if (!recipe) return;
-    const factor = servingsFactor(recipe.servings, servings);
+    const factor = servingsFactor(recipe.servings, d.servings);
     const availability = availabilityFor(recipeIngredientList(recipe), factor);
-    setCookedServings(servings);
+    setCookedServings(d.servings);
+    // Captured now, not when the deduct sheet is confirmed — otherwise the
+    // time spent adjusting pantry amounts would be recorded as cooking.
+    setDurations({ total: d.total, prep: d.prep, cook: d.cook, steps: d.steps });
     setPlan(buildDeductionPlan(availability, factor));
   }
 
   /** Record the cook; `deducted` is the audit trail that makes Undo exact. */
   async function saveCook(deducted: DeductedEntry[]): Promise<string | null> {
-    return recordCook({ householdId, recipeId, servings: cookedServings, deducted });
+    return recordCook({
+      householdId, recipeId, servings: cookedServings, deducted,
+      totalSeconds: durations?.total ?? null,
+      prepSeconds: durations?.prep ?? null,
+      cookSeconds: durations?.cook ?? null,
+      stepSeconds: durations?.steps ?? {},
+    });
   }
 
   /** Step 2a — "Skip": still record that you cooked, just don't touch the pantry. */
@@ -136,6 +160,7 @@ export default function CookPage() {
     <>
       <CookMode
         recipe={recipe}
+        householdId={householdId}
         finishing={finishing}
         onExit={() => router.replace(recipeHref)}
         onFinish={handleFinish}
