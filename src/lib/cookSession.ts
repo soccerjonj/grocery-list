@@ -16,6 +16,19 @@ const KEY = (householdId: string, recipeId: string) => `cook_session_${household
 /** Sessions older than this are stale enough to ask about rather than resume. */
 export const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * A "still open" heartbeat, kept under its own key so it can be written every
+ * second without rewriting the whole session blob.
+ */
+const SEEN_KEY = (householdId: string, recipeId: string) =>
+  `${KEY(householdId, recipeId)}_seen`;
+
+/**
+ * A gap shorter than this is a reload, not walking away — restoring shouldn't
+ * disturb the clock. Anything longer is banked as a pause.
+ */
+export const AWAY_GRACE_MS = 2 * 60 * 1000;
+
 export interface RunningTimer {
   /** Step index the timer belongs to (-1 = the ingredients page). */
   stepIndex: number;
@@ -30,6 +43,12 @@ export interface RunningTimer {
 export interface CookSession {
   recipeId: string;
   startedAt: number;
+  /**
+   * False until the user taps Start. A fresh session is created *paused* at
+   * zero, so opening cook mode to read the steps costs nothing — browsing time
+   * is banked away the moment cooking actually begins.
+   */
+  started: boolean;
   /** "prep" until the user taps Prep done. */
   phase: "prep" | "cook";
   /** When prep ended. null = never tapped, so we record one honest total. */
@@ -59,10 +78,13 @@ export function newCookSession(recipeId: string, servings: number | null): CookS
   return {
     recipeId,
     startedAt: now,
+    started: false,
     phase: "prep",
     prepEndedAt: null,
     pausedAtPrepEnd: 0,
-    pausedAt: null,
+    // Paused at the same instant it started: elapsed reads 0 and stays there
+    // until Start, without needing a nullable startedAt through all the math.
+    pausedAt: now,
     pausedTotal: 0,
     page: 0,
     pageEnteredAt: now,
@@ -96,6 +118,8 @@ export function loadCookSession(householdId: string, recipeId: string): CookSess
       timers: Array.isArray(parsed.timers) ? parsed.timers : [],
       pausedTotal: parsed.pausedTotal ?? 0,
       pausedAtPrepEnd: parsed.pausedAtPrepEnd ?? 0,
+      // Sessions written before Start existed were always already running.
+      started: parsed.started ?? true,
     };
   } catch {
     return null;
@@ -106,7 +130,53 @@ export function clearCookSession(householdId: string, recipeId: string) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(KEY(householdId, recipeId));
+    window.localStorage.removeItem(SEEN_KEY(householdId, recipeId));
   } catch { /* ignore */ }
+}
+
+/** Stamp that the session is still open, on screen, right now. */
+export function touchCookSession(householdId: string, recipeId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SEEN_KEY(householdId, recipeId), String(Date.now()));
+  } catch { /* ignore */ }
+}
+
+/** Epoch ms the session was last known to be open, or null if never stamped. */
+export function lastSeenAt(householdId: string, recipeId: string): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SEEN_KEY(householdId, recipeId));
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Treat time the app spent CLOSED as a pause rather than as cooking.
+ *
+ * Without this, closing the app after prep at 5pm and reopening at 9pm to
+ * finish records a four-hour cook — which then poisons the median in
+ * `typicalDuration`. This only ever runs on a genuine remount: backgrounding
+ * the phone mid-cook keeps the component mounted, so a simmer you walked away
+ * from still counts, as it should.
+ */
+export function bankAwayTime(
+  s: CookSession,
+  lastSeen: number | null,
+  now = Date.now(),
+): CookSession {
+  // Already paused: the clock is frozen at `pausedAt`, which covers the gap.
+  if (s.pausedAt !== null) return s;
+  // The latest moment we can prove the app was open. `pageEnteredAt` is the
+  // fallback for sessions written before the heartbeat existed.
+  const anchor = Math.max(lastSeen ?? 0, s.pageEnteredAt);
+  const away = now - anchor;
+  if (away < AWAY_GRACE_MS) return s;
+  return { ...s, pausedTotal: s.pausedTotal + away, pageEnteredAt: now };
 }
 
 /** Milliseconds of actual (unpaused) cooking so far. */

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type CookSession, type RunningTimer,
   newCookSession, loadCookSession, saveCookSession, clearCookSession,
+  touchCookSession, lastSeenAt, bankAwayTime,
   elapsedMs, phaseSeconds, STALE_AFTER_MS,
 } from "@/lib/cookSession";
 import { alertTimerDone, requestNotifyPermission } from "@/lib/notify";
@@ -45,7 +46,10 @@ export function useCookSession(
       setResumable(saved);
       return;
     }
-    setSession(saved);
+    // Reopening after the app was closed: those hours weren't cooking. The
+    // >24h branch above already asked; this is the common case — closing after
+    // prep and coming back the same evening.
+    setSession(bankAwayTime(saved, lastSeenAt(householdId, recipeId)));
     // defaultServings is only the seed for a brand-new session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [householdId, recipeId]);
@@ -58,9 +62,25 @@ export function useCookSession(
   // ── 1s re-render so the clock face moves (display only) ─────────────
   useEffect(() => {
     if (!session || session.pausedAt) return;
-    const id = setInterval(() => forceTick((n) => n + 1), 1000);
+    touchCookSession(householdId, recipeId);
+    const id = setInterval(() => {
+      // Stamping alongside the tick is what lets a later remount tell "closed
+      // for three hours" from "reloaded a second ago".
+      touchCookSession(householdId, recipeId);
+      forceTick((n) => n + 1);
+    }, 1000);
     return () => clearInterval(id);
-  }, [session, session?.pausedAt]);
+  }, [session, session?.pausedAt, householdId, recipeId]);
+
+  // The tick stops once the tab is hidden, so stamp on the way out — that's
+  // the last moment we can prove the session was open.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") touchCookSession(householdId, recipeId);
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, [householdId, recipeId]);
 
   // ── Fire alerts for timers whose deadline has passed ────────────────
   useEffect(() => {
@@ -121,6 +141,24 @@ export function useCookSession(
     }));
   }, [update]);
 
+  /**
+   * Begin timing. The session was created paused at zero, so any time spent
+   * reading the steps first is banked into `pausedTotal` and never counted.
+   */
+  const start = useCallback(() => {
+    update((s) => {
+      if (s.started) return s;
+      const now = Date.now();
+      return {
+        ...s,
+        started: true,
+        pausedAt: null,
+        pausedTotal: s.pausedTotal + (s.pausedAt ? now - s.pausedAt : 0),
+        pageEnteredAt: now,
+      };
+    });
+  }, [update]);
+
   const togglePause = useCallback(() => {
     update((s) => {
       if (s.pausedAt) {
@@ -133,23 +171,39 @@ export function useCookSession(
     });
   }, [update]);
 
-  /** Start a timer for a step. Asks for notification permission on first use. */
+  /**
+   * Start a timer for a step. Asks for notification permission on first use.
+   * Also starts the session if it hasn't been: setting a step timer means you
+   * are cooking, and a running step timer above a "Not started" session clock
+   * would just be a lie.
+   */
   const startTimer = useCallback((stepIndex: number, seconds: number) => {
     void requestNotifyPermission();
-    update((s) => ({
-      ...s,
-      timers: [
-        ...s.timers.filter((t) => t.stepIndex !== stepIndex),
-        { stepIndex, seconds, endsAt: Date.now() + seconds * 1000 },
-      ],
-    }));
+    update((s) => {
+      const now = Date.now();
+      const begun = s.started ? s : {
+        ...s,
+        started: true,
+        pausedAt: null,
+        pausedTotal: s.pausedTotal + (s.pausedAt ? now - s.pausedAt : 0),
+        pageEnteredAt: now,
+      };
+      return {
+        ...begun,
+        timers: [
+          ...begun.timers.filter((t) => t.stepIndex !== stepIndex),
+          { stepIndex, seconds, endsAt: now + seconds * 1000 },
+        ],
+      };
+    });
   }, [update]);
 
   const cancelTimer = useCallback((stepIndex: number) => {
     update((s) => ({ ...s, timers: s.timers.filter((t) => t.stepIndex !== stepIndex) }));
   }, [update]);
 
-  const discard = useCallback(() => {
+  /** Throw this cook away and start a fresh, unstarted session. */
+  const reset = useCallback(() => {
     clearCookSession(householdId, recipeId);
     setResumable(null);
     setSession(newCookSession(recipeId, defaultServings));
@@ -158,20 +212,15 @@ export function useCookSession(
   const resume = useCallback(() => {
     if (!resumable) return;
     const now = Date.now();
-    // The session may have been left RUNNING, in which case the hours since
-    // are not cooking time. We can't know when they actually walked away, so
-    // anchor on the last interaction (pageEnteredAt, or the pause if paused)
-    // and bank everything after it as a pause. Without this, resuming
-    // yesterday's session would report a 14-hour cook.
-    const away = Math.max(0, now - (resumable.pausedAt ?? resumable.pageEnteredAt));
-    setSession({
-      ...resumable,
-      pausedAt: null,
-      pausedTotal: resumable.pausedTotal + away,
-      pageEnteredAt: now,
-    });
+    // Left paused, the pause itself already covers the time away, so just
+    // restart the clock. Left running, the hours since aren't cooking time —
+    // bank them, or resuming yesterday's session reports a 14-hour cook.
+    const banked = resumable.pausedAt !== null
+      ? { ...resumable, pausedTotal: resumable.pausedTotal + (now - resumable.pausedAt) }
+      : bankAwayTime(resumable, lastSeenAt(householdId, recipeId), now);
+    setSession({ ...banked, started: true, pausedAt: null, pageEnteredAt: now });
     setResumable(null);
-  }, [resumable]);
+  }, [resumable, householdId, recipeId]);
 
   /** Final durations, banking the current page. Call once on finish. */
   const finalDurations = useCallback(() => {
@@ -198,8 +247,9 @@ export function useCookSession(
     resumable,
     elapsed: session ? Math.round(elapsedMs(session) / 1000) : 0,
     paused: !!session?.pausedAt,
-    goToPage, setServings, toggleChecked, endPrep, togglePause,
+    started: !!session?.started,
+    goToPage, setServings, toggleChecked, endPrep, togglePause, start,
     startTimer, cancelTimer, timerFor,
-    resume, discard, finalDurations, finish,
+    resume, reset, finalDurations, finish,
   };
 }

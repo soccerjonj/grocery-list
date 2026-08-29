@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { HouseholdRecipe } from "@/types/database";
 import { recipeIngredientList, recipeStepList, groupSections } from "@/lib/recipeTypes";
@@ -43,6 +43,8 @@ export default function CookMode({
   // React error #310 (see PantryList.tsx:648).
   const { supported: wakeSupported, held: wakeHeld } = useWakeLock(true);
   const s = useCookSession(householdId, recipe.id, base);
+  const [exitAsk, setExitAsk] = useState(false);
+  const [resetAsk, setResetAsk] = useState(false);
 
   const ingredients = recipeIngredientList(recipe);
   const steps = recipeStepList(recipe);
@@ -80,7 +82,7 @@ export default function CookMode({
             Resume
           </button>
           <button
-            type="button" onClick={s.discard}
+            type="button" onClick={s.reset}
             className="w-full py-3 rounded-2xl text-sm font-medium text-gray-500 dark:text-gray-400 active:opacity-60"
           >
             Start over
@@ -134,7 +136,8 @@ export default function CookMode({
           </p>
         </div>
         <button
-          type="button" onClick={onExit} aria-label="Exit cooking"
+          type="button" aria-label="Exit cooking"
+          onClick={() => (s.started && s.elapsed > 0 ? setExitAsk(true) : onExit())}
           className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 active:scale-90 transition-transform"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -145,40 +148,68 @@ export default function CookMode({
 
       {/* Session timer bar */}
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-zinc-800 bg-gray-50/60 dark:bg-zinc-900/60">
-        <span className={`text-sm font-semibold tabular-nums ${s.paused ? "text-gray-400 dark:text-gray-500" : "text-gray-900 dark:text-gray-50"}`}>
+        <span className={`text-sm font-semibold tabular-nums ${
+          !s.started || s.paused ? "text-gray-400 dark:text-gray-500" : "text-gray-900 dark:text-gray-50"
+        }`}>
           {formatCountdown(s.elapsed)}
         </span>
         <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
-          phase === "prep"
-            ? "bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
-            : "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400"
+          !s.started
+            ? "bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400"
+            : phase === "prep"
+              ? "bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
+              : "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400"
         }`}>
-          {s.paused ? "Paused" : phase === "prep" ? "Prep" : "Cooking"}
+          {!s.started ? "Not started" : s.paused ? "Paused" : phase === "prep" ? "Prep" : "Cooking"}
         </span>
 
         <div className="flex-1" />
 
-        {/* Always available — tapping it is the only reliable phase signal, so
-            it never hides behind a heuristic about which step is "cooking". */}
-        {phase === "prep" && (
+        {/* Reading the steps shouldn't cost you a cook time, so nothing is
+            counted until this is tapped. */}
+        {!s.started ? (
           <button
-            type="button" onClick={s.endPrep}
-            className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 active:scale-95 transition-transform"
+            type="button" onClick={s.start}
+            className="px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-green-600 text-white active:scale-95 transition-transform"
           >
-            Prep done
+            Start timer
           </button>
+        ) : (
+          <>
+            {/* Always available — tapping it is the only reliable phase signal,
+                so it never hides behind a heuristic about which step is
+                "cooking". */}
+            {phase === "prep" && (
+              <button
+                type="button" onClick={s.endPrep}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 active:scale-95 transition-transform"
+              >
+                Prep done
+              </button>
+            )}
+            <button
+              type="button" onClick={s.togglePause}
+              aria-label={s.paused ? "Resume timer" : "Pause timer"}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 active:scale-90 transition-transform"
+            >
+              {s.paused ? (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+              )}
+            </button>
+            <button
+              type="button" onClick={() => setResetAsk(true)}
+              aria-label="Reset timer"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 active:scale-90 transition-transform"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v6h6M20 20v-6h-6" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 9A8 8 0 006.3 6.3L4 8.5m0 6.5a8 8 0 0013.7 2.7L20 15.5" />
+              </svg>
+            </button>
+          </>
         )}
-        <button
-          type="button" onClick={s.togglePause}
-          aria-label={s.paused ? "Resume timer" : "Pause timer"}
-          className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 active:scale-90 transition-transform"
-        >
-          {s.paused ? (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
-          )}
-        </button>
       </div>
 
       {/* Progress */}
@@ -392,6 +423,80 @@ export default function CookMode({
           </button>
         )}
       </div>
+
+      {resetAsk && (
+        <CookPrompt
+          title="Start the timer over?"
+          body="This clears the elapsed time, the prep/cook split and any per-step timings for this cook. Your checked-off ingredients and your place in the steps stay put."
+          actions={
+            <>
+              <PromptButton tone="danger" onClick={() => { s.reset(); setResetAsk(false); }}>
+                Reset timer
+              </PromptButton>
+              <PromptButton tone="ghost" onClick={() => setResetAsk(false)}>Cancel</PromptButton>
+            </>
+          }
+        />
+      )}
+
+      {exitAsk && (
+        <CookPrompt
+          title="Leave this cook?"
+          body={`The timer is at ${formatDurationLabel(s.elapsed)}. You can pick it up where you left off, or throw it away.`}
+          actions={
+            <>
+              <PromptButton tone="primary" onClick={onExit}>Keep for later</PromptButton>
+              <PromptButton tone="danger" onClick={() => { s.finish(); onExit(); }}>
+                Discard this cook
+              </PromptButton>
+              <PromptButton tone="ghost" onClick={() => setExitAsk(false)}>Stay here</PromptButton>
+            </>
+          }
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * A prompt over cook mode. Deliberately not the shared Modal: that renders at
+ * z-50 alongside cook mode's own z-50 rather than through a portal, and stacked
+ * full-width buttons suit a phone held in a kitchen better than a button row.
+ */
+function CookPrompt({ title, body, actions }: {
+  title: string;
+  body: string;
+  actions: React.ReactNode;
+}) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-5 pb-8 sm:pb-0">
+      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-zinc-900 p-5 flex flex-col gap-4 shadow-xl">
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">{title}</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{body}</p>
+        </div>
+        <div className="flex flex-col gap-2">{actions}</div>
+      </div>
+    </div>
+  );
+}
+
+function PromptButton({ tone, onClick, children }: {
+  tone: "primary" | "danger" | "ghost";
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const styles = {
+    primary: "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900",
+    danger: "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400",
+    ghost: "text-gray-500 dark:text-gray-400",
+  }[tone];
+  return (
+    <button
+      type="button" onClick={onClick}
+      className={`w-full py-3 rounded-2xl text-sm font-semibold active:scale-[0.98] transition-transform ${styles}`}
+    >
+      {children}
+    </button>
   );
 }
