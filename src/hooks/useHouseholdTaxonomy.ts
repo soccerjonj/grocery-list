@@ -13,7 +13,13 @@ import type { HouseholdTaxonomy } from "@/types/database";
 // "recipe_tag" entries are stored with kind="recipe" (migration 028) so they
 // share this table's household scoping, RLS, realtime, and case-insensitive
 // uniqueness with the pantry's custom categories/locations.
-export type TaxonomyType = "category" | "location" | "recipe_tag";
+// Migration 030 adds three more: household staples ("we always have salt"),
+// ingredient aliases ("high heat cooking oil" IS our avocado oil, stored in
+// `target`), and custom recipe "Part of" sections. All ride this table for its
+// household scoping, RLS, realtime and case-insensitive uniqueness.
+export type TaxonomyType =
+  | "category" | "location" | "recipe_tag"
+  | "staple" | "ingredient_alias" | "recipe_part";
 
 export function useHouseholdTaxonomy(householdId: string) {
   const [entries, setEntries] = useState<HouseholdTaxonomy[]>([]);
@@ -65,18 +71,42 @@ export function useHouseholdTaxonomy(householdId: string) {
     [entries],
   );
 
-  /** Add a custom entry; returns its label (or null on failure). Idempotent-ish. */
-  async function add(type: TaxonomyType, kind: string, rawLabel: string): Promise<string | null> {
+  /**
+   * Add a custom entry; returns its label (or null on failure). Idempotent-ish.
+   * `target` is only used by ingredient aliases (the pantry item the phrase
+   * points at); re-adding an existing alias updates its target so re-linking
+   * "cooking oil" to a different pantry item works instead of silently no-oping.
+   */
+  async function add(
+    type: TaxonomyType,
+    kind: string,
+    rawLabel: string,
+    target?: string | null,
+  ): Promise<string | null> {
     const label = rawLabel.trim();
     if (!label) return null;
-    // Already exists (case-insensitive)? Just return it.
+    // Already exists (case-insensitive)? Update its target if that changed,
+    // otherwise just return it.
     const existing = entries.find((e) => e.type === type && e.kind === kind && e.label.toLowerCase() === label.toLowerCase());
-    if (existing) return existing.label;
+    if (existing) {
+      const next = target?.trim() || null;
+      if (next !== null && next !== existing.target) {
+        setEntries((prev) => prev.map((e) => (e.id === existing.id ? { ...e, target: next } : e)));
+        const { error } = await supabase
+          .from("household_taxonomy").update({ target: next }).eq("id", existing.id);
+        if (error) setEntries((prev) => prev.map((e) => (e.id === existing.id ? existing : e)));
+      }
+      return existing.label;
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from("household_taxonomy")
-      .insert({ household_id: householdId, type, kind, label, added_by: user?.id ?? null })
+      .insert({
+        household_id: householdId, type, kind, label,
+        target: target?.trim() || null,
+        added_by: user?.id ?? null,
+      })
       .select()
       .single();
     if (error || !data) return null;

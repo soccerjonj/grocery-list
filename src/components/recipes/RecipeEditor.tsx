@@ -5,6 +5,7 @@ import type { HouseholdRecipe } from "@/types/database";
 import type { RecipeIngredient, RecipeStep } from "@/lib/recipeTypes";
 import { recipeIngredientList, recipeStepList } from "@/lib/recipeTypes";
 import type { RecipePatch } from "@/hooks/useHouseholdRecipes";
+import PartOfPicker from "./PartOfPicker";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
 import { uploadRecipeImage, deleteRecipeImage } from "@/lib/uploadRecipeImage";
 
@@ -289,7 +290,7 @@ export default function RecipeEditor({
                   </svg>
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   className={FIELD} inputMode="decimal" placeholder="Qty"
                   value={ing.quantity ?? ""}
@@ -303,11 +304,11 @@ export default function RecipeEditor({
                   className={FIELD} placeholder="Unit"
                   value={ing.unit ?? ""} onChange={(e) => patchIng(i, { unit: e.target.value || undefined })}
                 />
-                <input
-                  className={FIELD} placeholder="Section"
-                  value={ing.group ?? ""} onChange={(e) => patchIng(i, { group: e.target.value || undefined })}
-                />
               </div>
+              <PartOfPicker
+                value={ing.group}
+                onChange={(next) => patchIng(i, { group: next })}
+              />
             </div>
           ))}
           <button
@@ -342,9 +343,9 @@ export default function RecipeEditor({
                   </svg>
                 </button>
               </div>
-              <input
-                className={FIELD} placeholder="Section (optional)"
-                value={s.group ?? ""} onChange={(e) => patchStep(i, { group: e.target.value || undefined })}
+              <PartOfPicker
+                value={s.group}
+                onChange={(next) => patchStep(i, { group: next })}
               />
             </div>
           ))}

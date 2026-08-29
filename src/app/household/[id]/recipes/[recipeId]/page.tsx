@@ -134,7 +134,7 @@ export default function RecipeDetailPage() {
             Start cooking
           </button>
 
-          <RecipeView recipe={recipe} onAddToList={() => setAddOpen(true)} />
+          <RecipeView recipe={recipe} householdId={householdId} onAddToList={() => setAddOpen(true)} />
 
           <RatingRow
             ratings={forRecipe(recipeId)}

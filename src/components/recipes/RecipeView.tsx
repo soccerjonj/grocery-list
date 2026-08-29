@@ -8,7 +8,8 @@ import {
 } from "@/lib/recipeTypes";
 import { scaleQuantity, formatAmount, servingsFactor } from "@/lib/recipeScale";
 import { useRecipeAvailability } from "@/hooks/useRecipeAvailability";
-import type { IngredientState } from "@/lib/recipeAvailability";
+import type { IngredientState, IngredientAvailability } from "@/lib/recipeAvailability";
+import IngredientSheet from "./IngredientSheet";
 import { safeHttpUrl } from "@/lib/utils";
 
 /** Colour for each availability state. `unknown` stays grey on purpose. */
@@ -17,12 +18,16 @@ const STATE_DOT: Record<IngredientState, string> = {
   low: "bg-amber-400",
   unknown: "bg-gray-300 dark:bg-zinc-600",
   missing: "bg-red-400",
+  // Staples are assumed on hand, so they read as calm — not as another green
+  // "verified in stock", which would overstate what we actually know.
+  staple: "bg-gray-200 dark:bg-zinc-700",
 };
 const STATE_TITLE: Record<IngredientState, string> = {
   have: "In your pantry",
   low: "Running short",
   unknown: "In your pantry (different units)",
   missing: "Not in your pantry",
+  staple: "A staple — assumed on hand",
 };
 
 /**
@@ -35,14 +40,17 @@ const STATE_TITLE: Record<IngredientState, string> = {
  */
 export default function RecipeView({
   recipe,
+  householdId,
   onAddToList,
 }: {
   recipe: HouseholdRecipe;
+  householdId: string;
   onAddToList: () => void;
 }) {
   const base = recipe.servings ?? null;
   const [target, setTarget] = useState<number | null>(base);
   const factor = servingsFactor(base, target);
+  const [openIngredient, setOpenIngredient] = useState<IngredientAvailability | null>(null);
 
   const { availabilityFor } = useRecipeAvailability();
 
@@ -52,8 +60,11 @@ export default function RecipeView({
   // Availability follows the servings you're looking at — doubling a recipe
   // can legitimately turn "have" into "running short".
   const availability = availabilityFor(ingredients, factor);
-  const stateByName = new Map(
-    availability.rows.map((r) => [r.ingredient, r.state] as const),
+  // Keyed by the ingredient OBJECT (not its name), so duplicate names in one
+  // recipe stay distinct. Holds the whole row, so tapping opens the sheet with
+  // pantry quantity and shortfall already resolved.
+  const rowByIngredient = new Map(
+    availability.rows.map((r) => [r.ingredient, r] as const),
   );
   const stepGroups = groupSections(steps);
   const time = formatMinutes(totalMinutes(recipe));
@@ -173,20 +184,30 @@ export default function RecipeView({
                   {g.rows.map((ing, i) => {
                     const qty = scaleQuantity(ing.quantity, factor, ing.unit);
                     const amount = formatAmount(qty, ing.unit);
-                    const state = stateByName.get(ing) ?? "missing";
+                    const row = rowByIngredient.get(ing) ?? null;
+                    const state = row?.state ?? "missing";
                     return (
-                      <li key={`${ing.name}-${i}`} className="flex items-baseline gap-3 py-2.5">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 self-center ${STATE_DOT[state]}`}
-                          title={STATE_TITLE[state]}
-                          aria-label={STATE_TITLE[state]}
-                        />
-                        <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{ing.name}</span>
-                        {amount && (
-                          <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 flex-shrink-0">
-                            {amount}
-                          </span>
-                        )}
+                      <li key={`${ing.name}-${i}`}>
+                        <button
+                          type="button"
+                          onClick={() => row && setOpenIngredient(row)}
+                          className="w-full flex items-baseline gap-3 py-2.5 text-left active:opacity-60 transition-opacity"
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 self-center ${STATE_DOT[state]}`}
+                            title={STATE_TITLE[state]}
+                            aria-label={STATE_TITLE[state]}
+                          />
+                          <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{ing.name}</span>
+                          {amount && (
+                            <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 flex-shrink-0">
+                              {amount}
+                            </span>
+                          )}
+                          <svg className="w-3.5 h-3.5 text-gray-300 dark:text-zinc-600 flex-shrink-0 self-center" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
                       </li>
                     );
                   })}
@@ -268,6 +289,13 @@ export default function RecipeView({
           View original source
         </a>
       )}
+
+      <IngredientSheet
+        row={openIngredient}
+        factor={factor}
+        householdId={householdId}
+        onClose={() => setOpenIngredient(null)}
+      />
     </div>
   );
 }

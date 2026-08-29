@@ -141,7 +141,10 @@ export default function RecipeAddToListSheet({
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
             Adding {addingCount} of {ingredients.length}
-            {alreadyHave.length > 0 && ` · ${alreadyHave.length} already in your pantry`}
+            {/* "already covered", not "in your pantry" — staples are assumed on
+                hand rather than verified, so claiming they're in the pantry
+                would be asserting something we don't actually know. */}
+            {alreadyHave.length > 0 && ` · ${alreadyHave.length} already covered`}
           </p>
           <button
             type="button"

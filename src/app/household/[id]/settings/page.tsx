@@ -11,13 +11,14 @@ import ColorPicker from "@/components/ui/ColorPicker";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import StaplesManager from "@/components/recipes/StaplesManager";
 import { useToast } from "@/context/ToastContext";
 import { getErrorMessage } from "@/lib/utils";
 import { renameHousehold, regenerateInviteCode, deleteHousehold } from "@/lib/householdAdmin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Section = "household" | "account";
+type Section = "household" | "staples" | "account";
 
 // ─── Sidebar nav items ────────────────────────────────────────────────────────
 // Profile + Preferences (theme) now live in the account hub (/settings);
@@ -31,6 +32,16 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode; descriptio
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+      </svg>
+    ),
+  },
+  {
+    id: "staples",
+    label: "Staples",
+    description: "Always-have items, links",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 100-4 2 2 0 000 4zm0 0v8a2 2 0 002 2h10a2 2 0 002-2V8M9 12h6" />
       </svg>
     ),
   },
@@ -561,6 +572,8 @@ export default function SettingsPage() {
             onTransfer={(id, name) => setTransferTarget({ id, name })}
           />
         );
+      case "staples":
+        return <StaplesManager />;
       case "account":
         return (
           <AccountSection

@@ -371,9 +371,11 @@ export interface Database {
         Row: {
           id: string;
           household_id: string;
-          type: string; // 'category' | 'location'
-          kind: string; // 'food' | 'supplies'
+          type: string; // 'category' | 'location' | 'recipe_tag' | 'staple' | 'ingredient_alias' | 'recipe_part'
+          kind: string; // 'food' | 'supplies' | 'recipe' | 'ingredient'
           label: string;
+          /** Only for ingredient_alias: the pantry item name this points at. */
+          target: string | null;
           added_by: string | null;
           created_at: string;
         };
@@ -383,6 +385,7 @@ export interface Database {
           type: string;
           kind: string;
           label: string;
+          target?: string | null;
           added_by?: string | null;
           created_at?: string;
         };
@@ -392,6 +395,7 @@ export interface Database {
           type?: string;
           kind?: string;
           label?: string;
+          target?: string | null;
           added_by?: string | null;
           created_at?: string;
         };
@@ -432,6 +436,10 @@ export const FOOD_CATEGORIES = [
   { value: "dairy",      label: "Dairy"      },
   { value: "drinks",     label: "Drinks"     },
   { value: "condiments", label: "Condiments" },
+  // Spices previously landed in "condiments" via pantryHints, which made a
+  // spice rack impossible to see as its own thing. `food_category` is free
+  // text with no DB constraint, so adding a value needs no migration.
+  { value: "spices",     label: "Spices"     },
   { value: "grains",     label: "Grains"     },
   { value: "snacks",     label: "Snacks"     },
   { value: "prepared",   label: "Prepared"   },

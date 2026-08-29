@@ -13,7 +13,7 @@ import { comparable, convert } from "@/lib/unitConvert";
  *  unknown — in the pantry, but the amounts can't be honestly compared
  *            (2 cups vs 1 bag). We show both rather than pretend.
  */
-export type IngredientState = "have" | "low" | "unknown" | "missing";
+export type IngredientState = "have" | "low" | "unknown" | "missing" | "staple";
 
 export interface IngredientAvailability {
   ingredient: RecipeIngredient;
@@ -45,10 +45,22 @@ export function computeAvailability(
   ingredients: RecipeIngredient[],
   pantryIndex: Map<string, PantryIndexEntry>,
   scaleFactor = 1,
+  opts: { staples?: Set<string>; aliases?: Map<string, string> } = {},
 ): RecipeAvailability {
+  const { staples, aliases } = opts;
+
   const rows: IngredientAvailability[] = ingredients.map((ingredient) => {
-    const key = normalizeItemName(ingredient.name);
+    const rawKey = normalizeItemName(ingredient.name);
+    // Resolve an alias BEFORE the pantry lookup, so "high heat cooking oil"
+    // finds the avocado oil row and inherits its real quantity/unit.
+    const key = (rawKey && aliases?.get(rawKey)) || rawKey;
     const pantry = (key && pantryIndex.get(key)) || null;
+
+    // A staple is assumed on hand whether or not a pantry row exists, so it
+    // never nags. Checked on both the raw phrase and the aliased target.
+    if (staples && ((rawKey && staples.has(rawKey)) || (key && staples.has(key)))) {
+      return { ingredient, state: "staple" as const, pantry, neededInPantryUnit: null, shortfall: null };
+    }
 
     if (!pantry) {
       return { ingredient, state: "missing" as const, pantry: null, neededInPantryUnit: null, shortfall: null };

@@ -4,6 +4,7 @@ import { useMemo, useCallback } from "react";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
 import { indexPantryRows } from "@/lib/checkPantryDuplicate";
 import { computeAvailability } from "@/lib/recipeAvailability";
+import { buildStapleSet, buildAliasMap } from "@/lib/pantryStaples";
 import type { RecipeIngredient } from "@/lib/recipeTypes";
 
 /**
@@ -15,18 +16,23 @@ import type { RecipeIngredient } from "@/lib/recipeTypes";
  * consistent with what the pantry screen shows.
  */
 export function useRecipeAvailability() {
-  const { pantry } = useHouseholdData();
+  const { pantry, taxonomy } = useHouseholdData();
 
   const pantryIndex = useMemo(
     () => indexPantryRows(pantry.items),
     [pantry.items],
   );
 
+  // Staples and aliases come off the same realtime taxonomy subscription the
+  // pantry's custom pills use — marking a staple updates every recipe at once.
+  const staples = useMemo(() => buildStapleSet(taxonomy.entries), [taxonomy.entries]);
+  const aliases = useMemo(() => buildAliasMap(taxonomy.entries), [taxonomy.entries]);
+
   const availabilityFor = useCallback(
     (ingredients: RecipeIngredient[], scaleFactor = 1) =>
-      computeAvailability(ingredients, pantryIndex, scaleFactor),
-    [pantryIndex],
+      computeAvailability(ingredients, pantryIndex, scaleFactor, { staples, aliases }),
+    [pantryIndex, staples, aliases],
   );
 
-  return { pantryIndex, availabilityFor };
+  return { pantryIndex, availabilityFor, staples, aliases };
 }

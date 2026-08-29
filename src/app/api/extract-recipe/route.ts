@@ -3,6 +3,8 @@ import { getAnthropic, extractJson, MODEL_HAIKU, MODEL_SONNET } from "@/lib/anth
 import {
   extractRecipesFromHtml,
   parseIngredientLine,
+  canonicalPart,
+  splitTrailingPart,
   type ExtractedIngredient,
   type ExtractedStep,
 } from "@/lib/recipeExtract";
@@ -91,14 +93,15 @@ Ingredient rules:
 - "quantity" is the numeric amount, e.g. 2, 1.5, 0.25. Convert fractions ("1/2" → 0.5). Omit if the recipe gives no quantity ("salt to taste").
 - "unit" is the measurement unit if any (cups, tbsp, tsp, oz, lb, g, kg, mL, L, can, pack, etc). Omit if no unit.
 - "raw" preserves the original line verbatim for verification.
-- "group" is the section heading the ingredient sits under ("For the sauce"), WITHOUT the trailing colon. Omit when the recipe has no sections. Never emit a heading as its own ingredient.
+- "group" is the component of the dish this belongs to — just the noun, Title Case, no "For the" prefix and no trailing colon: "Sauce", "Marinade", "Topping", "Filling", "Dough", "Assembly". Omit when the recipe has no sections. Never emit a heading as its own ingredient.
+- If an ingredient line ends with its own qualifier ("2 tbsp soy sauce, for the marinade"), strip that off the name and use it as "group" — name becomes "Soy Sauce", group becomes "Marinade". The name must never contain ", for ...".
 - "optional": true only for garnishes or lines the recipe itself marks optional.
 - If two ingredients are alternates ("flour or cornstarch") emit only the first.
 - Output every real ingredient — never elide the list.
 
 Step rules:
 - "text" is one instruction, verbatim where possible but without a leading step number.
-- "group" is the section heading the step belongs to, when the method is divided into parts.
+- "group" is the component this step builds, in the same Title-Case noun form as ingredient groups ("Sauce", "Marinade"), when the method is divided into parts.
 - Preserve the recipe's order exactly. Do not merge or summarize steps.
 - Omit "steps" entirely if the source has no instructions (e.g. an ingredients-only photo).
 
@@ -171,15 +174,17 @@ const EMPTY: ExtractResult = {
 // compiled because object spread skips excess-property checking.
 function coerceItem(raw: LlmItem): RecipeIngredient | null {
   if (typeof raw.name !== "string" || !raw.name.trim()) return null;
-  const group = typeof raw.group === "string" && raw.group.trim()
-    // Models re-add the colon despite the instruction; strip it here rather
-    // than trusting the prompt.
-    ? titleCaseName(raw.group.trim().replace(/:\s*$/, ""))
-    : undefined;
+  // Models re-add "For the " and the colon despite the instruction, so
+  // canonicalize rather than trusting the prompt.
+  const promptGroup = canonicalPart(typeof raw.group === "string" ? raw.group : null);
+  // A qualifier can also survive inside the name ("soy sauce, for marinade");
+  // splitting it here keeps the name matchable against the pantry.
+  const split = splitTrailingPart(raw.name);
+  const group = promptGroup ?? canonicalPart(split.group);
   return {
     // Cased here AND in parseIngredientLine — this covers the LLM paths, that
     // one covers the JSON-LD regex path the model never sees.
-    name: titleCaseName(raw.name),
+    name: titleCaseName(split.name),
     quantity: typeof raw.quantity === "number" && Number.isFinite(raw.quantity) ? raw.quantity : undefined,
     unit: typeof raw.unit === "string" && raw.unit.trim() ? raw.unit.trim() : undefined,
     raw: typeof raw.raw === "string" ? raw.raw : raw.name as string,
@@ -190,9 +195,7 @@ function coerceItem(raw: LlmItem): RecipeIngredient | null {
 
 function coerceStep(raw: LlmStep): ExtractedStep | null {
   if (typeof raw.text !== "string" || raw.text.trim().length < 2) return null;
-  const group = typeof raw.group === "string" && raw.group.trim()
-    ? titleCaseName(raw.group.trim().replace(/:\s*$/, ""))
-    : undefined;
+  const group = canonicalPart(typeof raw.group === "string" ? raw.group : null);
   return { text: sentenceCase(raw.text), ...(group ? { group } : {}) };
 }
 

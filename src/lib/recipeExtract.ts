@@ -14,7 +14,7 @@
 import { titleCaseName } from "@/lib/normalizeItemName";
 
 export interface ExtractedIngredient {
-  /** Shopping-list-ready name, e.g. "all-purpose flour". */
+  /** Shopping-list-ready name, e.g. "All-Purpose Flour". */
   name: string;
   /** Optional numeric quantity, best-effort parsed. */
   quantity?: number;
@@ -22,6 +22,18 @@ export interface ExtractedIngredient {
   unit?: string;
   /** The original ingredient line, preserved so users can verify. */
   raw: string;
+}
+
+/**
+ * What `parseIngredientLine` actually returns: an ingredient that may carry a
+ * section parsed out of the line ("…, for the marinade").
+ *
+ * Declared here rather than importing `RecipeIngredient` from recipeTypes.ts —
+ * that module imports THIS one, so pulling it back would be circular. The two
+ * shapes are structurally compatible, which is all the call sites need.
+ */
+export interface RecipeIngredientLike extends ExtractedIngredient {
+  group?: string;
 }
 
 /**
@@ -196,30 +208,141 @@ export function extractRecipesFromHtml(html: string): JsonLdRecipe | null {
 }
 
 /**
+ * Split a trailing "…, for the marinade" / "— for sauce" qualifier off an
+ * ingredient name and return it as a section.
+ *
+ * This is a CORRECTNESS fix, not cosmetics: the qualifier used to stay glued
+ * to the name, so `normalizeItemName("soy sauce, for marinade")` never matched
+ * a pantry "Soy Sauce" — the ingredient showed as missing forever and got
+ * re-added to the shopping list on every trip.
+ *
+ * Deliberately conservative. Only a trailing `for …` clause after a comma or
+ * dash counts, and only when the remainder is short enough to be a section
+ * name rather than prose. "Bread for serving" (no separator) is left alone,
+ * because splitting there would strip a real part of the name.
+ */
+export function splitTrailingPart(name: string): { name: string; group?: string } {
+  const m = name.match(/^(.*?)\s*[,;—–-]\s*for\s+(?:the\s+|a\s+)?([a-z0-9][a-z0-9 '’-]{1,24})\.?$/i);
+  if (!m) return { name: name.trim() };
+  const base = m[1].trim();
+  const part = m[2].trim();
+  // A qualifier that ate the whole name means we mis-parsed — keep the original.
+  if (!base) return { name: name.trim() };
+  // "for serving" / "for garnish" describe WHEN, not which component; they're
+  // handled as `optional` upstream rather than invented as sections.
+  if (/^(serving|serves|garnish|topping the|drizzling|dusting|brushing)$/i.test(part)) {
+    return { name: base };
+  }
+  return { name: base, group: titleCaseName(part) };
+}
+
+/**
  * Quick regex pass on a single ingredient line to extract qty + unit.
  * Used to short-circuit when the LLM isn't necessary. Returns just
  * the raw line if we can't parse cleanly.
  */
-export function parseIngredientLine(raw: string): ExtractedIngredient {
+/**
+ * Words that may legitimately sit between a number and the ingredient name.
+ * Measurements plus the count-nouns recipes use like units ("3 cloves garlic").
+ *
+ * This list is the FIX for a long-standing parsing bug: the pattern below used
+ * to accept *any* word after the number as a unit, so "1 baguette for serving"
+ * parsed to name "for serving" and "2 chicken breasts" to name "breasts" — the
+ * ingredient was unmatchable and read as nonsense. Anything not listed here is
+ * now treated as the start of the name instead.
+ */
+const KNOWN_UNIT_WORDS = new Set([
+  "tsp", "teaspoon", "teaspoons", "t",
+  "tbsp", "tablespoon", "tablespoons", "tbs", "tb",
+  "cup", "cups", "c",
+  "oz", "ounce", "ounces", "fl", "floz",
+  "lb", "lbs", "pound", "pounds",
+  "g", "gram", "grams", "kg", "kilogram", "kilograms",
+  "ml", "milliliter", "milliliters", "l", "liter", "liters", "litre", "litres",
+  "pint", "pints", "quart", "quarts", "gallon", "gallons",
+  "can", "cans", "pack", "packs", "package", "packages", "pkg",
+  "box", "boxes", "bag", "bags", "bottle", "bottles", "jar", "jars",
+  "clove", "cloves", "stick", "sticks", "slice", "slices",
+  "sprig", "sprigs", "head", "heads", "stalk", "stalks",
+  "bunch", "bunches", "pinch", "pinches", "dash", "dashes",
+  "handful", "handfuls", "piece", "pieces",
+]);
+
+export function parseIngredientLine(raw: string): RecipeIngredientLike {
   const trimmed = raw.trim();
   // Match leading qty + unit. Accept unicode fractions (½ ¼ ¾ ⅓ ⅔), mixed
-  // numbers ("1 1/2"), decimals, and simple fractions ("1/2").
+  // numbers ("1 1/2"), decimals, and simple fractions ("1/2"). The unit group
+  // is validated against KNOWN_UNIT_WORDS below rather than trusted.
   const m = trimmed.match(
     /^((?:\d+\s+\d\/\d|\d+\/\d|\d+(?:\.\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞]))(?:\s+([a-z]+\.?))?\s+(.+)$/i,
   );
   // Title-cased here as well as in the LLM path: this regex fast path is the
   // most common URL import (JSON-LD sites) and never reaches the model, so
   // fixing only the prompt would leave those recipes lowercase.
-  if (!m) return { name: titleCaseName(trimmed), raw: trimmed };
+  if (!m) {
+    const split = shapeName(trimmed);
+    return { ...split, raw: trimmed };
+  }
   const qtyStr = m[1];
-  const unitStr = m[2]?.toLowerCase().replace(/\.$/, "");
-  const rest = m[3].trim();
+  const candidate = m[2]?.toLowerCase().replace(/\.$/, "");
+  // Only consume the word as a unit if it really is one; otherwise it belongs
+  // to the name ("1 baguette for serving" → "Baguette", not unit "baguette").
+  const isUnit = !!candidate && KNOWN_UNIT_WORDS.has(candidate);
+  const rest = isUnit ? m[3].trim() : [m[2], m[3]].filter(Boolean).join(" ").trim();
+  const split = shapeName(rest);
   return {
-    name: titleCaseName(rest),
+    ...split,
     quantity: parseQty(qtyStr),
-    unit: normalizeUnit(unitStr),
+    unit: isUnit ? normalizeUnit(candidate) : undefined,
     raw: trimmed,
   };
+}
+
+/**
+ * Canonical form for a "Part of" section: "For the sauce:" → "Sauce".
+ *
+ * Applied to model output as well as parsed text. The prompt asks for the bare
+ * noun, but models reliably re-add "For the " and the colon — the same reason
+ * the colon was already being stripped here rather than trusted to the prompt.
+ * Canonicalizing matters beyond looks: `groupSections` compares group strings
+ * exactly, so "For the sauce" and "Sauce" would render as two headings.
+ */
+export function canonicalPart(raw: string | undefined | null): string | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw
+    .trim()
+    .replace(/:\s*$/, "")
+    .replace(/^for\s+(?:the\s+|a\s+)?/i, "")
+    .trim();
+  return cleaned ? titleCaseName(cleaned) : undefined;
+}
+
+/**
+ * Prep and serving notes that belong to the cook, not the shopping list.
+ * The LLM prompt already strips these; the regex fast path never did, so
+ * "1 onion, diced" was stored as "Onion, Diced" and matched no pantry row.
+ */
+const PREP_NOTE =
+  /^(?:finely |coarsely |roughly |thinly |freshly |lightly |well )?(?:diced|chopped|minced|sliced|grated|shredded|melted|softened|beaten|sifted|drained|rinsed|peeled|halved|quartered|cubed|crushed|toasted|packed|divided|cubed|trimmed|room temperature|at room temperature|plus more|to taste|for serving|for garnish|optional)$/i;
+
+/** Strip trailing prep/serving notes, with or without a comma. */
+function stripTrailingNoise(name: string): string {
+  let out = name.trim();
+  // Comma-separated notes, possibly several ("1 onion, peeled, diced").
+  for (let i = 0; i < 3; i += 1) {
+    const m = out.match(/^(.*?),\s*([^,]+)$/);
+    if (!m || !PREP_NOTE.test(m[2].trim())) break;
+    out = m[1].trim();
+  }
+  // "for serving" / "for garnish" also appear with no comma at all.
+  out = out.replace(/\s+for\s+(?:serving|garnish)\.?$/i, "").trim();
+  return out || name.trim();
+}
+
+/** Shared name shaping: split off a trailing part, drop prep notes, title-case. */
+function shapeName(rest: string): { name: string; group?: string } {
+  const { name, group } = splitTrailingPart(rest);
+  return { name: titleCaseName(stripTrailingNoise(name)), ...(group ? { group } : {}) };
 }
 
 function parseQty(s: string): number | undefined {

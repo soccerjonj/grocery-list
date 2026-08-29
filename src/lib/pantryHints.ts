@@ -135,6 +135,22 @@ const FOOD_LOOKUP: Array<{ kw: string[]; hint: Omit<PantryHint, "kind"> }> = [
     hint: { storage_location: "pantry", food_category: "snacks" },
   },
 
+  // ── Spices & seasonings ──────────────────────────────────────────────
+  // Split out of the condiments block so a spice rack is visible as its own
+  // pantry section. Listed BEFORE condiments because matching is
+  // most-specific-first and "garlic powder" would otherwise be swallowed.
+  {
+    kw: [
+      "cinnamon", "cumin", "paprika", "turmeric", "oregano", "thyme",
+      "rosemary", "bay leaf", "cayenne", "chili flakes", "chili powder",
+      "garlic powder", "onion powder", "curry powder", "garam masala",
+      "allspice", "nutmeg", "coriander", "cardamom", "ginger powder",
+      "black pepper", "peppercorn", "red pepper flakes", "italian seasoning",
+      "spice blend", "seasoning", "sage", "dill", "parsley flakes",
+    ],
+    hint: { storage_location: "pantry", food_category: "spices" },
+  },
+
   // ── Pantry condiments, baking & staples ──────────────────────────────
   {
     kw: [
@@ -146,10 +162,6 @@ const FOOD_LOOKUP: Array<{ kw: string[]; hint: Omit<PantryHint, "kind"> }> = [
       "nutella", "sunflower butter",
       "coffee", "espresso", "tea", "cocoa powder", "hot chocolate",
       "baking soda", "baking powder", "yeast", "vanilla extract",
-      "cinnamon", "cumin", "paprika", "turmeric", "oregano", "thyme",
-      "rosemary", "bay leaf", "cayenne", "chili flakes", "garlic powder",
-      "onion powder", "curry powder", "garam masala", "allspice", "nutmeg",
-      "spice blend", "seasoning",
       "broth", "stock", "bouillon",
       "tomato sauce", "marinara", "tomato paste", "diced tomato",
       "coconut milk", "cream of mushroom", "condensed milk", "evaporated milk",
