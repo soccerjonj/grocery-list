@@ -27,7 +27,7 @@ const STATE_TITLE: Record<IngredientState, string> = {
   low: "Running short",
   unknown: "In your pantry (different units)",
   missing: "Not in your pantry",
-  staple: "A staple — assumed on hand",
+  staple: "Not tracked — never counts as missing",
 };
 
 /**
@@ -76,6 +76,46 @@ export default function RecipeView({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* "Can I cook this?" — the answer and the fix for it, kept together at
+          the top. Buried under a long ingredient list, the button was easy to
+          miss entirely. Availability is presence-based: an ingredient counts as
+          "have" if it's in your kitchen at all, since comparing 2 cups to 1 bag
+          isn't answerable. */}
+      {ingredients.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2.5">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              availability.missing.length === 0 ? "bg-green-500" : "bg-amber-400"
+            }`} />
+            <p className="flex-1 text-xs text-gray-600 dark:text-gray-300">
+              {availability.missing.length === 0 ? (
+                <>You have everything for this</>
+              ) : (
+                <>
+                  You have{" "}
+                  <span className="font-semibold text-gray-900 dark:text-gray-50">
+                    {availability.haveCount} of {availability.totalCount}
+                  </span>{" "}
+                  ingredients
+                </>
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onAddToList}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors active:scale-[0.98]"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+            </svg>
+            {availability.missing.length > 0
+              ? `Add ${availability.missing.length} missing to shopping list`
+              : "Add ingredients to shopping list"}
+          </button>
+        </div>
+      )}
+
       {/* Hero */}
       {recipe.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -145,30 +185,6 @@ export default function RecipeView({
           )}
         </div>
 
-        {/* What you already have. Presence-based: we count an ingredient as
-            "have" if it's in your kitchen at all, since comparing 2 cups to
-            1 bag isn't answerable. */}
-        {ingredients.length > 0 && (
-          <div className="flex items-center gap-2.5 rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2.5">
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              availability.missing.length === 0 ? "bg-green-500" : "bg-amber-400"
-            }`} />
-            <p className="flex-1 text-xs text-gray-600 dark:text-gray-300">
-              {availability.missing.length === 0 ? (
-                <>You have everything for this</>
-              ) : (
-                <>
-                  You have{" "}
-                  <span className="font-semibold text-gray-900 dark:text-gray-50">
-                    {availability.haveCount} of {availability.totalCount}
-                  </span>{" "}
-                  ingredients
-                </>
-              )}
-            </p>
-          </div>
-        )}
-
         {ingredients.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">No ingredients yet.</p>
         ) : (
@@ -216,20 +232,6 @@ export default function RecipeView({
             ))}
           </div>
         )}
-
-        <button
-          type="button"
-          onClick={onAddToList}
-          disabled={ingredients.length === 0}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-200 dark:hover:bg-zinc-700 disabled:opacity-40 transition-colors active:scale-[0.98]"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h2l1 9h12l1.5-6H7M9 19.5a.5.5 0 11-1 0 .5.5 0 011 0zM18 19.5a.5.5 0 11-1 0 .5.5 0 011 0z" />
-          </svg>
-          {availability.missing.length > 0
-            ? `Add ${availability.missing.length} missing to shopping list`
-            : "Add ingredients to shopping list"}
-        </button>
       </section>
 
       {/* Steps */}

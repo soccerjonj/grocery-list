@@ -130,7 +130,8 @@ export default function IngredientSheet({
       <div className="rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3">
         {isStaple ? (
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Marked as a staple — assumed always on hand, so it never shows as missing.
+            Not tracked in your pantry. This never counts as missing, and it&apos;s
+            left out when you add missing ingredients to your shopping list.
           </p>
         ) : row?.pantry ? (
           <>
@@ -179,8 +180,13 @@ export default function IngredientSheet({
           {busy === "list" ? "Adding…" : "Add just this to shopping list"}
         </button>
         <button type="button" onClick={toggleStaple} disabled={!!busy}
-          className="w-full py-3 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50">
-          {isStaple ? "Remove from staples" : "Always have this (staple)"}
+          className="w-full py-3 px-3 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50 flex flex-col items-center gap-0.5">
+          <span>{isStaple ? "Track this in my pantry again" : "Don’t track this ingredient"}</span>
+          <span className="text-[11px] font-normal leading-snug text-gray-500 dark:text-gray-400 text-center">
+            {isStaple
+              ? "It will start showing as missing when it isn’t in your pantry"
+              : "Things like salt or oil — never shown as missing, never added to your list"}
+          </span>
         </button>
 
         {/* Link to a pantry item — the "high heat cooking oil" IS "avocado oil" case */}
