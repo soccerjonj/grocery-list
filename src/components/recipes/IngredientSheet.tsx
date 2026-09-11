@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import ItemSheet, { ItemSheetHeader } from "@/components/ui/ItemSheet";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
 import { useToast } from "@/context/ToastContext";
@@ -33,8 +33,43 @@ export default function IngredientSheet({
   const { success, error: toastError } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
+  const [linkQuery, setLinkQuery] = useState("");
 
   const ing = row?.ingredient ?? null;
+
+  // Candidates for linking. Filtered by the search, and ranked so items that
+  // share a word with the ingredient come first — "high heat cooking oil"
+  // surfaces every oil before you've typed anything. Matching goes through
+  // normalizeItemName on both sides so "Tomatoes" finds "tomato" and accents
+  // don't matter.
+  const linkCandidates = useMemo(() => {
+    const q = normalizeItemName(linkQuery);
+    const ingTokens = ing
+      ? normalizeItemName(ing.name).split(" ").filter((t) => t.length >= 3)
+      : [];
+    return pantry.items
+      .map((p) => {
+        const norm = normalizeItemName(p.name);
+        const score = ingTokens.filter((t) => norm.includes(t)).length;
+        return { item: p, norm, score };
+      })
+      .filter(({ norm }) => !q || norm.includes(q))
+      .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name))
+      .map(({ item }) => item);
+  }, [pantry.items, linkQuery, ing]);
+
+  function closeLinking() {
+    setLinking(false);
+    setLinkQuery("");
+  }
+
+  // The sheet stays mounted between ingredients (only `row` changes), so
+  // picker state has to be cleared on every way out or the next ingredient
+  // opens straight into the previous one's search.
+  function close() {
+    closeLinking();
+    onClose();
+  }
   const needed = ing ? scaleQuantity(ing.quantity, factor, ing.unit) : undefined;
   const neededLabel = ing ? formatAmount(needed, ing.unit) : null;
 
@@ -56,7 +91,7 @@ export default function IngredientSheet({
         fridgeZone: hint?.fridge_zone ?? null,
       });
       success(`Added ${ing.name} to your pantry`);
-      onClose();
+      close();
     });
   }
 
@@ -81,7 +116,7 @@ export default function IngredientSheet({
         await shopping.addItem(ing.name, needed ?? undefined, ing.unit || undefined);
       }
       success(`Added ${ing.name} to your list`);
-      onClose();
+      close();
     });
   }
 
@@ -95,7 +130,7 @@ export default function IngredientSheet({
         await taxonomy.add(STAPLE_TYPE, INGREDIENT_KIND, ing.name);
         success(`${ing.name} marked as a staple`);
       }
-      onClose();
+      close();
     });
   }
 
@@ -104,7 +139,7 @@ export default function IngredientSheet({
     await run("link", async () => {
       await taxonomy.add(ALIAS_TYPE, INGREDIENT_KIND, ing.name, pantryName);
       success(`"${ing.name}" now means ${pantryName}`);
-      onClose();
+      close();
     });
   }
 
@@ -113,7 +148,7 @@ export default function IngredientSheet({
   return (
     <ItemSheet
       open={row !== null}
-      onClose={onClose}
+      onClose={close}
       header={
         <ItemSheetHeader
           title={ing?.name ?? ""}
@@ -122,7 +157,7 @@ export default function IngredientSheet({
               {neededLabel ? `Recipe needs ${neededLabel}` : "No amount specified"}
             </span>
           }
-          onClose={onClose}
+          onClose={close}
         />
       }
     >
@@ -200,18 +235,35 @@ export default function IngredientSheet({
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Which pantry item does &ldquo;{ing?.name}&rdquo; mean? Saved for future recipes too.
             </p>
+            {pantry.items.length > 0 && (
+              <input
+                type="text"
+                value={linkQuery}
+                onChange={(e) => setLinkQuery(e.target.value)}
+                placeholder="Search your pantry…"
+                autoFocus
+                autoCapitalize="off"
+                autoCorrect="off"
+                className="w-full text-sm bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-gray-900 dark:text-gray-50 placeholder:text-gray-400 outline-none focus:border-gray-400 dark:focus:border-zinc-500 transition-colors"
+              />
+            )}
             <div className="max-h-56 overflow-y-auto flex flex-col gap-1">
-              {pantry.items.length === 0 && (
-                <p className="text-xs text-gray-400 dark:text-gray-500">Your pantry is empty.</p>
+              {pantry.items.length === 0 ? (
+                <p className="text-xs text-gray-400 dark:text-gray-500 px-1 py-1">Your pantry is empty.</p>
+              ) : linkCandidates.length === 0 ? (
+                <p className="text-xs text-gray-400 dark:text-gray-500 px-1 py-1">
+                  Nothing in your pantry matches &ldquo;{linkQuery.trim()}&rdquo;.
+                </p>
+              ) : (
+                linkCandidates.map((p) => (
+                  <button key={p.id} type="button" onClick={() => linkTo(p.name)} disabled={!!busy}
+                    className="text-left px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 text-sm text-gray-800 dark:text-gray-100 disabled:opacity-50">
+                    {p.name}
+                  </button>
+                ))
               )}
-              {pantry.items.map((p) => (
-                <button key={p.id} type="button" onClick={() => linkTo(p.name)} disabled={!!busy}
-                  className="text-left px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 text-sm text-gray-800 dark:text-gray-100 disabled:opacity-50">
-                  {p.name}
-                </button>
-              ))}
             </div>
-            <button type="button" onClick={() => setLinking(false)}
+            <button type="button" onClick={closeLinking}
               className="text-xs text-gray-400 dark:text-gray-500 py-1">Cancel</button>
           </div>
         )}
