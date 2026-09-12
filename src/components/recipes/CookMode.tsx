@@ -249,6 +249,11 @@ export default function CookMode({
                 </p>
               </div>
 
+              {!base && ingredients.length > 0 && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  Add a serving count on the recipe to scale it.
+                </p>
+              )}
               {base && (
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Cooking for</span>

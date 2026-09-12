@@ -42,13 +42,19 @@ export default function RecipeView({
   recipe,
   householdId,
   onAddToList,
+  onSetServings,
 }: {
   recipe: HouseholdRecipe;
   householdId: string;
   onAddToList: () => void;
+  /** Saves a servings count for a recipe that has none. Resolves true on success. */
+  onSetServings?: (servings: number) => Promise<boolean>;
 }) {
   const base = recipe.servings ?? null;
   const [target, setTarget] = useState<number | null>(base);
+  const [settingServings, setSettingServings] = useState(false);
+  const [servingsDraft, setServingsDraft] = useState("");
+  const [savingServings, setSavingServings] = useState(false);
   const factor = servingsFactor(base, target);
   const [openIngredient, setOpenIngredient] = useState<IngredientAvailability | null>(null);
 
@@ -73,6 +79,27 @@ export default function RecipeView({
   // Only offer scaling when we know what the amounts are relative to —
   // scaling against an unknown base would be a lie.
   const canScale = !!base && base > 0;
+
+  // Without a servings count every scaler in the app (here, cook mode, the
+  // shopping sheet) silently disappears, which reads as "this app can't
+  // scale". So the gap is filled right where the scaler would be.
+  async function saveServings() {
+    const n = Math.round(Number(servingsDraft));
+    if (!onSetServings || !Number.isFinite(n) || n < 1 || savingServings) return;
+    setSavingServings(true);
+    try {
+      const ok = await onSetServings(Math.min(200, n));
+      if (ok) {
+        // `target` was initialised from a null base; follow the new one so the
+        // scaler doesn't open on an empty count.
+        setTarget(Math.min(200, n));
+        setSettingServings(false);
+        setServingsDraft("");
+      }
+    } finally {
+      setSavingServings(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -164,6 +191,53 @@ export default function RecipeView({
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">Ingredients</h2>
+          {!canScale && onSetServings && (
+            settingServings ? (
+              <form
+                onSubmit={(e) => { e.preventDefault(); saveServings(); }}
+                className="flex items-center gap-1.5"
+              >
+                <span className="text-xs text-gray-500 dark:text-gray-400">Serves</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={200}
+                  value={servingsDraft}
+                  onChange={(e) => setServingsDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") { setSettingServings(false); setServingsDraft(""); } }}
+                  autoFocus
+                  aria-label="Number of servings"
+                  className="w-14 text-sm text-center tabular-nums bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-gray-900 dark:text-gray-50 outline-none focus:border-gray-400 dark:focus:border-zinc-500"
+                />
+                <button
+                  type="submit"
+                  disabled={savingServings || !(Number(servingsDraft) >= 1)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-transform"
+                >
+                  {savingServings ? "…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSettingServings(false); setServingsDraft(""); }}
+                  className="px-1.5 py-1 text-xs text-gray-400 dark:text-gray-500"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSettingServings(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 active:scale-95 transition-transform"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Set servings to scale
+              </button>
+            )
+          )}
           {canScale && (
             <div className="flex items-center gap-1.5">
               <button

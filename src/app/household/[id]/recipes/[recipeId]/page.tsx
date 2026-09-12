@@ -135,7 +135,16 @@ export default function RecipeDetailPage() {
             Start cooking
           </button>
 
-          <RecipeView recipe={recipe} householdId={householdId} onAddToList={() => setAddOpen(true)} />
+          <RecipeView
+            recipe={recipe}
+            householdId={householdId}
+            onAddToList={() => setAddOpen(true)}
+            onSetServings={async (n) => {
+              const ok = await updateRecipe(recipeId, { servings: n });
+              if (!ok) toastError("Couldn't save the servings");
+              return ok;
+            }}
+          />
 
           <RatingRow
             ratings={forRecipe(recipeId)}
