@@ -19,7 +19,8 @@ import type { HouseholdTaxonomy } from "@/types/database";
 // household scoping, RLS, realtime and case-insensitive uniqueness.
 export type TaxonomyType =
   | "category" | "location" | "recipe_tag"
-  | "staple" | "ingredient_alias" | "recipe_part";
+  | "staple" | "ingredient_alias" | "recipe_part"
+  | "expiry_ignored";
 
 export function useHouseholdTaxonomy(householdId: string) {
   const [entries, setEntries] = useState<HouseholdTaxonomy[]>([]);

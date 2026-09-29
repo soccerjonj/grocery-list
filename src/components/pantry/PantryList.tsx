@@ -18,6 +18,7 @@ import { normalizeItemName } from "@/lib/normalizeItemName";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useToast } from "@/context/ToastContext";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
+import { buildExpiryIgnoredSet, isExpiryIgnored } from "@/lib/expiryIgnore";
 
 // Quick-add starter items shown on the empty state (audit M4). Picked
 // to cover the most common household goods so a new user can populate
@@ -412,6 +413,7 @@ export default function PantryList({
   onAddToShoppingList,
 }: PantryListProps) {
   const { taxonomy } = useHouseholdData();
+  const expiryIgnoredSet = buildExpiryIgnoredSet(taxonomy.entries);
   // Default sort is now "name" (predictable). Items needing attention
   // surface in the Use Soon and Running Low strips at the top.
   const [sort, setSort] = useState<SortKey>("name");
@@ -687,7 +689,9 @@ export default function PantryList({
   // already in the Running Low strip (user's explicit signal wins).
   const useSoonItems = kind === "food"
     ? kindFiltered
-        .filter((i) => isUseSoon(i.expires_at) && !runningLowIds.has(i.id))
+        // Items marked as outliving their date (032) never join the strip.
+        .filter((i) => isUseSoon(i.expires_at) && !runningLowIds.has(i.id)
+          && !isExpiryIgnored(i.name, expiryIgnoredSet))
         // Most urgent first
         .sort((a, b) => (a.expires_at ?? "").localeCompare(b.expires_at ?? ""))
     : [];

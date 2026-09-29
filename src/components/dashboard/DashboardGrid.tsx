@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useHouseholdData } from "@/context/HouseholdDataContext";
+import { buildExpiryIgnoredSet, isExpiryIgnored } from "@/lib/expiryIgnore";
 import type { PantryItem } from "@/types/database";
 
 /**
@@ -17,9 +18,12 @@ function daysUntil(expiresAt: string): number {
   return Math.round((expiry.getTime() - today.getTime()) / 86_400_000);
 }
 
-function isUseSoon(item: PantryItem): boolean {
+function isUseSoon(item: PantryItem, ignored: Set<string>): boolean {
   if ((item.kind ?? "food") !== "food") return false;
   if (!item.expires_at) return false;
+  // Marked as outliving its date (migration 032) — the whole point is to stop
+  // being told about it.
+  if (isExpiryIgnored(item.name, ignored)) return false;
   return daysUntil(item.expires_at) <= 7;
 }
 
@@ -76,11 +80,12 @@ function EmptyHint({ text }: { text: string }) {
 }
 
 export default function DashboardGrid({ householdId }: { householdId: string }) {
-  const { pantry, shopping } = useHouseholdData();
+  const { pantry, shopping, taxonomy } = useHouseholdData();
   const items = pantry.items ?? [];
+  const expiryIgnored = buildExpiryIgnoredSet(taxonomy.entries);
 
   const useSoon = items
-    .filter(isUseSoon)
+    .filter((i) => isUseSoon(i, expiryIgnored))
     .sort((a, b) => daysUntil(a.expires_at!) - daysUntil(b.expires_at!));
   const runningLow = items.filter((i) => i.running_low && !i.running_low_dismissed);
   const foodCount = items.filter((i) => (i.kind ?? "food") === "food").length;

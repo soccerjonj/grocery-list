@@ -13,6 +13,9 @@ import { useHouseholdData } from "@/context/HouseholdDataContext";
 import AmountField from "@/components/ui/AmountField";
 import AttributeTile from "./AttributeTile";
 import FreshnessRing from "./FreshnessRing";
+import {
+  EXPIRY_IGNORED_TYPE, EXPIRY_IGNORED_KIND, buildExpiryIgnoredSet, isExpiryIgnored,
+} from "@/lib/expiryIgnore";
 
 type AttrKey = "expires" | "storage" | "category" | "assigned" | "note";
 
@@ -41,6 +44,12 @@ export interface PantryDetailFieldsProps {
   currentUserId: string | null;
   /** Add flow only: suggested shelf-life offset for a one-tap expiry chip. */
   suggestedExpiryDays?: number | null;
+  /**
+   * Item name, used to offer "it's still good" on the expiry editor. Omitted
+   * by the add flow: you can't have been nagged yet about an item that
+   * doesn't exist.
+   */
+  itemName?: string;
 }
 
 const LABEL = "text-xs font-medium text-gray-400 dark:text-gray-500";
@@ -145,7 +154,15 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
   }, [p.notes, openAttr]);
 
   // ── Tile value displays ────────────────────────────────────────────
-  const exp = getExpiryDisplay(p.expiresAt);
+  // Ignoring is stored per NAME, so it already covers the next jar you buy.
+  const expiryIgnored = isExpiryIgnored(p.itemName, buildExpiryIgnoredSet(taxonomy.entries));
+  const exp = getExpiryDisplay(p.expiresAt, expiryIgnored);
+
+  function toggleExpiryIgnored() {
+    if (!p.itemName) return;
+    if (expiryIgnored) taxonomy.remove(EXPIRY_IGNORED_TYPE, EXPIRY_IGNORED_KIND, p.itemName);
+    else taxonomy.add(EXPIRY_IGNORED_TYPE, EXPIRY_IGNORED_KIND, p.itemName);
+  }
   const storageLabel = labelFor(locationOptions, p.storageLocation);
   const zoneLabel = !isSupplies && p.storageLocation === "fridge"
     ? labelFor(FRIDGE_ZONES, p.fridgeZone) : null;
@@ -185,7 +202,7 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
             icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
             value={
               <div className="flex items-center gap-2.5">
-                <FreshnessRing expiresAt={p.expiresAt} />
+                <FreshnessRing expiresAt={p.expiresAt} ignored={expiryIgnored} />
                 <span className={`text-sm font-medium ${p.expiresAt ? exp.textClass : "text-gray-400 dark:text-gray-500"}`}>
                   {p.expiresAt ? exp.label : "No date"}
                 </span>
@@ -286,6 +303,23 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
                         className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-[0.94] transition-colors">{pr.label}</button>
                     ))}
                   </div>
+
+                  {/* Plenty of food outlives its printed date. Remembered by
+                      name, so the next jar is quiet too. */}
+                  {p.itemName && (
+                    <button
+                      type="button"
+                      onClick={toggleExpiryIgnored}
+                      className="w-full py-2.5 px-3 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 text-sm font-medium active:scale-[0.98] transition-transform flex flex-col items-center gap-0.5"
+                    >
+                      <span>{expiryIgnored ? "Warn me about this date again" : "It’s still good — ignore this date"}</span>
+                      <span className="text-[11px] font-normal leading-snug text-gray-500 dark:text-gray-400 text-center">
+                        {expiryIgnored
+                          ? `“${p.itemName}” will count as expiring again`
+                          : `Never flags “${p.itemName}” as expiring — now or next time you buy it`}
+                      </span>
+                    </button>
+                  )}
                 </>
               )}
 

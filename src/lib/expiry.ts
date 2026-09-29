@@ -17,6 +17,8 @@ export interface ExpiryDisplay {
   textClass: string;
   /** Whole days until expiry (negative = past). null when no date set. */
   daysLeft: number | null;
+  /** The household marked this item as outliving its date (migration 032). */
+  ignored: boolean;
   /** 0..1 remaining-life for the ring, over a ~90-day actionable window. */
   fraction: number;
 }
@@ -32,9 +34,15 @@ const TONE_TEXT: Record<ExpiryTone, string> = {
 /** Full ring at 90 days out; depletes as the date approaches. */
 const RING_WINDOW_DAYS = 90;
 
-export function getExpiryDisplay(expiresAt: string | null): ExpiryDisplay {
+/**
+ * @param ignored The household said this item outlives its date. Forces the
+ *   calm gray tone everywhere at once — badge, sheet meta and ring all read
+ *   from here — while still reporting the real `daysLeft` so callers that
+ *   want the date itself can show it.
+ */
+export function getExpiryDisplay(expiresAt: string | null, ignored = false): ExpiryDisplay {
   if (!expiresAt) {
-    return { label: "", detail: "", tone: "none", textClass: TONE_TEXT.none, daysLeft: null, fraction: 0 };
+    return { label: "", detail: "", tone: "none", textClass: TONE_TEXT.none, daysLeft: null, fraction: 0, ignored: false };
   }
 
   const today = new Date();
@@ -44,8 +52,15 @@ export function getExpiryDisplay(expiresAt: string | null): ExpiryDisplay {
   const fraction = diff <= 0 ? 0 : Math.min(diff / RING_WINDOW_DAYS, 1);
 
   const make = (label: string, detail: string, tone: ExpiryTone): ExpiryDisplay => ({
-    label, detail, tone, textClass: TONE_TEXT[tone], daysLeft: diff, fraction,
+    label, detail, tone, textClass: TONE_TEXT[tone], daysLeft: diff, fraction, ignored,
   });
+
+  // Keep showing the date — it's still true and occasionally useful — but stop
+  // scoring it. Returning early means no red/amber branch below can fire.
+  if (ignored) {
+    const formatted = expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return make(formatted, `Date ignored (was ${formatted})`, "gray");
+  }
 
   if (diff < 0)
     return make(diff === -1 ? "Yesterday" : `${Math.abs(diff)}d ago`, diff === -1 ? "Expired yesterday" : `Expired ${Math.abs(diff)} days ago`, "red");

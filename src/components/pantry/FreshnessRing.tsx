@@ -13,11 +13,14 @@ import { getExpiryDisplay } from "@/lib/expiry";
 export default function FreshnessRing({
   expiresAt,
   size = 46,
+  ignored = false,
 }: {
   expiresAt: string | null;
   size?: number;
+  /** Expiry ignored: full calm ring with a check, never a days-left count. */
+  ignored?: boolean;
 }) {
-  const d = getExpiryDisplay(expiresAt);
+  const d = getExpiryDisplay(expiresAt, ignored);
   const stroke = 4;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
@@ -44,7 +47,7 @@ export default function FreshnessRing({
       <div className="absolute inset-0 flex items-center justify-center">
         {d.tone === "none" ? (
           <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">Set</span>
-        ) : d.daysLeft !== null && d.daysLeft > 90 ? (
+        ) : d.ignored || (d.daysLeft !== null && d.daysLeft > 90) ? (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>

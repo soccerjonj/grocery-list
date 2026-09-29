@@ -7,6 +7,8 @@ import type { PantryItem as PantryItemType } from "@/types/database";
 import type { MemberProfile } from "@/hooks/useHouseholdMembers";
 import { DEFAULT_COLOR, hexAlpha } from "@/lib/memberColors";
 import { getExpiryDisplay } from "@/lib/expiry";
+import { buildExpiryIgnoredSet, isExpiryIgnored } from "@/lib/expiryIgnore";
+import { useHouseholdData } from "@/context/HouseholdDataContext";
 import AddToListModal from "./AddToListModal";
 import ItemSheet, { ItemSheetHeader } from "@/components/ui/ItemSheet";
 import PantryDetailFields from "./PantryDetailFields";
@@ -59,8 +61,8 @@ interface PantryItemProps {
  * expiry ladder (`getExpiryDisplay`) so the badge, header meta, and the
  * freshness ring can't drift. Returns null when no date is set.
  */
-function getExpiryBadge(expiresAt: string | null) {
-  const d = getExpiryDisplay(expiresAt);
+function getExpiryBadge(expiresAt: string | null, ignored = false) {
+  const d = getExpiryDisplay(expiresAt, ignored);
   if (d.tone === "none") return null;
   return { label: d.label, text: d.textClass, detail: d.detail };
 }
@@ -96,6 +98,7 @@ export default function PantryItem({
   sheetVariant = "sheet",
   renderSheet = true,
 }: PantryItemProps) {
+  const { taxonomy } = useHouseholdData();
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(item.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -189,7 +192,8 @@ export default function PantryItem({
   // Body scroll lock is now handled inside <ItemSheet/>.
 
   const isSupplies = (item.kind ?? "food") === "supplies";
-  const expiry = isSupplies ? null : getExpiryBadge(item.expires_at);
+  const expiryIgnored = isExpiryIgnored(item.name, buildExpiryIgnoredSet(taxonomy.entries));
+  const expiry = isSupplies ? null : getExpiryBadge(item.expires_at, expiryIgnored);
   const assignedMembers = getAssignedMembers(item.assigned_to, members);
   const qtyDisplay = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(1);
 
@@ -341,6 +345,7 @@ export default function PantryItem({
       }
     >
       <PantryDetailFields
+        itemName={item.name}
         kind={item.kind ?? "food"}
         quantity={item.quantity}
         unit={item.unit}
