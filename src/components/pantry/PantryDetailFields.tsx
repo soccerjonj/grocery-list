@@ -158,6 +158,13 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
   const expiryIgnored = isExpiryIgnored(p.itemName, buildExpiryIgnoredSet(taxonomy.entries));
   const exp = getExpiryDisplay(p.expiresAt, expiryIgnored);
 
+  // Only for something genuinely overdue. A date that passed yesterday is
+  // probably just true, and suggesting you dismiss it would be bad advice.
+  const IGNORE_NUDGE_AFTER_DAYS = 14;
+  const showIgnoreNudge =
+    !!p.itemName && !isSupplies && !!p.expiresAt && !expiryIgnored &&
+    exp.daysLeft !== null && exp.daysLeft <= -IGNORE_NUDGE_AFTER_DAYS;
+
   function toggleExpiryIgnored() {
     if (!p.itemName) return;
     if (expiryIgnored) taxonomy.remove(EXPIRY_IGNORED_TYPE, EXPIRY_IGNORED_KIND, p.itemName);
@@ -193,6 +200,26 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
           onUnderflow={p.onUnderflow}
         />
       </div>
+
+      {/* Discovery for "ignore this date" — the control itself lives inside the
+          Expires editor, which nobody opens looking for it. One tap here does
+          the whole thing. */}
+      {showIgnoreNudge && (
+        <button
+          type="button"
+          onClick={toggleExpiryIgnored}
+          className="flex items-start gap-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 px-3.5 py-2.5 text-left active:scale-[0.99] transition-transform"
+        >
+          <svg className="w-4 h-4 flex-shrink-0 mt-px text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="flex-1 text-xs leading-snug text-blue-800 dark:text-blue-200">
+            Past its date but still fine?{" "}
+            <span className="font-semibold underline">Ignore this date</span>{" "}
+            and {p.itemName} won’t be flagged as expiring again — including next time you buy it.
+          </span>
+        </button>
+      )}
 
       {/* Attribute tile grid */}
       <div className="grid grid-cols-2 gap-2">
@@ -312,7 +339,7 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
                       onClick={toggleExpiryIgnored}
                       className="w-full py-2.5 px-3 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 text-sm font-medium active:scale-[0.98] transition-transform flex flex-col items-center gap-0.5"
                     >
-                      <span>{expiryIgnored ? "Warn me about this date again" : "It’s still good — ignore this date"}</span>
+                      <span>{expiryIgnored ? "Watch this date again" : "Ignore this date"}</span>
                       <span className="text-[11px] font-normal leading-snug text-gray-500 dark:text-gray-400 text-center">
                         {expiryIgnored
                           ? `“${p.itemName}” will count as expiring again`
