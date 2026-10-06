@@ -286,7 +286,12 @@ export default function PantryDetailFields(p: PantryDetailFieldsProps) {
           icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
           value={
             p.notes?.trim()
-              ? <span className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 leading-snug">{p.notes}</span>
+              // Shown in full, not clamped: notes are capped at 150 chars, so
+              // the tile grows by a line or two at most, and clamping meant the
+              // only way to READ a note was to open the editor and risk
+              // changing it. pre-wrap keeps the line breaks as typed, and
+              // break-words stops a long unbroken string overflowing the tile.
+              ? <span className="text-sm text-gray-700 dark:text-gray-300 leading-snug whitespace-pre-wrap break-words">{p.notes}</span>
               : <span className={muted}>Add a note</span>
           }
         />
