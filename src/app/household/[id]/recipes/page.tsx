@@ -26,10 +26,22 @@ export default function RecipesPage() {
 
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  /** null = All; "" = the Unfiled pseudo-folder. */
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [cookableOnly, setCookableOnly] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const tags = taxonomy.listFor("recipe_tag", "recipe");
+  const folders = taxonomy.listFor("recipe_folder", "recipe");
+  // A recipe can carry a folder whose vocabulary row was deleted; show those
+  // too so nothing becomes unreachable (tags have the same property).
+  const usedFolders = useMemo(() => {
+    const extra = recipes
+      .map((r) => r.folder)
+      .filter((f): f is string => !!f && !folders.includes(f));
+    return [...folders, ...new Set(extra)];
+  }, [recipes, folders]);
+  const hasUnfiled = recipes.some((r) => !r.folder);
 
   // Search matches the recipe name AND its ingredients, so "chicken" finds
   // recipes that use chicken even when it isn't in the title.
@@ -37,6 +49,10 @@ export default function RecipesPage() {
     const q = query.trim().toLowerCase();
     const qKey = normalizeItemName(query);
     return recipes.filter((r) => {
+      if (activeFolder !== null) {
+        if (activeFolder === "") { if (r.folder) return false; }
+        else if (r.folder !== activeFolder) return false;
+      }
       if (activeTag && !(r.tags ?? []).includes(activeTag)) return false;
       if (!q) return true;
       if (r.name.toLowerCase().includes(q)) return true;
@@ -44,7 +60,7 @@ export default function RecipesPage() {
         (i) => i.name.toLowerCase().includes(q) || normalizeItemName(i.name) === qKey,
       );
     });
-  }, [recipes, query, activeTag]);
+  }, [recipes, query, activeTag, activeFolder]);
 
   /**
    * "What can I cook?" — score every recipe against the pantry and sort by how
@@ -196,6 +212,40 @@ export default function RecipesPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </button>
+      )}
+
+      {/* ── Folder row ─────────────────────────────────────────
+          Where a recipe lives (one each), above the tag row, which is what a
+          recipe is like (several each). The two compose. */}
+      {usedFolders.length > 0 && (
+        <div className="flex gap-1.5 mb-2.5 overflow-x-auto pb-0.5 -mx-1 px-1">
+          {[
+            { key: null as string | null, label: "All" },
+            ...usedFolders.map((f) => ({ key: f as string | null, label: f })),
+            ...(hasUnfiled ? [{ key: "" as string | null, label: "Unfiled" }] : []),
+          ].map(({ key, label }) => {
+            const on = activeFolder === key;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setActiveFolder(key)}
+                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors active:scale-[0.96] ${
+                  on
+                    ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                    : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {key !== null && key !== "" && (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                  </svg>
+                )}
+                {label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* ── Tag filter ─────────────────────────────────────── */}

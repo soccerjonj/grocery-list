@@ -44,11 +44,14 @@ export default function RecipeEditor({
   const [prep, setPrep] = useState(recipe.prep_minutes ? String(recipe.prep_minutes) : "");
   const [cook, setCook] = useState(recipe.cook_minutes ? String(recipe.cook_minutes) : "");
   const [tags, setTags] = useState<string[]>(recipe.tags ?? []);
+  const [folder, setFolder] = useState<string | null>(recipe.folder ?? null);
   const [ings, setIngs] = useState<RecipeIngredient[]>(() => recipeIngredientList(recipe));
   const [steps, setSteps] = useState<RecipeStep[]>(() => recipeStepList(recipe));
   const [busy, setBusy] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [addingTag, setAddingTag] = useState(false);
+  const [newFolder, setNewFolder] = useState("");
+  const [addingFolder, setAddingFolder] = useState(false);
 
   // Photo. `imagePath` is set only for images WE host, so replacing one can
   // clean up the old object while a remote hero URL is just forgotten.
@@ -59,6 +62,7 @@ export default function RecipeEditor({
   const photoRef = useRef<HTMLInputElement>(null);
 
   const knownTags = taxonomy.listFor("recipe_tag", "recipe");
+  const knownFolders = taxonomy.listFor("recipe_folder", "recipe");
 
   async function handlePhoto(file: File) {
     setUploading(true);
@@ -110,6 +114,7 @@ export default function RecipeEditor({
         prepMinutes: numOrNull(prep),
         cookMinutes: numOrNull(cook),
         tags,
+        folder,
         // `raw` is what the importer preserved for verification; keep it in
         // sync with hand-edits so it never contradicts the visible name.
         ingredients: ings
@@ -131,6 +136,18 @@ export default function RecipeEditor({
     const saved = await taxonomy.add("recipe_tag", "recipe", label);
     const final = saved ?? label;
     setTags((prev) => (prev.includes(final) ? prev : [...prev, final]));
+  }
+
+  async function commitNewFolder() {
+    const label = newFolder.trim();
+    setNewFolder("");
+    setAddingFolder(false);
+    if (!label) return;
+    // taxonomy.add is case-insensitively idempotent and returns the canonical
+    // label, so selecting it by the returned value keeps "Baking" and "baking"
+    // from becoming two folders.
+    const saved = await taxonomy.add("recipe_folder", "recipe", label);
+    setFolder(saved ?? label);
   }
 
   return (
@@ -227,6 +244,50 @@ export default function RecipeEditor({
           <label className={LABEL} htmlFor="r-cook">Cook (min)</label>
           <input id="r-cook" className={FIELD} inputMode="numeric" placeholder="30"
             value={cook} onChange={(e) => setCook(e.target.value)} />
+        </div>
+      </div>
+
+      {/* Folder — single-select, unlike Tags. Tapping the active one unfiles. */}
+      <div className="flex flex-col gap-2">
+        <span className={LABEL}>Folder</span>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {knownFolders.map((f) => {
+            const on = folder === f;
+            return (
+              <button
+                key={f} type="button"
+                onClick={() => setFolder(on ? null : f)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors active:scale-[0.94] ${
+                  on
+                    ? "bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                    : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                }`}
+              >{f}</button>
+            );
+          })}
+          {addingFolder ? (
+            <input
+              autoFocus value={newFolder}
+              onChange={(e) => setNewFolder(e.target.value.slice(0, 24))}
+              onBlur={commitNewFolder}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); commitNewFolder(); }
+                if (e.key === "Escape") { setNewFolder(""); setAddingFolder(false); }
+              }}
+              placeholder="New folder…"
+              className="w-28 px-2.5 py-1 rounded-full text-xs bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-600 text-gray-900 dark:text-gray-100 outline-none focus:border-gray-500"
+            />
+          ) : (
+            <button
+              type="button" onClick={() => setAddingFolder(true)}
+              className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-gray-300 dark:border-zinc-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 active:scale-[0.94] transition-colors"
+            >+ New</button>
+          )}
+          {knownFolders.length === 0 && !addingFolder && (
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+              No folders yet
+            </span>
+          )}
         </div>
       </div>
 

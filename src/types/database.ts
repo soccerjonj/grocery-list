@@ -254,6 +254,8 @@ export interface Database {
           notes: string | null;
           description: string | null;
           tags: string[];
+          /** Home folder for the library view; null = unfiled (033). */
+          folder: string | null;
           last_cooked_at: string | null;
           cook_count: number;
           source_url: string | null;
@@ -277,6 +279,7 @@ export interface Database {
           notes?: string | null;
           description?: string | null;
           tags?: string[];
+          folder?: string | null;
           last_cooked_at?: string | null;
           cook_count?: number;
           source_url?: string | null;
@@ -300,6 +303,7 @@ export interface Database {
           notes?: string | null;
           description?: string | null;
           tags?: string[];
+          folder?: string | null;
           last_cooked_at?: string | null;
           cook_count?: number;
           source_url?: string | null;
@@ -384,7 +388,7 @@ export interface Database {
         Row: {
           id: string;
           household_id: string;
-          type: string; // 'category' | 'location' | 'recipe_tag' | 'staple' | 'ingredient_alias' | 'recipe_part' | 'expiry_ignored'
+          type: string; // 'category' | 'location' | 'recipe_tag' | 'staple' | 'ingredient_alias' | 'recipe_part' | 'expiry_ignored' | 'recipe_folder'
           kind: string; // 'food' | 'supplies' | 'recipe' | 'ingredient'
           label: string;
           /** Only for ingredient_alias: the pantry item name this points at. */

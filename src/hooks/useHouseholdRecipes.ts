@@ -35,6 +35,8 @@ export interface RecipeInput {
   notes?: string | null;
   description?: string | null;
   tags?: string[];
+  /** Home folder for the library view; null = unfiled (migration 033). */
+  folder?: string | null;
   sourceUrl?: string | null;
   sourceKind?: "url" | "photo" | "manual" | "text";
 }
@@ -129,6 +131,7 @@ export function useHouseholdRecipes(householdId: string) {
         notes: input.notes ?? null,
         description: input.description ?? null,
         tags: input.tags ?? [],
+      folder: input.folder ?? null,
         // Only persist safe http(s) URLs — never a javascript:/data: URI that
         // would execute when rendered as a "View source" link.
         source_url: safeHttpUrl(input.sourceUrl) ?? null,
@@ -166,6 +169,7 @@ export function useHouseholdRecipes(householdId: string) {
       notes: patch.notes !== undefined ? patch.notes : snapshot.notes,
       description: patch.description !== undefined ? patch.description : snapshot.description,
       tags: patch.tags !== undefined ? patch.tags : snapshot.tags,
+      folder: patch.folder !== undefined ? patch.folder : snapshot.folder,
       source_url: patch.sourceUrl !== undefined ? (safeHttpUrl(patch.sourceUrl) ?? null) : snapshot.source_url,
       updated_at: new Date().toISOString(),
     };
@@ -184,6 +188,7 @@ export function useHouseholdRecipes(householdId: string) {
     if (patch.notes !== undefined)        updates.notes = patch.notes;
     if (patch.description !== undefined)  updates.description = patch.description;
     if (patch.tags !== undefined)         updates.tags = patch.tags;
+    if (patch.folder !== undefined)       updates.folder = patch.folder;
     if (patch.sourceUrl !== undefined)   updates.source_url = safeHttpUrl(patch.sourceUrl) ?? null;
 
     const { error } = await supabase

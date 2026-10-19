@@ -39,6 +39,7 @@ export function syntheticRecipe(
     notes: input.notes ?? null,
     description: input.description ?? null,
     tags: input.tags ?? [],
+    folder: input.folder ?? null,
     last_cooked_at: null,
     cook_count: 0,
     source_url: input.sourceUrl ?? null,

@@ -20,7 +20,7 @@ import type { HouseholdTaxonomy } from "@/types/database";
 export type TaxonomyType =
   | "category" | "location" | "recipe_tag"
   | "staple" | "ingredient_alias" | "recipe_part"
-  | "expiry_ignored";
+  | "expiry_ignored" | "recipe_folder";
 
 export function useHouseholdTaxonomy(householdId: string) {
   const [entries, setEntries] = useState<HouseholdTaxonomy[]>([]);
