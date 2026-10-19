@@ -59,11 +59,17 @@ interface ImageBody {
 interface TextBody {
   type: "text";
   text: string;
+  /** Opt-in: the paste holds several recipes, reply with a `recipes` array. */
+  multiple?: boolean;
 }
 type Body = UrlBody | ImageBody | TextBody;
 
 /** Paste mode cap — generous for a recipe, small enough to bound token cost. */
 const MAX_PASTE_LEN = 12000;
+/** Multi-recipe paste holds several at once, so it gets more room. */
+const MAX_MULTI_PASTE_LEN = 40000;
+/** Hard ceiling on how many recipes one paste may yield. */
+const MAX_RECIPES_PER_PASTE = 10;
 
 /**
  * Phase 4 rewrite. This prompt used to say "skip section headings and
@@ -108,6 +114,24 @@ Step rules:
 Metadata rules:
 - "title", "servings", "prepMinutes", "cookMinutes" are all optional — omit any the source doesn't state. Never guess times or yields.
 - "servings" is a plain number of servings.`;
+
+/**
+ * Multi-recipe mode. Deliberately conservative about splitting: merging two
+ * recipes' ingredients produces a plausible-looking wrong recipe, which is far
+ * worse than asking the user to paste twice. So the model is told to return one
+ * recipe when the boundary is unclear, and the UI confirms the split before
+ * anything is saved.
+ */
+const MULTI_SUFFIX = `
+
+MULTIPLE RECIPES:
+This paste may contain more than one recipe. Reply with ONLY a JSON object of the form:
+{ "recipes": [ { ...recipe object as described above... }, ... ] }
+- Split ONLY at an unmistakable boundary: a new title followed by its own ingredient list.
+- A section heading inside one recipe ("For the sauce") is NOT a new recipe — it is a "group".
+- If you are not confident the text holds separate recipes, return exactly one recipe in the array.
+- Each recipe needs its own title. Never let one recipe's ingredients or steps leak into another.
+- Return at most ${MAX_RECIPES_PER_PASTE} recipes.`;
 
 const MAX_HTML_LEN = 18000;
 
@@ -217,6 +241,35 @@ function coercePayload(parsed: LlmPayload | null): ExtractResult {
     imageUrl: null,
     description: null,
   };
+}
+
+/**
+ * Extract several recipes from one pasted blob. Reuses coercePayload per
+ * recipe, so the ingredient/step/metadata rules are identical to single mode.
+ */
+async function llmExtractMany(text: string): Promise<ExtractResult[]> {
+  const anthropic = getAnthropic();
+  const resp = await anthropic.messages.create({
+    model: MODEL_HAIKU,
+    // Several recipes of steps: 4000 would truncate and silently drop the tail
+    // of the last one, which is exactly the bug the single path already hit.
+    max_tokens: 16000,
+    system: [{ type: "text", text: SYSTEM_PROMPT + MULTI_SUFFIX, cache_control: { type: "ephemeral" } }],
+    messages: [{
+      role: "user",
+      content: `Here is recipe text a user pasted. It may contain several recipes. Extract them into the schema described:\n\n${text}`,
+    }],
+  });
+  const textBlock = resp.content.find((c) => c.type === "text");
+  const responseText = textBlock && "text" in textBlock ? textBlock.text : "";
+  const parsed = extractJson<{ recipes?: LlmPayload[] }>(responseText);
+  const raw = Array.isArray(parsed?.recipes) ? parsed.recipes : [];
+  return raw
+    .slice(0, MAX_RECIPES_PER_PASTE)
+    .map((r) => coercePayload(r))
+    // A recipe with no ingredients is a bad split or a stray heading, not a
+    // recipe — dropping it here keeps it out of the confirmation list.
+    .filter((r) => r.items.length > 0);
 }
 
 type TextSource = "json-ld-list" | "html" | "paste";
@@ -359,6 +412,13 @@ export async function POST(req: Request) {
       const text = typeof body.text === "string" ? body.text.trim() : "";
       if (text.length < 20) {
         return NextResponse.json({ error: "Paste a bit more recipe text" }, { status: 400 });
+      }
+      if (body.multiple) {
+        const many = await llmExtractMany(text.slice(0, MAX_MULTI_PASTE_LEN));
+        if (many.length === 0) {
+          return NextResponse.json({ error: "We couldn't find a recipe in that text" }, { status: 422 });
+        }
+        return NextResponse.json({ recipes: many, source: "paste" });
       }
       const result = await llmExtractFromText(text.slice(0, MAX_PASTE_LEN), "paste");
       if (result.items.length === 0) {

@@ -20,7 +20,7 @@ export default function RecipesPage() {
   const { householdId, householdName } = useHouseholdContext();
   const { recipes: recipesData, taxonomy } = useHouseholdData();
   const { recipes, loading, loadError, saveRecipe } = recipesData;
-  const { error: toastError } = useToast();
+  const { success, error: toastError } = useToast();
   const { availabilityFor } = useRecipeAvailability();
   const router = useRouter();
 
@@ -89,6 +89,26 @@ export default function RecipesPage() {
     } catch (e) {
       toastError(getErrorMessage(e));
     }
+  }
+
+  /**
+   * Batch paste. Unlike handleCreate this does NOT navigate — picking one of
+   * several to land on would be arbitrary — and it returns how many saved so
+   * the sheet can report a partial failure honestly rather than claiming all.
+   */
+  async function handleCreateMany(inputs: RecipeInput[]): Promise<number> {
+    let saved = 0;
+    for (const input of inputs) {
+      try {
+        const id = await saveRecipe(input);
+        if (id) saved++;
+      } catch { /* reported via the returned count */ }
+    }
+    if (saved > 0) {
+      setCreating(false);
+      success(`Saved ${saved} recipe${saved === 1 ? "" : "s"}`);
+    }
+    return saved;
   }
 
   return (
@@ -268,6 +288,7 @@ export default function RecipesPage() {
         open={creating}
         onClose={() => setCreating(false)}
         onCreate={handleCreate}
+        onCreateMany={handleCreateMany}
       />
     </div>
   );

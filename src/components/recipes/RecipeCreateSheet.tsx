@@ -29,10 +29,18 @@ export default function RecipeCreateSheet({
   open,
   onClose,
   onCreate,
+  onCreateMany,
 }: {
   open: boolean;
   onClose: () => void;
   onCreate: (input: RecipeInput) => Promise<void> | void;
+  /**
+   * Save several at once, resolving with how many actually saved. Separate
+   * from onCreate because that one closes this sheet and navigates to the new
+   * recipe — looping it would unmount us mid-save, and navigating to one of
+   * five is arbitrary anyway. Multi-paste is offered only when this is given.
+   */
+  onCreateMany?: (inputs: RecipeInput[]) => Promise<number>;
 }) {
   const [mode, setMode] = useState<Mode>("blank");
   const [name, setName] = useState("");
@@ -42,18 +50,43 @@ export default function RecipeCreateSheet({
   // Saving is this component's own busy state; extracting is the hook's.
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [multi, setMulti] = useState(false);
+  /** Multi mode: which detected recipes to actually save. */
+  const [picked, setPicked] = useState<Set<number>>(new Set());
   const {
-    busy: extracting, error, result, setResult, setError, reset,
-    extractUrl, extractPaste, extractPhoto,
+    busy: extracting, error, result, results, setResult, setError, reset,
+    extractUrl, extractPaste, extractPhoto, extractMany,
   } = useRecipeExtract();
   const busy = extracting || saving;
+
+  // Default to saving everything that was found.
+  useEffect(() => {
+    if (results) setPicked(new Set(results.map((_, i) => i)));
+  }, [results]);
 
   useEffect(() => {
     if (!open) {
       setMode("blank"); setName(""); setUrl(""); setPaste("");
-      setPhoto(null); setSaving(false); reset();
+      setPhoto(null); setSaving(false); setMulti(false); setPicked(new Set());
+      reset();
     }
   }, [open, reset]);
+
+  async function saveMany() {
+    if (!results || busy || !onCreateMany) return;
+    const chosen = results.filter((_, i) => picked.has(i));
+    if (chosen.length === 0) return;
+    setSaving(true);
+    try {
+      const saved = await onCreateMany(chosen);
+      // A partial failure must not read as success.
+      if (saved < chosen.length) {
+        setError(`Saved ${saved} of ${chosen.length}. Try the rest again.`);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function save(input: RecipeInput) {
     if (busy) return;
@@ -80,7 +113,65 @@ export default function RecipeCreateSheet({
       header={<ItemSheetHeader title={result ? "Check this over" : "New recipe"} onClose={onClose} />}
     >
       <AnimatePresence mode="wait" initial={false}>
-        {result ? (
+        {results ? (
+          /* ── Multi-paste confirmation ─────────────────────────── */
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="flex flex-col gap-3"
+          >
+            <p className="text-sm text-gray-700 dark:text-gray-200">
+              Found <span className="font-semibold">{results.length}</span> recipes.
+              Untick anything that isn&apos;t right.
+            </p>
+
+            <ul className="flex flex-col divide-y divide-gray-50 dark:divide-zinc-800 rounded-2xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5">
+              {results.map((r, i) => (
+                <li key={`${r.name}-${i}`}>
+                  <label className="flex items-start gap-3 py-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={picked.has(i)}
+                      onChange={() => setPicked((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i); else next.add(i);
+                        return next;
+                      })}
+                      className="mt-0.5 w-4 h-4 rounded accent-gray-900 dark:accent-zinc-100 flex-shrink-0"
+                    />
+                    <span className="flex-1 min-w-0 flex flex-col">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-50">{r.name}</span>
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {r.ingredients.length} ingredient{r.ingredients.length === 1 ? "" : "s"}
+                        {r.steps && r.steps.length > 0
+                          ? ` · ${r.steps.length} step${r.steps.length === 1 ? "" : "s"}`
+                          : " · no steps found"}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+
+            {error && <p className="text-xs text-red-500" role="alert">{error}</p>}
+
+            <button
+              type="button"
+              onClick={saveMany}
+              disabled={busy || picked.size === 0}
+              className="w-full py-3 rounded-2xl bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium disabled:opacity-40 active:scale-[0.98] transition-all"
+            >
+              {saving ? "Saving…" : `Save ${picked.size} recipe${picked.size === 1 ? "" : "s"}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => reset()}
+              className="text-xs text-gray-400 dark:text-gray-500 py-1 self-center"
+            >
+              Start over
+            </button>
+          </motion.div>
+        ) : result ? (
           /* ── Confirmation ─────────────────────────────────────── */
           <motion.div
             key="result"
@@ -243,6 +334,26 @@ export default function RecipeCreateSheet({
                 <p className="text-[11px] text-gray-400 dark:text-gray-500">
                   Ingredients and steps are picked out automatically.
                 </p>
+                {/* Opt-in rather than automatic: guessing that one recipe is
+                    two merges their ingredients, which is worse than a tap. */}
+                {onCreateMany && (
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={multi}
+                    onChange={(e) => setMulti(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded accent-gray-900 dark:accent-zinc-100 flex-shrink-0"
+                  />
+                  <span className="flex flex-col">
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                      This contains more than one recipe
+                    </span>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-snug">
+                      You&apos;ll see what was found and choose before anything saves
+                    </span>
+                  </span>
+                </label>
+                )}
               </div>
             )}
 
@@ -251,7 +362,7 @@ export default function RecipeCreateSheet({
                 type="button"
                 onClick={() => {
                   if (mode === "url") return extractUrl(url);
-                  if (mode === "paste") return extractPaste(paste);
+                  if (mode === "paste") return multi ? extractMany(paste) : extractPaste(paste);
                   return photo && extractPhoto(photo);
                 }}
                 disabled={!canExtract || busy}

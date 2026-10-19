@@ -35,6 +35,8 @@ export interface ExtractResponse {
   description?: string;
   source?: string;
   error?: string;
+  /** Multi-paste mode only: one entry per detected recipe. */
+  recipes?: ExtractResponse[];
 }
 
 export function fileToBase64(file: File): Promise<string> {
@@ -75,11 +77,14 @@ export function useRecipeExtract() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RecipeInput | null>(null);
+  /** Multi-paste: several candidates awaiting confirmation. */
+  const [results, setResults] = useState<RecipeInput[] | null>(null);
 
   const reset = useCallback(() => {
     setBusy(false);
     setError(null);
     setResult(null);
+    setResults(null);
   }, []);
 
   const run = useCallback(async (
@@ -115,6 +120,35 @@ export function useRecipeExtract() {
     [run],
   );
 
+  /**
+   * Several recipes from one paste. Nothing is saved here — the caller shows
+   * the detected split for confirmation first, so a bad split costs a tap.
+   */
+  const extractMany = useCallback(async (text: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/extract-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "text", text: text.trim(), multiple: true }),
+      });
+      const data = (await res.json()) as ExtractResponse;
+      if (!res.ok) throw new Error(data.error || "Couldn't read those recipes");
+      const list = (data.recipes ?? []).map((r) => toRecipeInput(r, "text"));
+      if (list.length === 0) throw new Error("We couldn't find a recipe in that text");
+      // One recipe back from multi mode is the model declining to split, which
+      // is the designed conservative answer — treat it as a normal single
+      // result so the user gets the plain confirmation screen.
+      if (list.length === 1) setResult(list[0]);
+      else setResults(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't read those recipes");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const extractPhoto = useCallback(async (photo: File) => {
     if (photo.size > MAX_PHOTO_BYTES) {
       setError("That photo is too large (max ~5 MB).");
@@ -132,8 +166,8 @@ export function useRecipeExtract() {
   }, [run]);
 
   return {
-    busy, error, result,
-    setResult, setError, reset,
-    extractUrl, extractPaste, extractPhoto,
+    busy, error, result, results,
+    setResult, setResults, setError, reset,
+    extractUrl, extractPaste, extractPhoto, extractMany,
   };
 }
