@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ItemSheet, { ItemSheetHeader } from "@/components/ui/ItemSheet";
 import type { RecipeInput } from "@/hooks/useHouseholdRecipes";
-import type { RecipeIngredient, RecipeStep } from "@/lib/recipeTypes";
+import {
+  useRecipeExtract, ACCEPTED_MEDIA, MAX_PHOTO_BYTES,
+} from "@/hooks/useRecipeExtract";
 
 /**
  * "New recipe" — four ways in: blank, a link, a photo, or pasted text.
@@ -23,33 +25,6 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "paste", label: "Paste" },
 ];
 
-const ACCEPTED_MEDIA = ["image/jpeg", "image/png", "image/webp"];
-const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
-
-interface ExtractResponse {
-  items?: RecipeIngredient[];
-  steps?: RecipeStep[];
-  title?: string;
-  servings?: number;
-  prepMinutes?: number;
-  cookMinutes?: number;
-  imageUrl?: string;
-  description?: string;
-  error?: string;
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const s = String(reader.result ?? "");
-      resolve(s.slice(s.indexOf(",") + 1)); // strip the data: prefix
-    };
-    reader.onerror = () => reject(new Error("Couldn't read that file"));
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function RecipeCreateSheet({
   open,
   onClose,
@@ -64,68 +39,29 @@ export default function RecipeCreateSheet({
   const [url, setUrl] = useState("");
   const [paste, setPaste] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<RecipeInput | null>(null);
+  // Saving is this component's own busy state; extracting is the hook's.
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const {
+    busy: extracting, error, result, setResult, setError, reset,
+    extractUrl, extractPaste, extractPhoto,
+  } = useRecipeExtract();
+  const busy = extracting || saving;
 
   useEffect(() => {
     if (!open) {
       setMode("blank"); setName(""); setUrl(""); setPaste("");
-      setPhoto(null); setBusy(false); setError(null); setResult(null);
+      setPhoto(null); setSaving(false); reset();
     }
-  }, [open]);
-
-  async function callExtract(body: Record<string, unknown>, sourceKind: RecipeInput["sourceKind"], sourceUrl?: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/extract-recipe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = (await res.json()) as ExtractResponse;
-      if (!res.ok) throw new Error(data.error || "Couldn't read that recipe");
-
-      setResult({
-        name: data.title?.trim() || "Untitled recipe",
-        ingredients: data.items ?? [],
-        steps: data.steps ?? [],
-        servings: data.servings ?? null,
-        prepMinutes: data.prepMinutes ?? null,
-        cookMinutes: data.cookMinutes ?? null,
-        // Remote hero image is stored as a URL, not re-hosted — no bandwidth
-        // cost and no copy of someone else's photo in our bucket.
-        imageUrl: data.imageUrl ?? null,
-        description: data.description ?? null,
-        sourceUrl: sourceUrl ?? null,
-        sourceKind,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't read that recipe");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handlePhoto() {
-    if (!photo) return;
-    if (photo.size > MAX_PHOTO_BYTES) {
-      setError("That photo is too large (max ~8 MB).");
-      return;
-    }
-    const imageBase64 = await fileToBase64(photo);
-    await callExtract({ type: "image", imageBase64, mediaType: photo.type || "image/jpeg" }, "photo");
-  }
+  }, [open, reset]);
 
   async function save(input: RecipeInput) {
     if (busy) return;
-    setBusy(true);
+    setSaving(true);
     try {
       await onCreate(input);
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
 
@@ -314,9 +250,9 @@ export default function RecipeCreateSheet({
               <button
                 type="button"
                 onClick={() => {
-                  if (mode === "url") return callExtract({ type: "url", url: url.trim() }, "url", url.trim());
-                  if (mode === "paste") return callExtract({ type: "text", text: paste.trim() }, "text");
-                  return handlePhoto();
+                  if (mode === "url") return extractUrl(url);
+                  if (mode === "paste") return extractPaste(paste);
+                  return photo && extractPhoto(photo);
                 }}
                 disabled={!canExtract || busy}
                 className="w-full py-3 rounded-2xl bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium disabled:opacity-40 active:scale-[0.98] transition-all"
